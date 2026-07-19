@@ -18,7 +18,8 @@ regression before it ships.
 - CD pipeline: merge to `main` → manual approval → deploy production.
 - Testing strategy: unit/integration tests, and privacy-invariant guardrail
   tests — both fully deterministic, no AI involved in testing at all.
-- Secrets/config via GitHub Environments.
+- Secrets/config via a GitHub Environment (scoping only, not a protection
+  gate — see decisions table for why).
 - Hosting choice, made explicit so cost is no surprise.
 
 **Out of scope** (later plans)
@@ -57,13 +58,13 @@ patch, or keep in sync.
 | Choice | Proposed | Notes |
 |---|---|---|
 | Environments | local, CI, production | No staging, no per-feature preview envs. |
-| Production host | Render **Starter** ($7/mo) | No cold starts; public-facing. |
+| Production host | Render **Hobby workspace** ($0/mo) + **Starter compute** ($7/mo) = $7/mo total | Render splits pricing into a workspace plan (Hobby/Pro/Scale/Enterprise — account-level features, Hobby's limits are well above what this project needs) and per-service compute (Free/Starter/Standard/… — the actual instance size, found under "Compute pricing," not one of the four big workspace cards). Easy to miss "Starter" looking only at the top-level plan cards. No cold starts on Starter compute; public-facing. |
 | Database | **Neon Postgres**, single database | No branch-per-environment — there's only one deployed environment now. |
-| CD trigger | Merge to `main` → deploy job queued | The deploy job itself is gated (next row) — merging doesn't mean an immediate live change. |
-| Promotion | Manual approval → deploy production | GitHub Environments protection rule: a required reviewer must approve the `production` deployment job before it runs. This is a code-safety checkpoint, not a content-review step — see above. |
+| CD trigger | Merge to `main` → CI only, no deploy | Merging never triggers a live change by itself — see Promotion. |
+| Promotion | A separate `workflow_dispatch`-only GitHub Actions workflow, run manually (Actions tab or `gh workflow run deploy.yml`) | **Not** a GitHub Environments protection rule — "required reviewers" on environments needs GitHub Pro/Team for a private repo (confirmed directly against this repo: the API rejects a reviewer rule on the Free plan). `workflow_dispatch` gives the identical safety property — nothing deploys without a human explicitly triggering it — for $0, on any plan, and is arguably simpler to reason about than an approval queue. |
 | AI calls in tests | **Never** — always mocked with fixture responses | The test suite never calls the real Anthropic API and is never used to validate AI output quality or privacy compliance. Testing is 100% deterministic Python assertions. |
 | Verifying the live API | Manual, outside the test suite | If the Anthropic API integration needs checking (new model, SDK upgrade), a person runs it manually. Not automated, not scheduled, not part of CI. |
-| Secrets | GitHub Environments (`production`) | Neon connection string, Anthropic key, etc., scoped to the one environment. |
+| Secrets | A `production` GitHub Environment, used only for secret scoping (no protection rule) | Environments without protection rules are free on every plan and still usefully restrict which workflows/branches can read production secrets — just dropping the reviewer-gate feature specifically, not the environment concept. |
 
 ## Environment topology
 
@@ -89,10 +90,13 @@ PR opened  ──▶  CI: ruff + pytest (Postgres service, AI mocked)  ──▶
                                                                      merge to main
                                                                           │
                                                                           ▼
-                                                        Deploy job queued, held for
-                                                        approval in GitHub
-                                                        Environments UI (code-safety
-                                                        checkpoint — not content review)
+                                                        (nothing deploys automatically —
+                                                        main can sit ahead of production
+                                                        indefinitely, that's fine)
+                                                                          │
+                                                        a human runs the `Deploy` workflow
+                                                        manually (workflow_dispatch) —
+                                                        this *is* the code-safety gate
                                                                           │
                                                                           ▼
                                                         Deploy → production
@@ -104,8 +108,39 @@ PR opened  ──▶  CI: ruff + pytest (Postgres service, AI mocked)  ──▶
                                                         this deploy gate)
 ```
 
-Rollback: redeploy the previous commit's Render deploy (Render keeps prior
-deploys one click away) — no separate rollback tooling needed at this scale.
+Rollback: run the deploy workflow again targeting the previous release tag
+(see Versioning below) — git-native, doesn't depend on remembering or
+finding the right entry in Render's own deploy history.
+
+## Versioning & releases
+
+`workflow_dispatch` can target any ref, which raises the question the
+maintainer flagged: without something more disciplined than "whatever's on
+`main` right now," there's no clear answer to "what version is actually
+running in production" or "what exactly do I roll back to."
+
+- **Deploys target a tag, not a moving branch.** `deploy.yml`'s
+  `workflow_dispatch` takes a required `ref` input (a release tag); it does
+  not default to deploying the tip of `main` directly. This makes every
+  deploy an explicit, auditable choice of a specific, named commit.
+- **Tagging scheme: lightweight, date-based** (`v2026.07.20`, incrementing
+  a suffix `-2` if there's a second release the same day) — not strict
+  semver. Semver's "breaking change" semantics don't map onto a CMS website
+  with no API consumers; a tag's only job here is answering "when was this
+  cut and what commit does it point to," and a date does that more directly
+  than a semver number would.
+- **Cutting a release** is a small manual step before deploying: tag the
+  commit on `main` that's ready to ship (`git tag v2026.07.20 && git push
+  --tags`), then run the deploy workflow with that tag as the `ref` input.
+  Could be automated into a single "cut a release" workflow later if the
+  two-step version gets tedious — not necessary to build that now.
+- **GitHub Releases** (auto-generated notes from merged PRs, one per tag)
+  give a human-readable "what shipped and when" log for free — cheap to
+  turn on, useful for a small nonprofit team without needing a separate
+  changelog process.
+- **Rollback** is now precise: re-run the deploy workflow with the previous
+  tag as the `ref` input. No ambiguity about which of Render's own deploy
+  history entries is "the right one."
 
 ## Testing strategy
 
@@ -145,11 +180,14 @@ not the test suite.
    string recorded as a secret (not committed).
 2. **Render setup** — one production web service (Starter); confirm
    `render.yaml` from Plan 01 targets it.
-3. **GitHub Environments** — create a `production` environment (required
-   reviewer) in repo settings; add secrets.
-4. **CD workflow** — `.github/workflows/deploy.yml`: on push to `main`, queue
-   a deploy job targeting the `production` environment, held for approval by
-   the required reviewer before it runs.
+3. **GitHub Environment** — create a `production` environment (no protection
+   rule — see Promotion decision above) in repo settings, purely to scope
+   secrets; add them.
+4. **CD workflow** — `.github/workflows/deploy.yml`: `on: workflow_dispatch`
+   only (no `push` trigger), targeting the `production` environment for
+   secrets. Takes a required `ref` input (a release tag — see Versioning &
+   releases above), not an implicit "whatever's on `main`." That manual
+   trigger, against an explicit tag, is the entire deploy gate.
 5. **Mock AI client fixture** — a pytest fixture/conftest that swaps the
    Anthropic client for a canned-response stub; used by default in CI.
 6. **Privacy guardrail tests** — write the three tests described above (or
@@ -178,9 +216,16 @@ not the test suite.
   budgeted in CLAUDE.md — simpler now than the earlier staging+production
   draft, since there's only one hosted environment.
 
+## Resolved (was open questions)
+
+- **Approval gate mechanism**: resolved — `workflow_dispatch`, not GitHub
+  Environments protection rules (that feature isn't available on this
+  repo's current plan; `workflow_dispatch` achieves the same property for
+  free). Since anyone who can run a workflow already has write access to
+  the repo, "who's the required reviewer" is now moot — it's whoever has
+  repo write access, same as who can merge a PR.
+
 ## Open questions for the maintainer
 
 - Confirm Render Starter ($7/mo) for production is acceptable, or prefer to
   stay fully free and accept production cold-starts for now.
-- Who is the required reviewer for production deploys — just you, or others
-  from the ≤20-person admin group?
