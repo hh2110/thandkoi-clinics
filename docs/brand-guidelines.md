@@ -87,7 +87,7 @@ welcoming accent instead — coral stays reserved for the cross/heart motif.
 | Amber (light) | `#CE8A2C` | **Primary Donate CTA** on light backgrounds |
 | Amber (dark) | `#E8B04A` | **Primary Donate CTA** on dark backgrounds — lighter for contrast |
 
-### Neutrals (cyan-teal biased, so they read as chosen)
+### Neutrals — light theme (cyan-teal biased, so they read as chosen)
 
 | Token | Hex | Role |
 |---|---|---|
@@ -97,6 +97,26 @@ welcoming accent instead — coral stays reserved for the cross/heart motif.
 | Border | `#E0E7E8` | Hairlines, card edges |
 | Paper | `#F2F6F6` | Page background (light) |
 | Card | `#FFFFFF` | Cards, panels |
+
+### Neutrals — dark theme
+
+The site has a **user-facing light/dark toggle** (not just dark-styled
+sections like the footer), so the neutral scale needs a real dark pairing —
+derived from the existing teal scale rather than a generic grey, so dark mode
+still reads as this brand and not a default inverted theme.
+
+| Token | Hex | Role | Derivation |
+|---|---|---|---|
+| Ink Dark | `#F2F6F6` | Primary text on dark | Reuses the **Paper** token — near-white, easier on the eyes than pure white |
+| Ink Soft Dark | `#ABB4B6` | Secondary text on dark | Lightened **Ink Soft** |
+| Ink Faint Dark | `#9EA0A1` | Captions, meta on dark | Lightened **Ink Faint** |
+| Border Dark | `#195A67` | Hairlines, card edges on dark | Lightened + desaturated **Teal Deep** |
+| Page Dark | `#0A3E48` | Page background (dark) | Reuses **Teal Deep** — the same colour already used for the footer, so dark mode and the footer are visually one family |
+| Card Dark | `#0D4F5C` | Cards, panels (dark) | Slightly lightened **Teal Deep**, for elevation contrast against Page Dark |
+
+Accent colours carry over largely as-is: Teal Brand, Pale Aqua, and Amber
+(dark) `#E8B04A` were already designed to sit on a dark ground. Coral stays
+decorative-only in both themes.
 
 ### Accessibility (WCAG AA) — read before using colour for text
 
@@ -110,10 +130,11 @@ welcoming accent instead — coral stays reserved for the cross/heart motif.
 - ⚠️ **Amber** — use **Amber (dark) `#E8B04A`** with dark ink text, or **Amber
   (light) `#CE8A2C`** with white text, to stay above 4.5:1 for the Donate CTA.
 - ⚠️ **Pale Aqua / Peach** — decorative / on-dark only; never body text on light.
+- ✅ **Ink Dark on Page Dark/Card Dark** — the dark-theme default for body text.
 - "Free / Zakat beneficiary" badges use **Teal**, not a new colour.
 
-Body text ≥16px; visible keyboard focus; design both themes (re-tune tokens,
-don't naively invert).
+Body text ≥16px; visible keyboard focus; both themes use their own re-tuned
+token set (above) rather than a naive CSS invert.
 
 ## 3. Typography
 
