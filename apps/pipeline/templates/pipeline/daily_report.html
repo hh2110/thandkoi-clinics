@@ -1,8 +1,14 @@
-{# Daily clinic report.
+{% comment %}
+  Daily clinic report.
 
-   Numbers come only from the `aggregate` context (computed in Python); the
-   `prose` block holds the AI-drafted narrative and is never a source of
-   figures. See apps/pipeline/rendering.py and privacy invariant #3. #}
+  Numbers come only from the `aggregate` context (computed in Python); the
+  `prose` block holds the AI-drafted narrative and is never a source of
+  figures. See apps/pipeline/rendering.py and privacy invariant #3.
+
+  A comment tag block is used here rather than a multi-line hash comment:
+  Django's hash-comment syntax is single-line only (its lexer regex is not
+  DOTALL), so a multi-line one leaks into the rendered HTML as literal text.
+{% endcomment %}
 <article class="daily-report">
   <section class="figures" data-role="figures">
     <p class="total-patients">Patients seen: <strong>{{ aggregate.total_patients }}</strong></p>
