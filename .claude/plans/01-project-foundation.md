@@ -33,8 +33,9 @@ deploy configured."
 | Dependency manager | **uv** (`pyproject.toml` + `uv.lock`) | Fast; Python-expert friendly. Fallback: pip-tools. |
 | Local database | PostgreSQL via `docker-compose` | Mirrors prod. Optional SQLite fallback for quick runs. |
 | Config | `django-environ` reading `.env` | Keeps secrets out of code. |
+| ORM / migrations | **Django ORM + Django's built-in migrations** (`makemigrations`/`migrate`) | Not SQLAlchemy/Alembic — Wagtail's pages, admin, permissions, and tree structure are all built on the Django ORM, so a second ORM would mean two migration systems tracking overlapping schema with no real benefit. Django's migrations *are* the migration tooling here. |
 | Lint / format | **ruff** (lint + format) | Replaces black + isort + flake8. |
-| Tests | pytest + pytest-django | |
+| Tests | pytest + pytest-django + **factory_boy** | factory_boy for model fixtures in integration tests, instead of hand-rolled `Model.objects.create(...)` calls in every test. |
 | Pre-commit | `pre-commit` running ruff | |
 | Host | **Render** via `render.yaml` blueprint | Alternative: Railway. |
 | WSGI/ASGI server | gunicorn | |
@@ -91,11 +92,13 @@ thandkoi-clinics/
    `.env` is gitignored (it is). `SECRET_KEY`, `DATABASE_URL`, `DEBUG`,
    `ALLOWED_HOSTS`, `DJANGO_SETTINGS_MODULE` come from env.
 4. **Database** — `docker-compose.yml` with Postgres; `DATABASE_URL` for local +
-   prod; run initial migrations.
+   prod; run initial Django migrations (`makemigrations` + `migrate`).
 5. **Core app** — `apps/core` with a minimal Wagtail `HomePage` placeholder and a
    `/healthz` view returning 200; project `base.html`.
 6. **Static** — WhiteNoise; `collectstatic` works.
-7. **Tests** — one smoke test (home renders 200, `/healthz` returns 200).
+7. **Tests** — one smoke test (home renders 200, `/healthz` returns 200); a
+   `factory_boy` factory for the `HomePage` placeholder so later plans have a
+   pattern to extend rather than inventing one per app.
 8. **CI** — `.github/workflows/ci.yml`: install (uv), ruff check, run pytest
    against a Postgres service container.
 9. **Deploy config** — `render.yaml` (web service + Postgres), gunicorn start
@@ -122,10 +125,18 @@ thandkoi-clinics/
 ## Decided (was open questions)
 
 - **uv** over pip-tools — confirmed, no objection raised.
-- **Render** over Railway — confirmed; Plan 02's staging/production split and
-  free-vs-Starter tier reasoning is Render-specific, so this also locks Render
-  in for that plan.
+- **Render** over Railway — confirmed; Plan 02's production hosting decision is
+  Render-specific, so this also locks Render in for that plan.
 - **Config-only** for this step — `render.yaml` present and reviewed, but no
-  live deploy. The live staging deploy is [Plan 02](02-development-lifecycle.md)'s
-  job, once there's an approval gate and a reviewer target worth deploying to.
+  live deploy. The live production deploy is
+  [Plan 02](02-development-lifecycle.md)'s job, once there's a CD pipeline and
+  an approval gate to deploy through.
 - **Python 3.12** — kept as proposed; no reason raised to move to 3.13 yet.
+- **factory_boy** for integration-test fixtures — confirmed, added to the Tests
+  row and task checklist.
+- **DB migrations** — Django's own migration framework, not a separate tool;
+  it's what step 4 of the task checklist runs.
+- **SQLAlchemy / Alembic** — not used. Wagtail requires the Django ORM for its
+  own models (pages, admin, permissions), so introducing SQLAlchemy would mean
+  running two ORMs and two migration systems side by side for no benefit.
+  Django ORM + Django migrations is the only migration tooling in this stack.
