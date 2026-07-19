@@ -16,8 +16,8 @@ privacy-invariant regression before it ships.
 **In scope**
 - Environment topology: local, CI, staging, production.
 - CD pipeline: merge → auto-deploy staging → manual approval → deploy production.
-- Testing strategy across three layers: unit/integration, privacy-invariant
-  guardrail tests, and AI-output tests (mocked in CI, real on a schedule).
+- Testing strategy: unit/integration tests, and privacy-invariant guardrail
+  tests — both fully deterministic, no AI involved in testing at all.
 - Secrets/config per environment via GitHub Environments.
 - Free-tier hosting choices and their limits, made explicit so nothing breaks
   by surprise (e.g. a DB that expires, a service that cold-starts).
@@ -57,8 +57,8 @@ budgeted in [CLAUDE.md](../../CLAUDE.md).
 | Database | **Neon Postgres**, branch per environment | Free tier doesn't expire (unlike Render's free Postgres, which drops after 90 days). `main` branch → prod, `staging` branch → staging. |
 | CD trigger | Merge to `main` → auto-deploy staging | Render auto-deploy from branch, or a deploy-hook step in GitHub Actions. |
 | Promotion | Manual approval → deploy production | GitHub Environments protection rule: a required reviewer must approve the `production` deployment job before it runs. |
-| CI AI calls | **Mocked** — fixture responses, no real API calls | Every PR run must be free, fast, and deterministic. |
-| Live AI check | **Weekly scheduled** GitHub Actions workflow | One real call to the Anthropic API against a fixed aggregate fixture, on a small dedicated key with a hard spend cap; catches real drift/breakage without per-PR cost. |
+| AI calls in tests | **Never** — always mocked with fixture responses | The test suite never calls the real Anthropic API and is never used to validate AI output quality or privacy compliance. Testing is 100% deterministic Python assertions. |
+| Verifying the live API | Manual, outside the test suite | If the Anthropic API integration needs checking (new model, SDK upgrade), a person runs it manually against staging. Not automated, not scheduled, not part of CI. |
 | Secrets | GitHub Environments (`staging`, `production`), separate secret sets | Never share a Neon connection string or Anthropic key between environments. |
 
 ## Environment topology
@@ -71,8 +71,9 @@ budgeted in [CLAUDE.md](../../CLAUDE.md).
  Postgres          (ephemeral)        auto-deployed on         deployed on manual
                    AI calls: mocked   merge to main             approval only
                                       AI calls: real            AI calls: real
-                                      (staging is where a
-                                      reviewer reads drafts)
+                                      (this is what a human
+                                      reviewer reads and
+                                      approves — not AI)
 ```
 
 ## CD pipeline
@@ -98,31 +99,32 @@ deploys one click away) — no separate rollback tooling needed at this scale.
 
 ## Testing strategy
 
-Three distinct layers, each with a different purpose and cost profile:
+Two layers, both fully deterministic — **no AI is involved in the testing
+process itself**, either as the thing being validated with a real API call or
+as a mechanism for judging output. AI-output quality is checked by the human
+reviewer at the approval gate (CLAUDE.md invariant #4), not by a test:
 
 1. **Unit / integration tests** (pytest, every PR) — ordinary correctness:
    parsers, views, models. Already scaffolded in Plan 01's CI job.
 2. **Privacy-invariant guardrail tests** (pytest, every PR, non-negotiable) —
-   automated tests that fail the build if a privacy invariant breaks, e.g.:
+   plain Python assertions against code behavior, no AI call in the loop:
    - Uploading a fixture `.xlsx` never results in a file on disk or a raw row
      in the database after the request completes.
-   - The payload sent to the (mocked) Anthropic client contains only
+   - The payload passed to the (mocked) Anthropic client contains only
      aggregate numbers/category counts — assert no patient-identifying field
-     names or row-level data appear in the captured prompt.
+     names or row-level data appear in the captured prompt object. This
+     inspects what our code *sent*; it does not ask any model to judge
+     anything.
    - A published newsletter/report page's numeric claims match the
-     deterministic Python-computed aggregate byte-for-byte (the AI call is
-     mocked to return prose only; the test asserts the numbers came from code,
-     not the mock).
-   These exist specifically because [CLAUDE.md](../../CLAUDE.md)'s privacy
-   invariants are architectural constraints — this makes a violation a test
-   failure, not something caught by review.
-3. **AI-output tests** — split by cost:
-   - **In CI (every PR):** the Anthropic client is mocked with fixture
-     responses. Tests assert prompt construction and draft-handling logic, not
-     real model output quality.
-   - **Weekly, scheduled:** one real call to Claude against a fixed aggregate
-     fixture, on a capped-budget key, to catch real API drift (schema change,
-     model deprecation) that a mock can't.
+     deterministic Python-computed aggregate byte-for-byte (the AI client is
+     mocked to return fixed prose; the test asserts the numbers came from
+     code, not the mock).
+
+Any code path that calls the Anthropic client is exercised in tests only
+against a mocked client — this is about keeping CI fast, free, and
+deterministic, not about validating model output quality. Whether the real
+API integration still works, and whether AI-drafted output is good, are both
+questions for a human on staging, not for the test suite.
 
 ## Task checklist
 
@@ -141,12 +143,9 @@ Three distinct layers, each with a different purpose and cost profile:
    Anthropic client for a canned-response stub; used by default in CI.
 6. **Privacy guardrail tests** — write the three tests described above (or
    more, if more invariants exist by the time the pipeline exists).
-7. **Weekly live smoke test** — `.github/workflows/ai-smoke-test.yml` on a
-   `schedule` trigger, real API key (repo secret, spend-capped), fixed
-   fixture aggregate, asserts the call succeeds and returns non-empty prose.
-8. **Update Plan 01's `render.yaml`** — confirm it parameterizes environment
+7. **Update Plan 01's `render.yaml`** — confirm it parameterizes environment
    (staging/production) rather than assuming one target.
-9. **Document the flow** — short section in README or a `docs/deploying.md`:
+8. **Document the flow** — short section in README or a `docs/deploying.md`:
    how a change goes from merge to production, who approves, what to check on
    staging before approving.
 
@@ -157,8 +156,8 @@ Three distinct layers, each with a different purpose and cost profile:
   it cannot happen from a PR merge alone.
 - CI runs with zero real Anthropic API calls and passes without network access
   to `api.anthropic.com`.
-- The weekly AI smoke-test workflow exists and has run at least once
-  successfully before this plan is marked done.
+- No AI model call appears anywhere in the automated test suite, scheduled or
+  otherwise — the only real API calls happen from staging/production traffic.
 - At least one privacy-guardrail test exists per invariant in CLAUDE.md that's
   testable at this stage (raw-PHI-never-persisted; AI-never-sees-patient-data;
   numbers-are-deterministic) — the human-in-the-loop invariant is enforced by
@@ -172,5 +171,3 @@ Three distinct layers, each with a different purpose and cost profile:
   stay fully free and accept production cold-starts for now.
 - Who is the required reviewer for production deploys — just you, or others
   from the ≤20-person admin group?
-- Anthropic API key for the weekly smoke test: new dedicated key with a spend
-  cap, or reuse an existing one?
