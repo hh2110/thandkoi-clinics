@@ -1,0 +1,44 @@
+{% load i18n %}
+{% comment %}
+Dark section (Teal Deep ground, in both themes — brand-guidelines.md's
+"Footer / deepest ground"). Contact/bank/social blocks read config (see
+apps/core/context_processors.py), never hardcoded values — they render a
+"coming soon" placeholder until real values are configured.
+{% endcomment %}
+<footer class="site-footer">
+  <div class="wrapper site-footer__grid">
+    <div>
+      <h2 class="site-footer__heading">{% translate "Contact" %}</h2>
+      {% if ORG_CONTACT_EMAIL or ORG_CONTACT_PHONE %}
+        {% if ORG_CONTACT_EMAIL %}<p><a href="mailto:{{ ORG_CONTACT_EMAIL }}">{{ ORG_CONTACT_EMAIL }}</a></p>{% endif %}
+        {% if ORG_CONTACT_PHONE %}<p>{{ ORG_CONTACT_PHONE }}</p>{% endif %}
+      {% else %}
+        <p>{% translate "Contact details coming soon." %}</p>
+      {% endif %}
+    </div>
+    <div>
+      <h2 class="site-footer__heading">{% translate "Zakat & Sadaqa" %}</h2>
+      {% if ORG_BANK_DETAILS %}
+        <p>{{ ORG_BANK_DETAILS|linebreaksbr }}</p>
+      {% else %}
+        <p>{% translate "Bank details coming soon." %}</p>
+      {% endif %}
+    </div>
+    <div>
+      <h2 class="site-footer__heading">{% translate "Follow" %}</h2>
+      {% if ORG_SOCIAL_LINKS %}
+        <ul class="site-footer__socials">
+          {% for name, url in ORG_SOCIAL_LINKS.items %}
+            <li><a href="{{ url }}">{{ name }}</a></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>{% translate "Social links coming soon." %}</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="wrapper site-footer__meta">
+    <p>&copy; {% now "Y" %} {% translate "The Thandkoi Clinics" %}</p>
+    <p lang="ur" dir="rtl">صحت سب کے لیے · چراغ شفا</p>
+  </div>
+</footer>

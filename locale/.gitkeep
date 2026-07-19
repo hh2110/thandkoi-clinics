@@ -1,0 +1,4 @@
+This directory is LOCALE_PATHS for UI-string translation (.po/.mo files),
+wired in Plan 03. No translations exist yet — that's Plan 10 (Bilingual
+generation). Kept in git via this file so the directory exists for
+`django-admin makemessages`/`compilemessages` to write into.
