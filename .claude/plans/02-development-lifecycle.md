@@ -108,8 +108,39 @@ PR opened  ──▶  CI: ruff + pytest (Postgres service, AI mocked)  ──▶
                                                         this deploy gate)
 ```
 
-Rollback: redeploy the previous commit's Render deploy (Render keeps prior
-deploys one click away) — no separate rollback tooling needed at this scale.
+Rollback: run the deploy workflow again targeting the previous release tag
+(see Versioning below) — git-native, doesn't depend on remembering or
+finding the right entry in Render's own deploy history.
+
+## Versioning & releases
+
+`workflow_dispatch` can target any ref, which raises the question the
+maintainer flagged: without something more disciplined than "whatever's on
+`main` right now," there's no clear answer to "what version is actually
+running in production" or "what exactly do I roll back to."
+
+- **Deploys target a tag, not a moving branch.** `deploy.yml`'s
+  `workflow_dispatch` takes a required `ref` input (a release tag); it does
+  not default to deploying the tip of `main` directly. This makes every
+  deploy an explicit, auditable choice of a specific, named commit.
+- **Tagging scheme: lightweight, date-based** (`v2026.07.20`, incrementing
+  a suffix `-2` if there's a second release the same day) — not strict
+  semver. Semver's "breaking change" semantics don't map onto a CMS website
+  with no API consumers; a tag's only job here is answering "when was this
+  cut and what commit does it point to," and a date does that more directly
+  than a semver number would.
+- **Cutting a release** is a small manual step before deploying: tag the
+  commit on `main` that's ready to ship (`git tag v2026.07.20 && git push
+  --tags`), then run the deploy workflow with that tag as the `ref` input.
+  Could be automated into a single "cut a release" workflow later if the
+  two-step version gets tedious — not necessary to build that now.
+- **GitHub Releases** (auto-generated notes from merged PRs, one per tag)
+  give a human-readable "what shipped and when" log for free — cheap to
+  turn on, useful for a small nonprofit team without needing a separate
+  changelog process.
+- **Rollback** is now precise: re-run the deploy workflow with the previous
+  tag as the `ref` input. No ambiguity about which of Render's own deploy
+  history entries is "the right one."
 
 ## Testing strategy
 
@@ -154,8 +185,9 @@ not the test suite.
    secrets; add them.
 4. **CD workflow** — `.github/workflows/deploy.yml`: `on: workflow_dispatch`
    only (no `push` trigger), targeting the `production` environment for
-   secrets. Deploys whatever commit is on `main` (or an input ref, if useful)
-   when a human runs it — that manual trigger is the entire gate.
+   secrets. Takes a required `ref` input (a release tag — see Versioning &
+   releases above), not an implicit "whatever's on `main`." That manual
+   trigger, against an explicit tag, is the entire deploy gate.
 5. **Mock AI client fixture** — a pytest fixture/conftest that swaps the
    Anthropic client for a canned-response stub; used by default in CI.
 6. **Privacy guardrail tests** — write the three tests described above (or
