@@ -1,0 +1,30 @@
+{# Daily clinic report.
+
+   Numbers come only from the `aggregate` context (computed in Python); the
+   `prose` block holds the AI-drafted narrative and is never a source of
+   figures. See apps/pipeline/rendering.py and privacy invariant #3. #}
+<article class="daily-report">
+  <section class="figures" data-role="figures">
+    <p class="total-patients">Patients seen: <strong>{{ aggregate.total_patients }}</strong></p>
+
+    {% if by_gender %}
+    <ul class="by-gender">
+      {% for label, count in by_gender %}
+      <li>{{ label }}: <strong>{{ count }}</strong></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if by_diagnosis %}
+    <ul class="by-diagnosis">
+      {% for label, count in by_diagnosis %}
+      <li>{{ label }}: <strong>{{ count }}</strong></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="narrative" data-role="narrative">
+    {{ prose }}
+  </section>
+</article>

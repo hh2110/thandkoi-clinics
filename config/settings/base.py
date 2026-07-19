@@ -40,6 +40,7 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 INSTALLED_APPS = [
     # Our apps
     "apps.core",
+    "apps.pipeline",
     # Wagtail
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",

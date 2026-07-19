@@ -12,7 +12,7 @@ the overall design.
 | # | Plan | Status |
 |---|------|--------|
 | 01 | [Project foundation](01-project-foundation.md) — Django + Wagtail scaffold, settings, Postgres, deploy target, CI, secrets | ✅ Done |
-| 02 | [Development lifecycle & environments](02-development-lifecycle.md) — staging/production split, CD pipeline, testing strategy, privacy-guardrail tests, mocked-vs-live AI in CI | 📝 Drafted |
+| 02 | [Development lifecycle & environments](02-development-lifecycle.md) — staging/production split, CD pipeline, testing strategy, privacy-guardrail tests, mocked-vs-live AI in CI | 🚧 In progress |
 | 03 | [Design system & base templates](03-design-system.md) — brand tokens, self-hosted type, base templates, nav/footer, bilingual (EN/UR) routing + RTL, accessibility | 📝 Drafted |
 | 04 | [Core content pages](04-core-content-pages.md) — Home, About, Team/Management, Our Work/Services, Contact | 📝 Drafted |
 | 05 | [Donate placeholder](05-donate-placeholder.md) — Zakat/Sadaqa message + bank/contact config | 📝 Drafted |

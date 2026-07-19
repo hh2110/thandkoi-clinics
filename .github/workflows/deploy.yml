@@ -1,0 +1,75 @@
+name: Deploy
+
+# Manual-only promotion to production. There is deliberately NO `push` trigger:
+# merging to `main` never changes production by itself. A human runs this
+# workflow (Actions tab → Run workflow, or `gh workflow run deploy.yml`) against
+# an explicit release tag. That manual trigger IS the deploy-safety gate.
+#
+# Why workflow_dispatch and not a GitHub Environments "required reviewers" rule:
+# that protection feature needs GitHub Pro/Team for a private repo, which this
+# repo is not on. workflow_dispatch gives the identical property — nothing
+# deploys without a human explicitly triggering it — for $0 on any plan. See
+# .claude/plans/02-development-lifecycle.md (Promotion decision) and
+# docs/deploying.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Release tag to deploy (e.g. v2026.07.20). A tag, not a branch."
+        required: true
+        type: string
+
+# Never run two production deploys at once.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # Scopes the production secrets (e.g. RENDER_DEPLOY_HOOK_URL) to this job.
+    # The `production` environment carries no protection rule — it exists purely
+    # for secret scoping (see the plan's Secrets decision).
+    environment: production
+
+    steps:
+      # Check out the exact ref being deployed. Fetching tags lets us verify the
+      # ref really is a release tag before anything ships.
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Verify the ref is a release tag
+        run: |
+          if ! git tag --list | grep -Fxq "${{ inputs.ref }}"; then
+            echo "::error::'${{ inputs.ref }}' is not a tag in this repository." \
+              "Deploys must target a release tag (e.g. v2026.07.20), not a branch or raw SHA."
+            exit 1
+          fi
+          echo "Deploying tag ${{ inputs.ref }} ($(git rev-parse --short HEAD))."
+
+      # Trigger the Render deploy of this exact commit via a deploy hook. The
+      # hook URL is a production-environment secret; Render deploy hooks accept
+      # a `ref` query param so the deployed commit matches the tag above.
+      - name: Trigger Render deploy
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "${RENDER_DEPLOY_HOOK_URL}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL is not set. Add it to the" \
+              "'production' GitHub Environment before deploying (see docs/deploying.md)."
+            exit 1
+          fi
+          commit="$(git rev-parse HEAD)"
+          echo "Requesting Render deploy of ${{ inputs.ref }} (${commit})..."
+          status=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "${RENDER_DEPLOY_HOOK_URL}&ref=${commit}")
+          echo "Render deploy hook responded with HTTP ${status}."
+          case "${status}" in
+            2*) echo "Deploy triggered. Track progress in the Render dashboard." ;;
+            *) echo "::error::Render deploy hook failed (HTTP ${status})."; exit 1 ;;
+          esac

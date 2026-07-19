@@ -86,13 +86,16 @@ Select one with the `DJANGO_SETTINGS_MODULE` environment variable.
 
 ## Deployment
 
-Deployment to [Render](https://render.com/) is described by
-[`render.yaml`](render.yaml) (a web service + managed PostgreSQL). This is
-config-only for now — see [Plan 02](.claude/plans/02-development-lifecycle.md)
-for the live deploy.
+Production runs on [Render](https://render.com/) (Starter compute) against a
+single [Neon](https://neon.tech/) Postgres database, described by
+[`render.yaml`](render.yaml). Deploys are **manual and tag-based** — merging to
+`main` never changes production by itself; a person runs the `Deploy` workflow
+against a chosen release tag. Full flow, rollback, versioning, and how AI
+content is reviewed separately are in **[docs/deploying.md](docs/deploying.md)**.
 
 ## Docs
 
+- [Deploying](docs/deploying.md)
 - [Architecture & AI Capability Brief](docs/architecture-and-ai-brief.md)
 - [Brand Guidelines](docs/brand-guidelines.md)
 - [Build plans](.claude/plans/README.md)
