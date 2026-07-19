@@ -12,15 +12,16 @@ the overall design.
 | # | Plan | Status |
 |---|------|--------|
 | 01 | [Project foundation](01-project-foundation.md) — Django + Wagtail scaffold, settings, Postgres, deploy target, CI, secrets | 📝 Drafted |
-| 02 | Design system & base templates — brand, nav/footer, bilingual scaffolding, accessibility | ⬜ Not started |
-| 03 | Core content pages — Home, About, Team/Management, Our Work/Services, Contact | ⬜ Not started |
-| 04 | Donate placeholder — Zakat/Sadaqa message + bank/contact config | ⬜ Not started |
-| 05 | Newsletters, Camp Reports & Gallery | ⬜ Not started |
-| 06 | Accounts & roles — uploaders/approvers | ⬜ Not started |
-| 07 | Data pipeline — intake, parser registry, aggregate-and-discard, daily report page | ⬜ Not started |
-| 08 | AI monthly newsletter — Anthropic SDK, deterministic-numbers guardrail, draft → review | ⬜ Not started |
-| 09 | Bilingual generation — Urdu (and Pashto) | ⬜ Not started |
-| 10 | Ops — deploy hardening, backups, monitoring, funding-export | ⬜ Not started |
+| 02 | [Development lifecycle & environments](02-development-lifecycle.md) — staging/production split, CD pipeline, testing strategy, privacy-guardrail tests, mocked-vs-live AI in CI | 📝 Drafted |
+| 03 | Design system & base templates — brand, nav/footer, bilingual scaffolding, accessibility | ⬜ Not started |
+| 04 | Core content pages — Home, About, Team/Management, Our Work/Services, Contact | ⬜ Not started |
+| 05 | Donate placeholder — Zakat/Sadaqa message + bank/contact config | ⬜ Not started |
+| 06 | Newsletters, Camp Reports & Gallery | ⬜ Not started |
+| 07 | Accounts & roles — uploaders/approvers | ⬜ Not started |
+| 08 | Data pipeline — intake, parser registry, aggregate-and-discard, daily report page | ⬜ Not started |
+| 09 | AI monthly newsletter — Anthropic SDK, deterministic-numbers guardrail, draft → review | ⬜ Not started |
+| 10 | Bilingual generation — Urdu (and Pashto) | ⬜ Not started |
+| 11 | Ops — deploy hardening, backups, monitoring, funding-export | ⬜ Not started |
 
 **Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ✅ Done
 

@@ -1,6 +1,6 @@
 # Plan 01 — Project Foundation
 
-_Status: Drafted · Depends on: none · Next: 02 Design system & base templates_
+_Status: Drafted · Depends on: none · Next: 02 Development lifecycle & environments_
 
 ## Goal
 
@@ -119,8 +119,13 @@ thandkoi-clinics/
 - No analytics or third-party scripts that could leak data by default.
 - `DEBUG=False` and a locked-down `ALLOWED_HOSTS` in prod settings.
 
-## Open questions for the maintainer
+## Decided (was open questions)
 
-- Confirm **uv** vs pip-tools, and **Render** vs Railway.
-- Is a live staging deploy wanted at the end of this step, or config-only?
-- Preferred Python version if not 3.12.
+- **uv** over pip-tools — confirmed, no objection raised.
+- **Render** over Railway — confirmed; Plan 02's staging/production split and
+  free-vs-Starter tier reasoning is Render-specific, so this also locks Render
+  in for that plan.
+- **Config-only** for this step — `render.yaml` present and reviewed, but no
+  live deploy. The live staging deploy is [Plan 02](02-development-lifecycle.md)'s
+  job, once there's an approval gate and a reviewer target worth deploying to.
+- **Python 3.12** — kept as proposed; no reason raised to move to 3.13 yet.
