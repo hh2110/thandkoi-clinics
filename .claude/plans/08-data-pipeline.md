@@ -122,7 +122,7 @@ Admin ──.xlsx──▶ upload view (Wagtail admin, can_upload_export)
 | Raw file handling | **In-memory upload handler only** for this view (`request.upload_handlers = [MemoryFileUploadHandler(...)]`); **no** `FileField` for the export anywhere | The structural enforcement of invariant #1 — the raw bytes cannot reach disk or MEDIA because nothing is capable of writing them there. |
 | Parser selection | The uploading admin **picks the format** from a dropdown of registered parsers; each parser also exposes `sniff(workbook) -> bool` used to **confirm/auto-suggest** the choice | Explicit selection avoids silently mis-parsing a look-alike format; `sniff` guards against picking the wrong one. Not AI — a hand-written check of columns/sheet names. |
 | Parser contract | `BaseExportParser` with `sniff()` and `parse(buffer) -> ParsedExport` (de-identified rows + aggregate dict); concrete parsers register into `ParserRegistry` by a format key | One parser per export format; adding a format = adding a subclass + registering it, **no change to pipeline core**. This is goal 3 (extensibility) done with explicit code. |
-| De-identification | Drop **name, father's/husband's name, and full street address** inside the parser before any persistence; derive **age band** from DOB then drop DOB; **keep a coarse `location`** (village / union council), not the exact address | **Maintainer decision (PR #15): age bands, and keep location.** Age *band* rather than exact age/DOB, and a *coarse* location rather than a full address, keep the row table de-identified while preserving location for impact reporting. Direct identifiers never written even transiently (brief §4). *Still to confirm:* diagnosis as free text vs. a controlled category — recommend a controlled category to limit re-identification. |
+| De-identification | Drop **name, father's/husband's name, and full street address** inside the parser before any persistence; derive **age band** from DOB then drop DOB; **keep a coarse `location`** (village / union council), not the exact address; **classify free-text diagnosis into a fixed `diagnosis_category` via a parser-side mapping table**, never store the raw text | **Maintainer decision (PR #15): age bands, and keep location.** Age *band* rather than exact age/DOB, and a *coarse* location rather than a full address, keep the row table de-identified while preserving location for impact reporting. Direct identifiers never written even transiently (brief §4). **Diagnosis confirmed free text in the source clinic software** (maintainer, post-PR-15) — the parser owns a hand-written keyword/lookup mapping (e.g. `{"htn": "hypertension", "high bp": "hypertension", ...}`) into a small fixed category set, with an explicit **`other`/`unclassified`** bucket for anything unmapped. Raw diagnosis text is read only transiently during parsing and is never written to `DeidentifiedVisit` or anywhere else — it's a second application of invariant #1 (not just row-vs-aggregate, but free-text-vs-category within the row itself), and it's what makes `category_counts` aggregation actually work (free text doesn't group cleanly). The mapping table lives in code, reviewed like the rest of the parser — not user-editable at runtime, consistent with "hand-written parser per format, not agentic inference." |
 | Persisted data | `DeidentifiedVisit` (row-level, de-identified) **+** `DailyAggregate` (summary) **+** `IngestRun` (audit: who/when/parser/row-count/**content hash**, no data) | Matches brief §4's "aggregates **and** a de-identified row-level table" (a decided retention). The row table exists so future report types / date-range questions don't need a new aggregate table each time. |
 | Aggregate shape | `DailyAggregate`: one row per clinic-date, with **named integer columns** for the common metrics (total visits, by sex, new vs follow-up, Zakat vs paid) **+ a JSON field** for flexible category counts (by department, by diagnosis category) | Named columns give Plan 09 a stable, typed read interface; the JSON field absorbs new categories without a migration per category. This is the **interface Plan 09 reads** — see below. |
 | Idempotency / re-upload | `IngestRun` stores a **content hash** of the parsed input; a re-upload for a date that already has data **replaces** (supersedes) that date's rows + aggregate in one transaction, never silently double-counting | **Maintainer decision (PR #15): replace.** A same-day corrected export supersedes the earlier one (delete-then-reinsert that date's `DeidentifiedVisit` + recompute its `DailyAggregate` atomically). The hash is a fingerprint, not the file — storing it is not storing PHI; here it identifies an exact-duplicate re-upload (a no-op) vs. a genuine correction (replace). |
@@ -138,13 +138,16 @@ Three tables, all PHI-free:
    removed. Candidate fields (final field list still subject to the real export
    sample): `visit_date`, `department`/service, `age_band`, `sex`,
    `location` (**coarse** — village / union council, per the maintainer's PR #15
-   decision to keep location; **not** the full address), `diagnosis_category`,
-   `is_new_patient`, `is_zakat_beneficiary`, `ingest_run` (FK). **No** name,
-   father's/husband's name, DOB, or full street address — by construction, not by
-   deletion. Keeping location only at the village / union-council level preserves
-   impact reporting without re-identifying individuals. Purpose (brief §4): answer
-   future date-range / cross-tab questions without inventing a new aggregate table
-   each time.
+   decision to keep location; **not** the full address), `diagnosis_category`
+   (a **fixed category**, mapped by the parser from the source system's free-text
+   diagnosis field — the raw text itself is never stored, see the
+   De-identification decision above), `is_new_patient`, `is_zakat_beneficiary`,
+   `ingest_run` (FK). **No** name, father's/husband's name, DOB, full street
+   address, or raw diagnosis text — by construction, not by deletion. Keeping
+   location only at the village / union-council level preserves impact reporting
+   without re-identifying individuals. Purpose (brief §4): answer future
+   date-range / cross-tab questions without inventing a new aggregate table each
+   time.
 2. **`DailyAggregate`** — one row per clinic-date: named integer metrics
    (`total_visits`, counts by sex, new vs. follow-up, Zakat vs. paid) plus a
    `category_counts` JSON field (by department, by diagnosis category). This is
@@ -192,8 +195,10 @@ Three tables, all PHI-free:
    (coordinated with Plan 07).
 3. **Parser registry** — `BaseExportParser`, `ParserRegistry`, `ParsedExport`.
 4. **First concrete parser** — for the current export format (against a real
-   de-identified sample), including the identifier-stripping and DOB→age-band
-   de-identification and the deterministic aggregate computation.
+   de-identified sample), including the identifier-stripping, DOB→age-band
+   de-identification, the free-text-diagnosis→`diagnosis_category` mapping
+   table (with an `other`/`unclassified` fallback), and the deterministic
+   aggregate computation.
 5. **Upload view** — Wagtail admin view, `can_upload_export`-gated, **in-memory
    upload handler override**, HTMX submit; on success writes rows + aggregate +
    `IngestRun` in one transaction and returns a **summary only** (counts), never
@@ -212,8 +217,10 @@ Three tables, all PHI-free:
 9. **Privacy-guardrail tests** (the concrete subjects Plan 02 promised):
    - After an upload request, **no file exists on disk** and **no raw identifier
      column value** exists anywhere in the DB.
-   - The de-identified row table contains **no** name/father-husband/full-address/DOB
-     (a coarse `location` is allowed and expected).
+   - The de-identified row table contains **no** name/father-husband/full-address/DOB,
+     **and no raw diagnosis text** — only a `diagnosis_category` value from the
+     fixed set the mapping table can produce (a coarse `location` is allowed and
+     expected).
    - Aggregates equal a **byte-for-byte deterministic** recomputation from a
      fixture export (numbers come from Python, provable without any AI).
    - The upload view is **denied** to a user lacking `can_upload_export`.
@@ -249,9 +256,11 @@ Three tables, all PHI-free:
   brief §6.1, never real rows).
 - **What the de-identified row table keeps** → **age bands** (not exact age/DOB)
   and **keep location at a coarse level** (village / union council, not full
-  address). *Remaining sub-item:* diagnosis as free text vs. a controlled category
-  is not yet decided — recommend a controlled category to limit re-identification;
-  confirm when the sample is available.
+  address). **Diagnosis representation** → confirmed **free text in the source
+  clinic software** (maintainer, post-PR-15); the parser maps it to a fixed
+  `diagnosis_category` via a hand-written keyword/lookup table with an
+  `other`/`unclassified` fallback, and never persists the raw text — see the
+  De-identification decision above.
 - **Daily report granularity** → **one published page per date**, archivable, and
   **auto-published straight to production without a draft** for pages produced by a
   committed, code-reviewed parser (see the invariant-#4 note in the decisions
@@ -260,9 +269,3 @@ Three tables, all PHI-free:
   from the canonical `DeidentifiedVisit` row table ("the latter").
 - **Re-upload behaviour** → **replace**: a same-day corrected export supersedes the
   prior one for that date (atomic delete-and-reinsert + recompute).
-
-## Still open (not answered on PR #15)
-
-- **Diagnosis representation** — free text vs. a controlled category for
-  `diagnosis_category` (see above). Defaulting to a controlled category pending
-  confirmation, since free-text diagnoses can carry re-identifying detail.
