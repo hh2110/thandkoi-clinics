@@ -126,9 +126,44 @@ Admin ──.xlsx──▶ upload view (Wagtail admin, can_upload_export)
 | Persisted data | `DeidentifiedVisit` (row-level, de-identified) **+** `DailyAggregate` (summary) **+** `IngestRun` (audit: who/when/parser/row-count/**content hash**, no data) | Matches brief §4's "aggregates **and** a de-identified row-level table" (a decided retention). The row table exists so future report types / date-range questions don't need a new aggregate table each time. |
 | Aggregate shape | `DailyAggregate`: one row per clinic-date, with **named integer columns** for the common metrics (total visits, by sex, new vs follow-up, Zakat vs paid) **+ a JSON field** for flexible category counts (by department, by diagnosis category) | Named columns give Plan 09 a stable, typed read interface; the JSON field absorbs new categories without a migration per category. This is the **interface Plan 09 reads** — see below. |
 | Idempotency / re-upload | `IngestRun` stores a **content hash** of the parsed input; a re-upload for a date that already has data **replaces** (supersedes) that date's rows + aggregate in one transaction, never silently double-counting | **Maintainer decision (PR #15): replace.** A same-day corrected export supersedes the earlier one (delete-then-reinsert that date's `DeidentifiedVisit` + recompute its `DailyAggregate` atomically). The hash is a fingerprint, not the file — storing it is not storing PHI; here it identifies an exact-duplicate re-upload (a no-op) vs. a genuine correction (replace). |
-| Daily report page | A Wagtail `DailyReportPage` under a `ReportIndexPage`, **one page per clinic-date** (archivable, linkable), whose **numbers render live from `DailyAggregate`**, deterministic; the AI-narrative slot is left empty for Plan 09 | **Maintainer decision (PR #15): one published page per day, archivable, and auto-published straight to production — no draft step** — for pages produced by a **committed, code-reviewed parser**. This does **not** breach invariant #4: the page contains **no AI content** (only Python-computed numbers, invariant #3), and invariant #4 governs *AI-generated* pages. Human review for these pages happens at parser code-review time. When Plan 09 adds AI narrative, that narrative reverts to the draft/approve gate. |
-| Aggregates & pages | Aggregates persist **automatically** on every upload; the deterministic daily page is likewise **created and published automatically** for that date | Both are deterministic arithmetic from a reviewed parser, so neither needs per-item human review. The only human-in-the-loop content remains AI-generated prose (Plan 09), which stays a draft until an Administrator publishes it. |
+| Daily report page | A Wagtail `DailyReportPage` under a `ReportIndexPage`, **one page per clinic-date** (archivable, linkable), whose **numbers render live from `DailyAggregate`** (deterministic), plus a **short AI-written summary sentence** generated from a fixed, targeted prompt over that same page's numbers | **Maintainer decision (PR #15): one published page per day, archivable, and auto-published straight to production — no draft step.** Extended by a follow-up maintainer decision (2026-07-19, CLAUDE.md invariant #4) to allow a short AI summary sentence on the same page to auto-publish too, under narrow conditions — see "The AI summary sentence" below. This is a deliberate, scoped exception to invariant #4, not a general allowance for AI content to skip review; Plan 09's newsletter narrative still requires draft/approve. |
+| Aggregates & pages | Aggregates persist **automatically** on every upload; the deterministic daily page (numbers + summary sentence) is likewise **created and published automatically** for that date | Both the numbers and the summary sentence are auto-published for this one page type only, per the CLAUDE.md invariant #4 exception. Plan 09's newsletter narrative is unaffected — it stays a draft until an Administrator publishes it. |
 | Excel libs | `openpyxl` for `.xlsx`, `xlrd` for legacy `.xls`, via pandas — already in the stack (brief §3) | Format detection by extension + `sniff()`. |
+
+## The AI summary sentence — and why it's allowed to auto-publish
+
+CLAUDE.md invariant #4 was amended (2026-07-19, maintainer decision) with one
+narrow exception, scoped specifically to this page. The exception exists
+*because* it's this narrow — it is not a precedent for AI content generally
+skipping review:
+
+- **Fixed template, not a free-form prompt.** The prompt is a single hardcoded
+  template (e.g. `"In one sentence, summarize this clinic's day: {numbers}.
+  State only these figures — do not add context, comparisons, or claims not
+  present in the data."`) with the page's own `DailyAggregate` values
+  interpolated in. The model is not asked to draft, opine, or contextualize —
+  only to phrase the numbers it's handed, same discipline as invariant #3
+  ("the AI writes prose only; it must never invent or restate statistics from
+  memory" — here it restates statistics it's *given*, which is the allowed
+  direction).
+- **The payload is aggregates only.** Same guardrail as everywhere else in
+  this codebase (invariant #2): the prompt payload is built from
+  `DailyAggregate`'s named columns and JSON category counts — never from
+  `DeidentifiedVisit` rows, and structurally incapable of containing anything
+  row-level.
+- **Never blocks the deterministic content.** If the Anthropic call fails,
+  times out, or returns something that fails a basic sanity check (e.g.
+  empty, or exceeds a length cap), the page **still auto-publishes with the
+  numbers alone** and no summary sentence (or a static fallback line like "See
+  the figures above."). The AI sentence is a nice-to-have layered on top of
+  the numbers, never a dependency for shipping them.
+- **Tested exactly like every other AI call (Plan 02's convention).** Mocked
+  client in CI, real client never constructible in tests (the existing
+  autouse guard in `conftest.py`), plus a guardrail test asserting the
+  payload sent to the mock contains only that page's own aggregate values.
+- **Scope is this one sentence, nothing else.** Plan 09's monthly newsletter
+  narrative is unaffected by this exception and still requires a human
+  Administrator to review and publish the draft.
 
 ## The data model — and the interface it leaves Plan 09
 
@@ -208,13 +243,18 @@ Three tables, all PHI-free:
    **replaces** that date's rows + aggregate atomically (supersede rule).
 7. **Daily report page** — `ReportIndexPage` + one `DailyReportPage` **per date**
    rendering live `DailyAggregate` numbers, **auto-created and auto-published** for
-   that date (no draft, since the parser is committed & reviewed and the page has
-   no AI content); pages are archivable/linkable. Wire Home's Report teaser (the
-   half Plan 04/06 left waiting).
-8. **Aggregate recompute command** — a management command that rebuilds
+   that date (no draft, since the parser is committed & reviewed); pages are
+   archivable/linkable. Wire Home's Report teaser (the half Plan 04/06 left
+   waiting).
+8. **AI summary sentence** — a fixed-template Anthropic call (aggregates-only
+   payload) that generates the page's one-sentence summary at the same time the
+   aggregate is computed; a failure/timeout/sanity-check falls back to
+   publishing the numbers with no sentence (or a static fallback line) rather
+   than blocking — see "The AI summary sentence" above.
+9. **Aggregate recompute command** — a management command that rebuilds
    `DailyAggregate` from `DeidentifiedVisit` (the derived-cache contract), so metric
    definitions can change without re-uploading.
-9. **Privacy-guardrail tests** (the concrete subjects Plan 02 promised):
+10. **Privacy-guardrail tests** (the concrete subjects Plan 02 promised):
    - After an upload request, **no file exists on disk** and **no raw identifier
      column value** exists anywhere in the DB.
    - The de-identified row table contains **no** name/father-husband/full-address/DOB,
@@ -223,6 +263,11 @@ Three tables, all PHI-free:
      expected).
    - Aggregates equal a **byte-for-byte deterministic** recomputation from a
      fixture export (numbers come from Python, provable without any AI).
+   - The AI summary sentence's prompt payload (captured via the mocked client)
+     contains only that page's own `DailyAggregate` values — no row-level data,
+     no other date's data.
+   - A published daily report page still contains its numbers even when the
+     mocked AI client is made to raise/time out (the fallback path).
    - The upload view is **denied** to a user lacking `can_upload_export`.
    - Re-uploading the same fixture does not double-count; a corrected re-upload for
      the same date **replaces** rather than appends.
@@ -236,15 +281,24 @@ Three tables, all PHI-free:
 - `DeidentifiedVisit`, `DailyAggregate`, and `IngestRun` are populated;
   aggregates match a deterministic Python recomputation exactly.
 - The daily report page for that date renders its aggregate numbers and is
-  **auto-published to production** (no draft) — because it is deterministic and
-  AI-free. **No AI-generated content is auto-published** anywhere in this plan
-  (there is none until Plan 09).
+  **auto-published to production** (no draft) — the numbers are deterministic
+  (invariant #3), and the one AI-written summary sentence on the page is
+  covered by the narrow, explicit CLAUDE.md invariant #4 exception (2026-07-19)
+  — fixed-template prompt, aggregates-only payload, never blocks the numbers on
+  failure. **No other AI content auto-publishes anywhere in this plan** — this
+  exception is scoped to exactly this one sentence.
+- The AI summary sentence's prompt payload, captured in a guardrail test,
+  contains only that page's own aggregate values.
+- A published daily report page still ships its numbers when the mocked AI
+  client raises or times out (fallback path exercised in tests).
 - `DailyAggregate` can be dropped and rebuilt from `DeidentifiedVisit` and matches
   the original (derived-cache contract).
 - A user without `can_upload_export` is denied the upload view.
 - Re-uploading the same file is detected as a no-op; a corrected re-upload for the
   same date **replaces** that date's data rather than double-counting.
-- No AI/Anthropic call exists anywhere in this plan's code.
+- The **only** Anthropic call in this plan's code is the daily-summary-sentence
+  generation described above; it is always mocked in tests (Plan 02's
+  convention — no real API call anywhere in the suite).
 - `ruff check` and `pytest` (including the guardrail tests) pass in CI.
 
 ## Resolved questions (answered by the maintainer on PR #15)

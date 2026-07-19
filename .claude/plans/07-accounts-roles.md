@@ -91,9 +91,10 @@ whole extent of the custom code — one permission, not an auth system.
 - Keeping the **publish** capability with humans only where it matters for
   invariant #4: the AI/automation code (Plan 09) holds **no** publish permission,
   so AI-drafted pages can be *created* by automation but only *published* by a
-  human. Deterministic, AI-free pages (the Plan 08 daily report) are exempt — they
-  carry no AI content and may publish automatically (see "How invariant #4 is
-  enforced").
+  human. The Plan 08 daily report page is exempt — its numbers are
+  deterministic, and its one AI-written summary sentence falls under CLAUDE.md's
+  narrow, explicit invariant #4 exception (2026-07-19) — so the page may publish
+  automatically (see "How invariant #4 is enforced").
 
 **Out of scope** (later plans / never)
 - The upload view itself, and everything it does with a file → **Plan 08**. This
@@ -142,14 +143,20 @@ enforced by two facts, one unchanged and one clarified on PR #15:
    So any *AI-generated* page can only reach the public site after a human
    Administrator opens it and clicks publish. This is the human-in-the-loop gate,
    and it does not depend on splitting the humans into roles.
-2. **Deterministic, AI-free pages are out of scope for invariant #4.** The Plan 08
-   daily report page renders only Python-computed numbers from a **committed,
-   code-reviewed parser** (invariant #3), with **no AI content**. The maintainer
-   confirmed (PR #15) these should publish straight to production without a draft
-   step. Because they contain nothing AI-generated, auto-publishing them does not
-   engage invariant #4 — the human review for them happened at parser code-review
-   time. If/when Plan 09 adds AI narrative to these pages, that narrative reverts
-   to the draft/approve path in (1).
+2. **The Plan 08 daily report page has a narrow, explicit exception, not a
+   blanket exemption.** Its numbers render from a **committed, code-reviewed
+   parser** (invariant #3) — that part was always out of scope for invariant #4,
+   since it's not AI-generated. The maintainer confirmed (PR #15) these pages
+   publish straight to production without a draft step. On 2026-07-19 the
+   maintainer additionally decided the page's one short AI-written summary
+   sentence may *also* auto-publish, and CLAUDE.md invariant #4 was amended with
+   an explicit, narrow exception to allow it — conditioned on a fixed-template
+   prompt, an aggregates-only payload, mocked-in-CI testing with a payload
+   guardrail, and never blocking the numbers if the AI call fails (see Plan 08's
+   "The AI summary sentence" for the full conditions). This exception is scoped
+   to that one sentence; it is not a precedent for AI content generally skipping
+   review. Plan 09's newsletter narrative still reverts to the draft/approve
+   path in (1).
 
 ## Decisions (confirmed on PR #15)
 
@@ -160,7 +167,7 @@ enforced by two facts, one unchanged and one clarified on PR #15:
 | Roles | **One group: Administrator**, held by all real accounts | **Confirmed by maintainer** — no separation of duties. Provisioned as a **data migration** (version-controlled, reproducible, not hand-clicked per environment). The permission model can be re-split into Uploader/Approver groups later if ever wanted. |
 | Upload permission | One **custom Django permission** `can_upload_export` (on a Plan 08 model, or a dedicated permission-holder model), assigned to the **Administrator** group | The only custom piece. Plan 08's upload view does `@permission_required` on it; no page-permission fits an upload. |
 | Admin surface | Administrators get the **full** Wagtail admin | With one full-admin role there is no minimal-surface Uploader to build for, so the menu-hiding hook (previously proposed to pare an Uploader's admin down to just Upload) is **not needed**. |
-| Publish gate for invariant #4 | **AI/automation code holds no publish permission**; humans (Administrators) publish AI content | The human-in-the-loop gate. Plan 09's AI code calls `save_revision()` (create a draft), which needs no publish permission — so automation can draft but is structurally incapable of publishing AI-generated pages. **Exception:** deterministic, AI-free pages (the Plan 08 daily report, generated from a committed & code-reviewed parser) may publish automatically — invariant #4 governs *AI-generated* pages, and these contain none. See "How invariant #4 is enforced." |
+| Publish gate for invariant #4 | **AI/automation code holds no publish permission**; humans (Administrators) publish AI content | The human-in-the-loop gate. Plan 09's AI code calls `save_revision()` (create a draft), which needs no publish permission — so automation can draft but is structurally incapable of publishing AI-generated pages. **Narrow exception (CLAUDE.md, 2026-07-19):** the Plan 08 daily report page — deterministic numbers from a committed & code-reviewed parser, plus one AI-written summary sentence from a fixed template over an aggregates-only payload — may publish automatically under the conditions in Plan 08's "The AI summary sentence." This is scoped to that one sentence, not a general AI-content exemption. See "How invariant #4 is enforced." |
 | Account provisioning | Administrator creates each account in the Wagtail admin (Settings → Users), assigns the Administrator group, user sets their own password on first login via Django's password-reset flow | No self-signup, no seeded passwords in the repo or in fixtures. 3 accounts total, created by hand — automating this isn't worth it at this scale. |
 | Password policy | Django's `AUTH_PASSWORD_VALIDATORS` (length, common-password, numeric) enabled; HTTPS-only session cookies | Baseline already available from Django; just confirm it's on in prod settings. |
 | 2FA | **Not adopted** (maintainer decision) — rely on strong passwords + HTTPS | `wagtail-2fa` is not added; the extra dependency and login step aren't worth it for three trusted accounts. |
