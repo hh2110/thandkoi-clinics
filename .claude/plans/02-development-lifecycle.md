@@ -58,7 +58,7 @@ patch, or keep in sync.
 | Choice | Proposed | Notes |
 |---|---|---|
 | Environments | local, CI, production | No staging, no per-feature preview envs. |
-| Production host | Render **Starter** ($7/mo) | No cold starts; public-facing. |
+| Production host | Render **Hobby workspace** ($0/mo) + **Starter compute** ($7/mo) = $7/mo total | Render splits pricing into a workspace plan (Hobby/Pro/Scale/Enterprise — account-level features, Hobby's limits are well above what this project needs) and per-service compute (Free/Starter/Standard/… — the actual instance size, found under "Compute pricing," not one of the four big workspace cards). Easy to miss "Starter" looking only at the top-level plan cards. No cold starts on Starter compute; public-facing. |
 | Database | **Neon Postgres**, single database | No branch-per-environment — there's only one deployed environment now. |
 | CD trigger | Merge to `main` → CI only, no deploy | Merging never triggers a live change by itself — see Promotion. |
 | Promotion | A separate `workflow_dispatch`-only GitHub Actions workflow, run manually (Actions tab or `gh workflow run deploy.yml`) | **Not** a GitHub Environments protection rule — "required reviewers" on environments needs GitHub Pro/Team for a private repo (confirmed directly against this repo: the API rejects a reviewer rule on the Free plan). `workflow_dispatch` gives the identical safety property — nothing deploys without a human explicitly triggering it — for $0, on any plan, and is arguably simpler to reason about than an approval queue. |
