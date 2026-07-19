@@ -63,9 +63,12 @@ father's/husband's name, date of birth, address, vitals, complaints, diagnoses,
 and prescribed medicines. Therefore:
 
 1. **Raw PHI is never persisted.** On upload, the file is parsed and aggregated
-   **in memory during the request**, then discarded. Only de-identified
-   aggregates (and, optionally, a de-identified row-level table with direct
-   identifiers stripped) are stored.
+   **in memory during the request**, then discarded. Two things are stored:
+   de-identified aggregates, and a **de-identified row-level table** — direct
+   identifiers (name, father's/husband's name, address) stripped on the way
+   in, never written even transiently. The row-level table exists to support
+   report types and date-range queries we haven't anticipated yet, without
+   re-deriving new aggregate tables for every new question.
 2. **The AI never sees a patient row.** Aggregation happens in Python first;
    only de-identified numbers and category counts are ever passed to a model.
 3. **Numbers are deterministic.** Every published figure is computed in Python
@@ -84,7 +87,7 @@ Clinic software ──export──▶ daily .xls/.xlsx
               │   • clean / dedup / strip identifiers       │
               │   • RAW FILE DISCARDED here ✗               │
               │            │                                │
-              │   de-identified aggregates (+ optional rows)│
+              │   de-identified aggregates + row-level table│
               │            ▼                                │
               │        PostgreSQL  ◀── permanent             │
               │            │                                │
@@ -182,9 +185,11 @@ by construction.
 
 ## 8. Open items
 
-- Confirm domain registration for `thandkoiclinics.com`.
+- ~~Confirm domain registration for `thandkoiclinics.com`.~~ Registered via
+  Cloudflare Registrar, 2026-07-19.
 - Confirm the list of admin accounts (uploaders/approvers).
-- Provide logo and brand assets (palette can otherwise be extracted from the
-  newsletter).
-- Decide whether to retain the optional de-identified row-level table or keep
-  aggregates only.
+- ~~Provide logo and brand assets.~~ Done — see
+  [brand-guidelines.md](brand-guidelines.md).
+- ~~Decide whether to retain the optional de-identified row-level table or
+  keep aggregates only.~~ Decided — retain the de-identified row-level table
+  (see §4).
