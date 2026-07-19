@@ -25,7 +25,26 @@ rules are architectural constraints, not preferences — never weaken them:
    and injected into prompts. The AI writes prose only; it must never invent or
    restate statistics from memory.
 4. **Human-in-the-loop.** Every AI-generated page is a draft that a person
-   reviews and approves before it is published.
+   reviews and approves before it is published. **One narrow, explicit
+   exception** (decided 2026-07-19, Plan 08): a short AI-written summary
+   sentence attached to a deterministic daily report page may auto-publish
+   together with the numbers it describes, but only when *all* of the
+   following hold —
+   - the prompt is a **fixed template** that only restates the page's own
+     already-computed figures (per invariant #3 — it may not invent, fetch,
+     or generalize beyond the numbers it's given);
+   - the call is tested exactly like every other AI call in this codebase:
+     mocked in CI, with a guardrail test asserting the payload sent to it
+     contains only that page's aggregate numbers; and
+   - if the call fails or times out, the page **still auto-publishes with the
+     numbers alone** — the AI sentence is never allowed to block or gate the
+     deterministic content.
+
+   This exception covers *only* that one summary sentence. It does not extend
+   to Plan 09's monthly newsletter narrative or any other AI-authored content,
+   which still requires human review and approval before publishing. Widening
+   this exception is a decision to make deliberately again, not something a
+   future plan should assume by analogy.
 5. **Never commit patient data or raw exports.** `.gitignore` blocks `*.xls`,
    `*.xlsx`, `/uploads/`, `/data/`. Do not override this.
 
