@@ -22,7 +22,9 @@ deploy configured."
 
 **Out of scope** (later plans)
 - Any clinic-specific pages or models → Plans 02–05.
-- Auth roles → Plan 06. Pipeline/AI → Plans 07–09. Deploy hardening → Plan 10.
+- Auth roles → Plan 06. Pipeline/AI → Plans 07–09. Deploy hardening → out of
+  scope for now (see the [plans README](README.md#out-of-scope-for-now) —
+  Ops hardening).
 
 ## Proposed decisions (confirm before building)
 

@@ -132,9 +132,11 @@ pulls exact wording rather than paraphrasing from this plan:
   newsletter" teaser is built to degrade gracefully — hidden, not broken —
   until that content type exists). The inauguration/first-camp story (p.11–13)
   may become the first real Camp Report then.
-- Urdu translations of this content → Plan 10. Models are built so adding
-  translated locales later (via Wagtail's i18n / `wagtail-localize`) doesn't
-  require reshaping them, but no Urdu content is written this step.
+- Urdu translations of this content → out of scope for now (see the
+  [plans README](README.md#out-of-scope-for-now) — Bilingual generation).
+  Models are built so adding translated locales later (via Wagtail's i18n /
+  `wagtail-localize`) doesn't require reshaping them, but no Urdu content is
+  written this step.
 - Real impact numbers driven by the data pipeline → Plan 08/09. Home's
   "impact numbers" are admin-editable static figures for now (seeded from
   p.14's real counts at launch), not computed.

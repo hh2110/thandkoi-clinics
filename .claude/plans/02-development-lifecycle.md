@@ -24,7 +24,8 @@ regression before it ships.
 
 **Out of scope** (later plans)
 - The actual pages/models being deployed → Plans 03–09.
-- Backup strategy, monitoring/alerting, funding-export → Plan 11 (Ops).
+- Backup strategy, monitoring/alerting, funding-export → out of scope for now
+  (see the [plans README](README.md#out-of-scope-for-now) — Ops hardening).
 - Load/performance testing — not warranted at this traffic scale yet.
 
 ## No staging environment — and why that's fine

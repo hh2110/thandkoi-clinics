@@ -37,7 +37,9 @@ a human uses), not a new model.
   exists to fill it — building it here would mean guessing its shape twice.
 - AI-drafted newsletter content → Plan 09. This plan's `NewsletterPage` is
   the target model Plan 09 drafts into; no AI code here.
-- Urdu translations → Plan 10, same as every other content plan.
+- Urdu translations → out of scope for now (see the
+  [plans README](README.md#out-of-scope-for-now) — Bilingual generation),
+  same as every other content plan.
 - Bulk/automated photo import — camp and gallery photos are added one at a
   time through the admin, same as any other Wagtail image upload.
 

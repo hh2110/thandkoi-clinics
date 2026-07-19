@@ -35,9 +35,10 @@ in either language, in either theme."
 
 **Out of scope** (later plans)
 - Real page content and models (Home, About, Team, etc.) → Plan 04.
-- Actual Urdu/Pashto translations of content → Plan 10 (Bilingual
-  generation). This step wires the *routing and layout* for two languages;
-  it doesn't translate anything yet — there's no content to translate.
+- Actual Urdu/Pashto translations of content → out of scope for now (see the
+  [plans README](README.md#out-of-scope-for-now) — Bilingual generation).
+  This step wires the *routing and layout* for two languages; it doesn't
+  translate anything yet — there's no content to translate.
 - Donate-specific styling beyond the Amber token already in the palette →
   Plan 05.
 
@@ -48,7 +49,7 @@ in either language, in either theme."
 | CSS approach | Hand-written CSS with custom properties (design tokens), no framework | Small site, small maintainer team; a framework (Tailwind etc.) adds a build step and a JS toolchain footprint that don't pay for themselves here. Plain CSS + `:root` tokens is easy for a Python-only maintainer to read and change. |
 | Font hosting | Self-hosted `.woff2` under `static/fonts/`, `@font-face` with `font-display: swap` | Matches brand-guidelines.md's "self-hostable" requirement; no third-party font CDN request. |
 | Font subsetting | Latin subset for Archivo/Public Sans; full Arabic-script subset for Noto Nastaliq Urdu/Naskh Arabic | Keeps download size reasonable; Urdu needs the full glyph set. |
-| i18n framework | Django's built-in i18n (`USE_I18N`, `LocaleMiddleware`, `i18n_patterns`, `{% trans %}`/`{% blocktrans %}`) | No third-party i18n package needed at this stage — Wagtail-specific translated *page content* (as opposed to UI string translation) is a Plan 10 concern (likely `wagtail-localize` then). |
+| i18n framework | Django's built-in i18n (`USE_I18N`, `LocaleMiddleware`, `i18n_patterns`, `{% trans %}`/`{% blocktrans %}`) | No third-party i18n package needed at this stage — Wagtail-specific translated *page content* (as opposed to UI string translation) is currently out of scope (see the plans README — Bilingual generation; likely `wagtail-localize` if that's picked up later). |
 | Languages now | `en` (default), `ur` | Pashto (`ps`) stays a placeholder in `LANGUAGES` per CLAUDE.md ("Pashto may follow") but isn't built out this step. |
 | RTL approach | CSS logical properties (`margin-inline-start`, `padding-inline-end`, etc.) over physical `left`/`right`, plus `dir="rtl"` on `<html>` for `ur` | Avoids a separate RTL stylesheet; one set of rules mirrors automatically. |
 | Nav interactivity | Plain HTML/CSS (`<details>` for mobile nav disclosure) as the no-JS baseline; HTMX layered on later only if needed | Matches the "minimal JS" architecture decision — don't reach for JS until a later plan actually needs it (e.g. upload, newsletter generation). |
