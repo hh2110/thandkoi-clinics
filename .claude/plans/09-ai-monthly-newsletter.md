@@ -1,0 +1,229 @@
+# Plan 09 — AI Monthly Newsletter
+
+_Status: Drafted · Depends on: 06 Newsletters, Camp Reports & Gallery; 07 Accounts & roles; 08 Data pipeline · Next: (none — roadmap ends at 09; see README's "Out of scope")_
+
+## Goal
+
+The first real use of the Anthropic SDK for **content drafting**: once a month,
+assemble that month's `DailyAggregate` figures, the admin's notes, and any
+photos into a single prompt-with-tools call to Claude, and land the result as
+a **Wagtail draft** — a new `NewsletterPage` revision under the
+`NewsletterIndexPage` Plan 06 already built — for an Administrator (Plan 07)
+to review and publish.
+
+This plan is deliberately the "one-shot prompt with tooling" shape described
+in [architecture-and-ai-brief.md §6.2](../../docs/architecture-and-ai-brief.md):
+the model receives the month's numbers plus context and calls small,
+read-only tools to look up specifics rather than being handed one giant
+pre-formatted blob. It is also the plan that puts CLAUDE.md invariant #4's
+**general rule** into practice for the first time — Plan 08's daily summary
+sentence is a narrow, explicit exception to that rule (a fixed template
+restating numbers already on the page); this plan is full free-form narrative
+drafting, so it gets the actual human-in-the-loop gate, no exception.
+
+No new model. Plan 06's own doc says this outright: "Plan 09 later drafts
+*into* the Newsletter model this plan creates, via `save_revision()` ... not a
+new model." This plan produces an unpublished `NewsletterPage` revision; it
+never writes anything an Administrator hasn't seen.
+
+## Scope
+
+**In scope**
+- A **monthly rollup** computed from `DailyAggregate` (Plan 08's read
+  interface) — never a re-parse of raw exports, never a read of
+  `DeidentifiedVisit` directly for the common case (see "Data interface"
+  below).
+- An **admin-notes and photos input mechanism** feeding the prompt (mechanism
+  TBD — see Open questions).
+- The **tool functions** the model calls during drafting: `get_month_stats`,
+  `get_trend_vs_last_month`, `get_previous_newsletter` (brief §6.2), all
+  read-only over aggregates/published content.
+- The **draft-creation flow**: an Anthropic call producing newsletter body
+  content, written into a new `NewsletterPage` instance under
+  `NewsletterIndexPage` via `save_revision()` — unpublished, exactly like a
+  human editor's draft.
+- **Review/publish flow**: an Administrator opens the draft in the Wagtail
+  admin, edits if needed, and publishes it — no code-path in this plan holds
+  publish permission (per Plan 07's "AI/automation code holds no publish
+  permission").
+- **Failure handling**: what happens when the Anthropic call fails, times
+  out, or returns something unusable — see "Failure handling" below.
+- The **deterministic-numbers guardrail test** for this plan's prompt/tool
+  payloads, matching Plan 08's pattern.
+
+**Out of scope** (later, or by decision)
+- **Any new model, field, or index page for newsletters** — Plan 06 already
+  built `NewsletterIndexPage`/`NewsletterPage`; this plan drafts into them.
+- **Urdu/Pashto translation** of the drafted newsletter — out of scope for
+  this plan (see the roadmap's "Out of scope" section in
+  [`.claude/plans/README.md`](README.md)). English-only here.
+- **Auto-publish of any kind.** Unlike Plan 08's one narrow, explicitly-scoped
+  exception (a fixed-template sentence restating a single page's own
+  numbers), this plan's newsletter narrative is full free-form drafting and
+  gets the general invariant-#4 rule: draft → human review → publish, every
+  time, no exceptions. CLAUDE.md says this explicitly: *"This exception
+  covers only that one summary sentence. It does not extend to Plan 09's
+  monthly newsletter narrative or any other AI-authored content, which still
+  requires human review and approval before publishing."*
+- **Camp Report or Gallery drafting** — this plan is newsletters only; camp
+  reports remain human-authored per Plan 06.
+- **The public site assistant / "ask your data" chat** — architecture brief
+  §6.3, deferred (see README's "Out of scope").
+- **Agentic schema inference / new export formats** — Plan 08's territory,
+  already deferred.
+
+## The invariant-#4 boundary — Plan 08's exception does not apply here
+
+CLAUDE.md invariant #4 states the general rule ("every AI-generated page is a
+draft that a person reviews and approves before it is published") and then
+carves out **one narrow exception** for Plan 08's daily summary sentence,
+under three conditions that are all specific to that one sentence (fixed
+template, aggregates-only payload, never blocks the deterministic numbers on
+failure). The same paragraph names this plan directly to rule it out:
+
+> "This exception covers *only* that one summary sentence. It does not extend
+> to Plan 09's monthly newsletter narrative or any other AI-authored content
+> ... Widening this exception is a decision to make deliberately again, not
+> something a future plan should assume by analogy."
+
+So Plan 09 is built to the **general** rule, not the exception:
+- The model drafts free-form narrative (not a single fixed-template
+  sentence) — it has latitude in phrasing, structure, and emphasis, which is
+  exactly the kind of output invariant #4 exists to gate.
+- The Anthropic call in this plan never has publish permission (Plan 07);
+  `save_revision()` is the only write path available to it.
+- If the call fails, times out, or the maintainer never runs the monthly
+  job, the correct behavior is **no draft is created** — never a fallback
+  publish. This is the opposite failure mode from Plan 08's daily page,
+  where the numbers must ship regardless of the AI call's outcome. Here
+  there is no deterministic content riding alongside the AI prose that needs
+  to ship unconditionally; a newsletter that doesn't exist yet is not a
+  regression the way an unpublished daily report would be.
+
+## Data interface consumed (from Plan 08)
+
+This plan is a **reader**, not a re-implementer, of Plan 08's data model:
+
+- **`DailyAggregate`** is the primary read interface. A monthly rollup is an
+  aggregation *over* `DailyAggregate` rows for the target month (sum/average
+  the named integer columns, merge the `category_counts` JSON across the
+  month) — not a re-parse of any export and not, for the common case, a
+  direct read of `DeidentifiedVisit`. This mirrors Plan 08's own framing:
+  *"the brief's proposed tools (`get_month_stats`, `get_trend_vs_last_month`)
+  become simple ORM reads / aggregations over this table."*
+- **`DeidentifiedVisit` is out of reach for this plan's tools by design.**
+  Per CLAUDE.md invariant #2 and the brief's "de-identification boundary
+  sits upstream of the `ai` module," nothing in this plan's tool layer
+  queries `DeidentifiedVisit`. If a future need ever required row-level
+  cross-tabs for the newsletter, that would be a new, explicitly-scoped tool
+  decision — not something this plan assumes.
+- **`get_previous_newsletter`** reads the most recently *published*
+  `NewsletterPage` (Plan 06's model) for voice/style consistency — published
+  content only, matching the public-site-assistant principle (brief §6.3) of
+  only grounding on what's actually public, even though this tool's use is
+  internal rather than public-facing.
+
+## Proposed decisions (confirm before building)
+
+| Choice | Proposed | Notes |
+|---|---|---|
+| Prompt shape | "One-shot prompt with tooling" per brief §6.2 — a single system/user prompt describing the drafting task, with the model calling read-only tools (`get_month_stats`, `get_trend_vs_last_month`, `get_previous_newsletter`) to pull specifics rather than one pre-flattened context blob | Matches the brief's own description verbatim; lets the model ask for exactly the comparisons it needs rather than the app guessing what to include up front. |
+| Model | `claude-opus-4-8` | Per brief §6, model-selection table: "Newsletter/report drafting, schema inference → Claude Opus 4.8." Same model Plan 08 would use if it ever needed drafting-grade quality (it doesn't — its one sentence is template-fixed). |
+| Numbers guardrail | Every figure available to the model comes from a Python-computed tool result (`get_month_stats` / `get_trend_vs_last_month`), never typed into the prompt as prose by a human and never left for the model to compute or recall | Same discipline as invariant #3 and Plan 08's guardrail — "the AI writes prose only; it must never invent or restate statistics from memory." Testable the same way: a guardrail test asserts every numeric tool-call result traces back to a `DailyAggregate` query, and a fixture-based test asserts the model is never the source of a number that ends up in a published page. |
+| Landing point | A new `NewsletterPage` instance under the existing `NewsletterIndexPage` (Plan 06), created via `save_revision()` — unpublished | Plan 06's doc states this exact mechanism as the intended integration point; no new model, no new page type. |
+| Publish permission | The drafting code path holds **no** publish permission (Plan 07's "AI/automation code holds no publish permission") | Structural enforcement of invariant #4's general rule, same mechanism Plan 07 already built for any AI-authored page. |
+| Failure handling | If the Anthropic call fails, times out, or the output fails a basic sanity check, **no draft is created** for that month — this is a "try again" / "run again later" situation, not a fallback publish | The opposite of Plan 08's daily page, which must ship its numbers regardless. Here, nothing else on the page depends on the AI call succeeding, so there is nothing to protect by publishing a partial or fallback newsletter. |
+| Testing | Anthropic client mocked in CI via the existing autouse `conftest.py` guard (Plan 02) — real client never constructible in tests; a guardrail test captures the mocked client's tool-call payloads and asserts they contain only real `DailyAggregate`-derived numbers | Zero real API calls in the suite, exactly like every other AI call in this codebase (Plan 02's convention, reused unchanged by Plan 08 and now this plan). |
+| Bilingual scope | English only in this plan | Urdu/Pashto translation of newsletters (and other content) is out of scope for the current roadmap — see [`.claude/plans/README.md`](README.md)'s "Out of scope" section. Not scope-creeping into that here. |
+
+## Open questions for the maintainer
+
+- **Monthly trigger mechanism.** A management command run manually by an
+  Administrator at month-end, or a scheduled job (cron / Render cron / task
+  scheduler) that runs automatically and leaves a draft waiting? Either is
+  compatible with "no auto-publish" — the question is only whether *drafting*
+  itself is manual or scheduled.
+- **Admin-notes input.** How does the admin's monthly context (anecdotes,
+  things to highlight, corrections to tone) reach the prompt? Candidates: a
+  plain text field on a small "monthly newsletter request" admin form/model,
+  reused each month; an existing Wagtail admin rich-text field filled in
+  before running the drafting command; or something lighter-weight like an
+  email/doc pasted in ad hoc. No structural decision has been made yet.
+- **Photo input.** Do photos for the newsletter reuse Plan 06's
+  `GalleryImage`/consent pattern directly (e.g. the admin picks from already
+  consent-checked gallery images for that month), or is there a separate
+  upload step scoped just to the newsletter draft? Reusing Plan 06's
+  consent-gated pattern seems like the natural default, but it hasn't been
+  confirmed with the maintainer.
+- **What counts as "the month."** Calendar month strictly, or a
+  clinic-defined reporting period that might not align to calendar
+  boundaries? Assumed calendar month unless told otherwise.
+- **Retry/notification on failure.** When a drafting run fails (API error,
+  sanity-check rejection), does anything notify the Administrator that no
+  draft was produced, or is "check the admin, see nothing new" the whole
+  mechanism? Worth deciding before implementation, not load-bearing enough
+  to block this plan doc.
+- **`get_previous_newsletter` scope.** Just the immediately previous issue,
+  or the last N issues for a stronger voice-consistency signal? Proposed as
+  "just the previous one" for simplicity, open to revision.
+
+## Task checklist (code — this plan's eventual implementation PR)
+
+1. **`ai` module scaffold** (or extend one if Plan 08 already started one for
+   its summary sentence) — wraps the Anthropic Python SDK, houses tool
+   functions, kept upstream-clean of `DeidentifiedVisit` per the
+   de-identification boundary.
+2. **Monthly rollup** — a function/queryset aggregating `DailyAggregate` rows
+   for a target month into the shape `get_month_stats` and
+   `get_trend_vs_last_month` need (this month's totals/category counts, and
+   a comparison against the prior month).
+3. **Tool functions** — `get_month_stats(month)`, `get_trend_vs_last_month(month)`,
+   `get_previous_newsletter()`, each a thin, typed, read-only wrapper with
+   its own unit test independent of any AI call.
+4. **Admin-notes and photo input** — whatever mechanism is confirmed in the
+   Open questions above (form field, admin model, or reused Plan 06 pattern).
+5. **Drafting call** — the one-shot prompt-with-tooling Anthropic call
+   (`claude-opus-4-8`), assembling the month's data, notes, and photos, and
+   producing newsletter body content.
+6. **Draft-landing** — write the model's output into a new `NewsletterPage`
+   under `NewsletterIndexPage` via `save_revision()`; no publish call
+   anywhere in this code path (Plan 07 permission boundary).
+7. **Failure handling** — no draft on failure/timeout/sanity-check rejection;
+   log the failure for visibility (mechanism per the retry/notification open
+   question).
+8. **Trigger mechanism** — management command (manual or scheduled, per the
+   open question above) that runs the monthly rollup + drafting call.
+9. **Deterministic-numbers guardrail test** — mocked-client test asserting
+   every numeric value in the tool-call payloads and in the resulting draft
+   traces back to a real `DailyAggregate`-derived computation, never a
+   model-invented figure (same discipline and same test shape as Plan 08's
+   guardrail test for its summary sentence).
+10. **Draft-visibility test** — the drafted `NewsletterPage` revision does
+    not appear in the public archive or Home's teaser until an Administrator
+    publishes it (reusing the draft-visibility mechanism Plan 06 already
+    tested).
+11. **Permission test** — the drafting code path cannot publish; only a user
+    with publish permission (Administrator) can turn the draft into a
+    published page.
+
+## Acceptance criteria
+
+- Running the monthly drafting flow for a month with existing
+  `DailyAggregate` data produces an **unpublished** `NewsletterPage` revision
+  under `NewsletterIndexPage`, visible to Administrators in the Wagtail admin
+  and nowhere else.
+- Every figure that appears in the draft is traceable, in a guardrail test,
+  to a real `DailyAggregate`-derived computation — never a number the model
+  supplied from its own generation.
+- The tool functions (`get_month_stats`, `get_trend_vs_last_month`,
+  `get_previous_newsletter`) never query `DeidentifiedVisit`.
+- If the mocked Anthropic client is made to raise or time out in a test, **no**
+  `NewsletterPage` revision is created for that run — no partial or fallback
+  draft.
+- No code path in this plan can publish a page; only a human Administrator,
+  via the normal Wagtail publish action, can.
+- The **only** Anthropic call in this plan's code is the monthly-newsletter
+  drafting call described above; it is always mocked in tests (Plan 02's
+  convention — no real API call anywhere in the suite).
+- `ruff check` and `pytest` (including the guardrail and draft-visibility
+  tests) pass in CI.
