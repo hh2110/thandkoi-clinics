@@ -10,15 +10,48 @@ update without touching code. English content only — this step is "the
 shopfront exists and looks right," not the full nine-page structure from
 [architecture-and-ai-brief.md §5](../../docs/architecture-and-ai-brief.md).
 
-This plan ships with **real launch copy**, not placeholder text — see
-"Source material" below.
+This plan ships with **real launch copy** lined up, not placeholder text —
+see "Source material" below. Where that copy actually *lives* is important
+enough to spell out before the source list, since it's easy to get backwards.
+
+## Where content lives: code vs. CMS
+
+Two different things are easy to conflate here, so this plan is explicit
+about which is which:
+
+- **Code (this plan's actual deliverable, lives in the git repo):** the
+  Wagtail page models, fields, block types, and templates — i.e. the *shape*
+  a page can take (an About page has a vision `RichTextField`, a Team page
+  has orderable `TeamMember` children with a name/role/category/photo/bio,
+  and so on). This is what Plan 04's implementation PR contains.
+- **Content (lives in PostgreSQL, entered through `/admin/`, never
+  committed):** the actual text — the real vision statement, each team
+  member's name and bio, each service's description. Once Plan 04's code is
+  deployed, a person logs into the Wagtail admin and types or pastes this
+  in, the same way they'll edit it going forward. This is true of *all*
+  page content here, not just the Contact & Bank Details setting — the
+  Contact/bank case just made the "not in the repo" rule explicit first,
+  because getting it wrong there (committing an account number) was the
+  obviously risky direction. The same rule quietly applies to every other
+  field in this plan too.
+
+So the PDF-sourced material below is **reference material for whoever does
+that admin data-entry pass** (probably the maintainer, at or after this
+plan's implementation) — not text that Plan 04's PR writes into a
+migration, fixture, or template. If launch-time content entry ever *is*
+worth automating (e.g. a management command that seeds the ~17 team members
+so they don't have to be retyped by hand), that command would still only
+be a one-time bootstrapping convenience — the resulting rows are exactly as
+CMS-editable afterward as anything typed in by hand, and that's a Plan 04
+implementation detail to decide then, not a reason to treat this content as
+code now.
 
 ## Source material
 
 The maintainer's organisational profile PDF (`The Thandkoi Clinics final
 V15.pdf`, 20 pages) has real, ready-to-use copy for every page in this plan.
-Page references below are to that PDF so the implementer can pull exact
-wording rather than paraphrase from this plan:
+Page references below are to that PDF so whoever does the content entry
+pulls exact wording rather than paraphrasing from this plan:
 
 - **p.5 — "Our Message"**: founders' welcome message/quote (Dr Amanullah,
   Dr Kausar Khurshid) — good About-page intro or pull-quote.
@@ -138,7 +171,7 @@ Team members and services are child *objects*, not child *pages* — they don't
 need their own URL, preview, or SEO metadata, so modelling them as Wagtail
 pages would be overhead the admin has to navigate around for no benefit.
 
-## Task checklist
+## Task checklist (code — this plan's PR)
 
 1. **Contact & Bank Details setting** — `apps/core` (or a new `apps/settings`
    app): a `BaseSiteSetting` with phone, email, socials (list), bank account
@@ -150,19 +183,19 @@ pages would be overhead the admin has to navigate around for no benefit.
    and a "latest report/newsletter" teaser section (queries, renders nothing
    if no matching content exists yet).
 3. **About page** — `RichTextField`s for vision, mission, objectives,
-   quality-of-care model, and the founding/inauguration story, populated
-   from source PDF p.5–7 and p.11–13 (see Source material above); a simple
+   quality-of-care model, and the founding/inauguration story; a simple
    `StreamField` or child-list for partner logos/names if there are any at
-   launch.
+   launch. (Fields only — the real text from p.5–7/p.11–13 is entered later,
+   see Content entry below.)
 4. **Team page** — `TeamPage` + `TeamMember` orderable child model (name,
    role, category, photo w/ required alt text, short bio); template groups
-   members by category (Doctors, Staff & Committee); populated from the real
-   roster (p.8–10) — photos still needed as a separate asset task.
+   members by category (Doctors, Staff & Committee). (Model only — the real
+   roster is entered later.)
 5. **Our Work page** — `OurWorkPage` + `Service` orderable child model (name,
    description, icon/image, status); template renders as a grid/list per
    brand-guidelines.md §4 layout rules, visually distinguishing `Planned`
-   services (e.g. a "coming soon" tag) from `Active` ones; populated from
-   the real service list and infrastructure section (p.15–17).
+   services (e.g. a "coming soon" tag) from `Active` ones. (Model only — the
+   real service/infrastructure content is entered later.)
 6. **Contact page** — renders the Contact & Bank Details setting; a simple
    "email us" `mailto:` link rather than a contact form (no form backend
    needed at this stage — matches "no analytics or third-party scripts by
@@ -178,6 +211,23 @@ pages would be overhead the admin has to navigate around for no benefit.
    a test that the Contact page reflects a change to the setting; a test
    that Home's donate CTA and report teaser are absent/hidden when unset
    rather than broken.
+
+## Content entry checklist (post-deploy, via Wagtail admin — not part of this PR)
+
+Once the code above is deployed, someone (maintainer or an admin) enters the
+real content through `/admin/`. None of this touches git:
+
+1. Contact & Bank Details setting — phone, email, socials, bank details
+   (p.19–20; confirmed current with the maintainer).
+2. Home — vision-adjacent hero copy, impact stats seeded from p.14's real
+   counts, donate CTA left unset (Plan 05 doesn't exist yet).
+3. About — vision/mission/objectives (p.6), quality-of-care paragraph (p.7),
+   founders' message (p.5), founding/inauguration story (p.11–13).
+4. Team — the roster from p.8–10, grouped Doctors / Staff & Committee; photos
+   pending (see open question below).
+5. Our Work — the real service list from p.15 (marking Laboratory & Pharmacy
+   and Radiology/Imaging as `Planned`), infrastructure copy from p.16–17;
+   photos pending.
 
 ## Acceptance criteria
 
