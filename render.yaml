@@ -14,6 +14,7 @@ databases:
     databaseName: thandkoi
     user: thandkoi
     plan: free
+    postgresMajorVersion: "18"
 
 services:
   - type: web

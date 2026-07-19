@@ -7,7 +7,7 @@
 # Credentials here are LOCAL-ONLY and match DATABASE_URL in .env.example.
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_USER: thandkoi
