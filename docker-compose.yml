@@ -1,0 +1,27 @@
+# Local development services. Only Postgres for now — the app itself runs on the
+# host (via uv) so the Python-expert maintainer keeps a normal local workflow.
+#
+#   docker compose up -d     # start Postgres in the background
+#   docker compose down      # stop it (data persists in the named volume)
+#
+# Credentials here are LOCAL-ONLY and match DATABASE_URL in .env.example.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: thandkoi
+      POSTGRES_PASSWORD: thandkoi
+      POSTGRES_DB: thandkoi
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thandkoi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

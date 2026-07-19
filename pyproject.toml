@@ -1,0 +1,46 @@
+[project]
+name = "thandkoi-clinics"
+version = "0.1.0"
+description = "Website + AI-native data pipeline for The Thandkoi Clinics (Django + Wagtail)."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "django>=5.2,<5.3",
+    "wagtail>=7.4,<7.5",
+    "django-environ>=0.11,<0.13",
+    "psycopg[binary]>=3.2,<4",
+    "gunicorn>=23,<24",
+    "whitenoise>=6.7,<7",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12,<0.14",
+    "pytest>=8.3,<9",
+    "pytest-django>=4.9,<5",
+    "factory-boy>=3.3,<4",
+    "pre-commit>=4,<5",
+]
+
+# --- Tooling configuration -------------------------------------------------
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend-exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+# pycodestyle (E, W), pyflakes (F), isort (I), pyupgrade (UP),
+# flake8-bugbear (B), flake8-comprehensions (C4), django (DJ).
+select = ["E", "W", "F", "I", "UP", "B", "C4", "DJ"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.dev"
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+addopts = "--reuse-db"
+
+[tool.uv]
+# Nothing custom yet; kept for discoverability of the dev group above.

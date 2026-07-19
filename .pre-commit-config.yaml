@@ -1,0 +1,11 @@
+# Pre-commit hooks: ruff lint + format (per Plan 01).
+# Install once with:  uv run pre-commit install
+# Run manually with:  uv run pre-commit run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.13.0
+    hooks:
+      # Lint (with autofix), then format.
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format

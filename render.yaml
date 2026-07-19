@@ -1,0 +1,53 @@
+# Render blueprint (https://render.com/docs/blueprint-spec).
+#
+# Config-only for Plan 01 — reviewed but NOT deployed yet. The live production
+# deploy is Plan 02's job, once there is a CD pipeline and an approval gate.
+#
+# It defines a managed Postgres database and a Python web service that:
+#   * installs dependencies with uv from the committed uv.lock,
+#   * collects static files (served by WhiteNoise),
+#   * runs migrations as a pre-deploy step,
+#   * serves the app with gunicorn.
+
+databases:
+  - name: thandkoi-db
+    databaseName: thandkoi
+    user: thandkoi
+    plan: free
+
+services:
+  - type: web
+    name: thandkoi-clinics
+    runtime: python
+    plan: free
+    # Install uv, sync the locked environment, then collect static assets.
+    buildCommand: >-
+      pip install uv &&
+      uv sync --frozen --no-dev &&
+      uv run python manage.py collectstatic --no-input
+    # Apply migrations before the new version starts taking traffic.
+    preDeployCommand: uv run python manage.py migrate --no-input
+    startCommand: uv run gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.prod
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      # Injected from the managed database above.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: thandkoi-db
+          property: connectionString
+      # Generated once by Render and kept secret.
+      - key: SECRET_KEY
+        generateValue: true
+      # The service's own external hostname, so ALLOWED_HOSTS stays locked down.
+      # Add any custom domain (thandkoiclinics.com) here once DNS is configured.
+      - key: ALLOWED_HOSTS
+        fromService:
+          type: web
+          name: thandkoi-clinics
+          property: host
