@@ -156,6 +156,26 @@ def test_published_report_numbers_are_deterministic(mock_anthropic_client):
     assert aggregate.by_diagnosis == EXPECTED_BY_DIAGNOSIS
 
 
+def test_template_comment_does_not_leak_into_output(mock_anthropic_client):
+    """The template's documentation comment must not render as visible text.
+
+    Django's ``{# ... #}`` hash-comment syntax is single-line only (its lexer
+    regex is not DOTALL), so a multi-line hash comment leaks into the HTML as
+    literal text. The template uses a ``{% comment %}`` block instead; this
+    guards against a regression back to the leaking form.
+    """
+    aggregate = aggregate_export(io.BytesIO(_build_export_xlsx()))
+    prose = draft_newsletter_prose(aggregate, mock_anthropic_client)
+
+    html = render_daily_report(aggregate, prose)
+
+    # Distinctive phrases from the template's internal doc comment — none should
+    # ever reach the rendered page.
+    assert "Daily clinic report" not in html
+    assert "privacy invariant #3" not in html
+    assert "rendering.py" not in html
+
+
 def test_real_anthropic_client_is_forbidden_in_tests():
     """The suite can never construct a real client or reach the live API.
 
