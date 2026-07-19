@@ -1,21 +1,54 @@
-{% load static wagtailcore_tags %}
+{% load static i18n %}
 <!DOCTYPE html>
-<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<html lang="{{ LANGUAGE_CODE|default:'en' }}" dir="{% if LANGUAGE_BIDI %}rtl{% else %}ltr{% endif %}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {% comment %}
+    Anti-FOUC: read the stored theme choice and set data-theme on <html>
+    synchronously, before any stylesheet paints. Pairs with
+    static/js/theme-toggle.js, which handles the click and keeps
+    localStorage in sync. With no stored choice (or JS/storage
+    unavailable) this is a no-op and the page falls back to the OS
+    prefers-color-scheme via tokens.css.
+    {% endcomment %}
+    <script>
+      (function () {
+        try {
+          var stored = window.localStorage.getItem("thandkoi-theme");
+          if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+          }
+        } catch (err) {
+          /* Storage unavailable — falls back to prefers-color-scheme. */
+        }
+      })();
+    </script>
     <title>
       {% block title %}{% if page.seo_title %}{{ page.seo_title }}{% else %}{{ page.title }}{% endif %}{% endblock %}
       {% block title_suffix %} — The Thandkoi Clinics{% endblock %}
     </title>
+    <link rel="icon" href="{% static 'favicons/favicon.svg' %}" type="image/svg+xml" />
+    <link rel="icon" href="{% static 'favicons/favicon-32.png' %}" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="{% static 'favicons/favicon-180.png' %}" />
+    <link rel="icon" href="{% static 'favicons/favicon-512.png' %}" sizes="512x512" type="image/png" />
     {# No analytics or third-party scripts by default (privacy invariant). #}
+    <link rel="stylesheet" href="{% static 'css/tokens.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/fonts.css' %}" />
     <link rel="stylesheet" href="{% static 'css/base.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/components.css' %}" />
     {% block extra_head %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">
-    <main>
-      {% block content %}{% endblock %}
-    </main>
+    <a class="skip-link" href="#main-content">{% translate "Skip to main content" %}</a>
+    <div class="site">
+      {% include "partials/header.html" %}
+      <main id="main-content">
+        {% block content %}{% endblock %}
+      </main>
+      {% include "partials/footer.html" %}
+    </div>
+    <script src="{% static 'js/theme-toggle.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
   </body>
 </html>

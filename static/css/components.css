@@ -1,0 +1,295 @@
+/*
+ * Header, footer, nav, buttons, cards, theme toggle.
+ *
+ * All colour comes from tokens.css custom properties — zero per-component
+ * dark-mode overrides in this file, per Plan 03's decision table. All
+ * directional spacing uses CSS logical properties (inline-start/end,
+ * block-start/end) instead of left/right, so dir="rtl" mirrors the whole
+ * header/nav/footer automatically without a separate RTL stylesheet.
+ */
+
+/* --- Site header ---------------------------------------------------------- */
+.site-header {
+  border-block-end: 1px solid var(--color-border-default);
+  background-color: var(--color-surface);
+}
+
+.site-header__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+}
+
+.site-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  text-decoration: none;
+}
+
+.site-header__logo {
+  height: 2.5rem;
+  width: auto;
+}
+
+.site-header__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* --- Primary nav -----------------------------------------------------------
+   Plain HTML/CSS <details> disclosure for the mobile nav — no JS beyond the
+   theme toggle (Plan 03's "minimal JS" decision). On wide viewports the
+   <details> chrome is hidden and the list is shown inline instead. */
+.primary-nav {
+  border-block-end: 1px solid var(--color-border-default);
+}
+
+.primary-nav[open] > summary {
+  border-block-end: 1px solid var(--color-border-default);
+}
+
+.primary-nav > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2);
+  font-family: var(--font-heading);
+  font-weight: 700;
+}
+
+.primary-nav > summary::-webkit-details-marker {
+  display: none;
+}
+
+.primary-nav > summary::after {
+  content: "\2630";
+  font-size: var(--font-size-md);
+}
+
+.primary-nav[open] > summary::after {
+  content: "\2715";
+}
+
+.primary-nav__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.primary-nav__list a {
+  display: block;
+  padding-block: var(--space-1);
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.primary-nav__list a:hover,
+.primary-nav__list a:focus-visible {
+  color: var(--color-brand-hover);
+}
+
+.primary-nav__list a[aria-current="page"] {
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+@media (min-width: 56rem) {
+  .primary-nav {
+    border-block-end: none;
+  }
+
+  .primary-nav > summary {
+    display: none;
+  }
+
+  .primary-nav__list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 0;
+  }
+
+  .primary-nav[open] > summary {
+    border-block-end: none;
+  }
+}
+
+/* --- Language switcher ------------------------------------------------------ */
+.language-switcher {
+  display: flex;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+}
+
+.language-switcher a {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--color-text-soft);
+}
+
+.language-switcher a[aria-current="true"] {
+  background-color: var(--color-brand);
+  border-color: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+/* --- Theme toggle ------------------------------------------------------------ */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  border: 1px solid var(--color-border-default);
+  border-radius: 999px;
+  background-color: transparent;
+  color: var(--color-text);
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-brand-hover);
+}
+
+.theme-toggle__icon {
+  width: 1em;
+  height: 1em;
+}
+
+/* Hidden until JS confirms it can actually do something (progressive
+   enhancement — see static/js/theme-toggle.js). */
+.theme-toggle[hidden] {
+  display: none;
+}
+
+/* --- Buttons -------------------------------------------------------------- */
+.button {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 0.65em 1.25em;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+}
+
+.button--primary {
+  background-color: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+.button--primary:hover {
+  background-color: var(--color-brand-hover);
+  color: var(--color-on-brand);
+}
+
+.button--donate {
+  background-color: var(--color-donate-bg);
+  color: var(--color-donate-text);
+}
+
+.button--donate:hover {
+  filter: brightness(1.05);
+}
+
+.button--outline {
+  background-color: transparent;
+  border-color: currentColor;
+  color: var(--color-text);
+}
+
+/* --- Cards ------------------------------------------------------------------ */
+.card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  padding: var(--space-3);
+}
+
+/* --- Site footer -------------------------------------------------------------
+   Always the dark teal ground, in both themes (brand-guidelines.md's
+   "Footer / deepest ground") — uses its own fixed --color-footer-* tokens
+   rather than the page's light/dark tokens, so it's one visual family with
+   dark mode without literally being "dark mode" logic. */
+.site-footer {
+  background-color: var(--color-footer-bg);
+  color: var(--color-footer-text);
+  margin-block-start: var(--space-8);
+}
+
+.site-footer a {
+  color: var(--color-pale-aqua);
+}
+
+.site-footer__grid {
+  display: grid;
+  gap: var(--space-4);
+  padding-block: var(--space-6);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 48rem) {
+  .site-footer__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.site-footer__heading {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-pale-aqua);
+  margin-block-end: var(--space-1);
+}
+
+.site-footer__meta {
+  border-block-start: 1px solid var(--color-footer-border);
+  padding-block: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-footer-text-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  justify-content: space-between;
+}
+
+.site-footer__socials {
+  display: flex;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* --- Error pages ------------------------------------------------------------ */
+.error-page {
+  max-width: var(--reading-width);
+  margin-inline: auto;
+  padding-block: var(--space-8);
+  text-align: center;
+}
+
+.error-page__code {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-2xl);
+  color: var(--color-brand);
+}

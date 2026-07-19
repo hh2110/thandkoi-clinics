@@ -71,6 +71,11 @@ MIDDLEWARE = [
     # stack so it runs right after the security middleware.
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # Must come after SessionMiddleware, before CommonMiddleware (Django
+    # docs). Activates the request language from the /en/, /ur/ URL prefix
+    # used by i18n_patterns in config/urls.py, and redirects unprefixed
+    # public URLs to the detected language.
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -92,6 +97,12 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                # Exposes LANGUAGE_CODE / LANGUAGE_BIDI / LANGUAGES to every
+                # template — base.html's <html lang dir> switch reads these.
+                "django.template.context_processors.i18n",
+                # Contact/bank/social placeholders for the footer — config,
+                # not hardcoded content (see apps/core/context_processors.py).
+                "apps.core.context_processors.org_contact",
             ],
         },
     },
@@ -133,10 +144,17 @@ AUTH_PASSWORD_VALIDATORS = [
 # Content is English + Urdu (Pashto may follow); build with i18n on from day one.
 LANGUAGE_CODE = "en"
 
+# Native autonyms (how a language names itself), not English translations of
+# the name — that's what shows in the language switcher.
 LANGUAGES = [
     ("en", "English"),
-    ("ur", "Urdu"),
+    ("ur", "اردو"),
 ]
+
+# .po files for UI-string translation (Plan 03 wires the directory; Plan 10
+# is the first plan to actually add translated strings, content translation
+# is a separate, wagtail-localize concern).
+LOCALE_PATHS = [BASE_DIR / "locale"]
 
 TIME_ZONE = "Asia/Karachi"
 USE_I18N = True
@@ -178,3 +196,14 @@ WAGTAILADMIN_BASE_URL = env("WAGTAILADMIN_BASE_URL", default="http://localhost:8
 
 # Restrict document file types to a safe set (no Excel exports, ever).
 WAGTAILDOCS_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "gif", "webp"]
+
+# --- Org contact / bank / socials (site footer placeholders) ---------------
+# "Contact and bank details are configured in the running application, not
+# stored in this repository" (architecture brief). Plan 03 wires the footer
+# to read these rather than hardcoding placeholder text; Plan 05 (Donate)
+# will likely move bank details into a proper Wagtail-editable settings model
+# once there's real content to manage — env vars are enough for now.
+ORG_CONTACT_EMAIL = env("ORG_CONTACT_EMAIL", default="")
+ORG_CONTACT_PHONE = env("ORG_CONTACT_PHONE", default="")
+ORG_BANK_DETAILS = env("ORG_BANK_DETAILS", default="")
+ORG_SOCIAL_LINKS = env.dict("ORG_SOCIAL_LINKS", default={})

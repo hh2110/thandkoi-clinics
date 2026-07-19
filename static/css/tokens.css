@@ -1,0 +1,153 @@
+/*
+ * Design tokens: colour, type scale, spacing.
+ *
+ * Layering (brand-guidelines.md's dark-theme section + Plan 03's decision
+ * table): `:root` carries the light palette as the default/fallback, the
+ * `prefers-color-scheme: dark` media query overrides it for visitors who
+ * haven't made an explicit choice, and `:root[data-theme="…"]` overrides
+ * *that* in both directions once a visitor picks a theme explicitly (see
+ * `static/js/theme-toggle.js` and the anti-FOUC script in `templates/base.html`).
+ *
+ * Every other stylesheet in this project reads these custom properties only —
+ * never a literal hex value, never the media query directly — so a component
+ * gets both themes for free.
+ */
+
+:root {
+  /* --- Core brand -------------------------------------------------------- */
+  --color-teal-brand: #086c7e;
+  --color-teal-deep: #0a3e48;
+  --color-teal-bright: #12879b;
+  --color-pale-aqua: #a0e0e8;
+  --color-aqua-tint: #e4f4f6;
+
+  /* --- Accent: coral (decorative — cross/heart motif only) ---------------- */
+  --color-coral: #ef5148;
+  --color-coral-deep: #d83a30;
+  --color-peach: #f0b878;
+
+  /* --- Accent: amber (Donate CTA only) ------------------------------------ */
+  --color-amber-on-light: #ce8a2c;
+  --color-amber-on-dark: #e8b04a;
+
+  /* --- Neutrals: light theme (default) ------------------------------------ */
+  --color-ink: #0e2025;
+  --color-ink-soft: #3e5257;
+  --color-ink-faint: #728a8f;
+  --color-border: #e0e7e8;
+  --color-paper: #f2f6f6;
+  --color-card: #ffffff;
+
+  /* --- Semantic tokens (what components actually read) -------------------- */
+  --color-bg: var(--color-paper);
+  --color-surface: var(--color-card);
+  --color-text: var(--color-ink);
+  --color-text-soft: var(--color-ink-soft);
+  --color-text-faint: var(--color-ink-faint);
+  --color-border-default: var(--color-border);
+  --color-brand: var(--color-teal-brand);
+  --color-brand-hover: var(--color-teal-bright);
+  --color-brand-deep: var(--color-teal-deep);
+  --color-accent-soft-bg: var(--color-aqua-tint);
+  --color-on-brand: #ffffff;
+  --color-donate-bg: var(--color-amber-on-light);
+  --color-donate-text: #ffffff;
+  --color-focus-ring: var(--color-teal-bright);
+
+  /* Footer is always the dark teal ground, in both themes (brand-guidelines
+     "Footer / deepest ground"), so it gets its own fixed tokens rather than
+     reading the page's light/dark tokens. */
+  --color-footer-bg: var(--color-teal-deep);
+  --color-footer-text: var(--color-paper);
+  --color-footer-text-soft: #abb4b6;
+  --color-footer-border: #195a67;
+
+  color-scheme: light dark;
+
+  /* --- Type scale (1.25 ratio) --------------------------------------------- */
+  --font-size-xs: 0.8rem;
+  --font-size-sm: 1rem;
+  --font-size-md: 1.25rem;
+  --font-size-lg: 1.563rem;
+  --font-size-xl: 1.953rem;
+  --font-size-2xl: 2.441rem;
+
+  /* --- Spacing (8px base unit) --------------------------------------------- */
+  --space-1: 0.5rem; /* 8px */
+  --space-2: 1rem; /* 16px */
+  --space-3: 1.5rem; /* 24px */
+  --space-4: 2rem; /* 32px */
+  --space-6: 3rem; /* 48px */
+  --space-8: 4rem; /* 64px */
+
+  /* --- Layout --------------------------------------------------------------- */
+  --reading-width: 45rem; /* ~720px */
+  --card-radius: 12px;
+  --card-shadow: 0 1px 2px rgba(10, 62, 72, 0.06), 0 4px 12px rgba(10, 62, 72, 0.08);
+
+  /* --- Type families -------------------------------------------------------- */
+  --font-heading: "Archivo", "Noto Naskh Arabic", sans-serif;
+  --font-body: "Public Sans", "Noto Naskh Arabic", sans-serif;
+  --font-urdu-display: "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif;
+}
+
+/* --- Dark theme: OS preference (fallback signal, no explicit choice yet) --- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ink: #f2f6f6; /* reuses Paper token, per brand-guidelines.md */
+    --color-ink-soft: #abb4b6;
+    --color-ink-faint: #9ea0a1;
+    --color-border: #195a67;
+    --color-paper: #0a3e48; /* reuses Teal Deep token */
+    --color-card: #0d4f5c;
+
+    --color-bg: var(--color-paper);
+    --color-surface: var(--color-card);
+    --color-text: var(--color-ink);
+    --color-text-soft: var(--color-ink-soft);
+    --color-text-faint: var(--color-ink-faint);
+    --color-border-default: var(--color-border);
+    --color-donate-bg: var(--color-amber-on-dark);
+    --color-donate-text: var(--color-ink);
+    --color-accent-soft-bg: var(--color-teal-deep);
+  }
+}
+
+/* --- Explicit user choice always wins, in either direction ----------------- */
+:root[data-theme="dark"] {
+  --color-ink: #f2f6f6;
+  --color-ink-soft: #abb4b6;
+  --color-ink-faint: #9ea0a1;
+  --color-border: #195a67;
+  --color-paper: #0a3e48;
+  --color-card: #0d4f5c;
+
+  --color-bg: var(--color-paper);
+  --color-surface: var(--color-card);
+  --color-text: var(--color-ink);
+  --color-text-soft: var(--color-ink-soft);
+  --color-text-faint: var(--color-ink-faint);
+  --color-border-default: var(--color-border);
+  --color-donate-bg: var(--color-amber-on-dark);
+  --color-donate-text: var(--color-ink);
+  --color-accent-soft-bg: var(--color-teal-deep);
+}
+
+:root[data-theme="light"] {
+  --color-ink: #0e2025;
+  --color-ink-soft: #3e5257;
+  --color-ink-faint: #728a8f;
+  --color-border: #e0e7e8;
+  --color-paper: #f2f6f6;
+  --color-card: #ffffff;
+
+  --color-bg: var(--color-paper);
+  --color-surface: var(--color-card);
+  --color-text: var(--color-ink);
+  --color-text-soft: var(--color-ink-soft);
+  --color-text-faint: var(--color-ink-faint);
+  --color-border-default: var(--color-border);
+  --color-donate-bg: var(--color-amber-on-light);
+  --color-donate-text: #ffffff;
+  --color-accent-soft-bg: var(--color-aqua-tint);
+}

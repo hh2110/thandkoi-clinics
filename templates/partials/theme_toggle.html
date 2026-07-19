@@ -1,0 +1,23 @@
+{% load i18n %}
+{% comment %}
+Starts hidden: static/js/theme-toggle.js reveals it once it confirms it
+can actually flip the theme (progressive enhancement — with JS disabled
+the button never appears and the site just follows the OS
+prefers-color-scheme via tokens.css's media query). aria-pressed reflects
+whether dark mode is currently active; the visible label plus this
+attribute together give the button a real accessible name and state, not
+just an icon.
+{% endcomment %}
+<button
+  type="button"
+  class="theme-toggle"
+  data-theme-toggle
+  aria-pressed="false"
+  hidden
+>
+  <svg class="theme-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4"></circle>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+  </svg>
+  <span data-theme-toggle-label>{% translate "Light theme" %}</span>
+</button>

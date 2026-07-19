@@ -1,0 +1,33 @@
+{% load static i18n %}
+{% comment %}
+LANGUAGE_CODE is resolved through `default` first (as the *main* filtered
+variable, not a filter argument) before it's ever used in string
+concatenation below — Django's `{% with %}`/`add` filter argument resolution
+raises VariableDoesNotExist for a genuinely-missing context variable instead
+of degrading gracefully, unlike `{{ var|default:… }}` output. That matters
+here because 500.html (which includes this partial via base.html) is
+rendered by Django's default error handler with NO context at all — not
+even `request` — so LANGUAGE_CODE may be entirely absent, not just falsy.
+{% endcomment %}
+{% with lang=LANGUAGE_CODE|default:"en" %}
+{% with home_path="/"|add:lang|add:"/" %}
+<header class="site-header">
+  <div class="wrapper site-header__bar">
+    <a class="site-header__brand" href="{{ home_path }}" aria-label="{% translate 'The Thandkoi Clinics — home' %}">
+      <img
+        class="site-header__logo"
+        src="{% static 'images/logo.svg' %}"
+        alt="{% translate 'The Thandkoi Clinics' %}"
+        width="192"
+        height="144"
+      />
+    </a>
+    <div class="site-header__controls">
+      {% include "partials/language_switcher.html" %}
+      {% include "partials/theme_toggle.html" %}
+    </div>
+  </div>
+  {% include "partials/nav.html" %}
+</header>
+{% endwith %}
+{% endwith %}
