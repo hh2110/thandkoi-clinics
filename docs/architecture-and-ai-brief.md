@@ -182,9 +182,10 @@ by construction.
 
 ## 8. Open items
 
-- Confirm domain registration for `thandkoiclinics.com`.
+- ~~Confirm domain registration for `thandkoiclinics.com`.~~ Registered via
+  Cloudflare Registrar, 2026-07-19.
 - Confirm the list of admin accounts (uploaders/approvers).
-- Provide logo and brand assets (palette can otherwise be extracted from the
-  newsletter).
+- ~~Provide logo and brand assets.~~ Done — see
+  [brand-guidelines.md](brand-guidelines.md).
 - Decide whether to retain the optional de-identified row-level table or keep
   aggregates only.
