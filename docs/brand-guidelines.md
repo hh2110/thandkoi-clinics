@@ -7,9 +7,12 @@ material. **The logo is the authority** — all colours below are sampled from t
 official logo (see [`brand/`](../brand/)).
 
 > Earlier drafts inferred colours from the newsletters and drifted toward a deep
-> pine-teal + mint + amber. The logo corrects this: the brand is a **mid
-> teal-cyan** with a **coral-red** accent and a **pale-aqua** secondary. This
-> document is now aligned to the logo.
+> pine-teal + mint + amber as general brand colours. The logo corrects this: the
+> brand is a **mid teal-cyan** with a **coral-red** accent (cross/heart motif
+> only) and a **pale-aqua** secondary. This document is now aligned to the logo.
+> Amber reappears once, deliberately, as the Donate button colour (§2) — coral
+> read as alarming for a donation ask; it is not a return to the earlier
+> inferred palette.
 
 ## 1. Logo
 
@@ -18,32 +21,39 @@ swaddled child) with a red medical cross where the ring opens, above the wordmar
 **THE / THANDKOI / CLINICS**.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../brand/logo-reversed.png">
-  <img alt="The Thandkoi Clinics logo" src="../brand/logo-primary.jpg" width="300">
+  <img alt="The Thandkoi Clinics logo" src="../brand/logo.svg" width="300">
 </picture>
 
-### Light and dark versions
+### Vector assets (primary — use these)
 
-The wordmark and ring are **white**, so the logo needs a different treatment per
-background:
+The logo is now true vector (SVG), professionally traced, transparent
+background. Because the ring is an outline (not a solid disc) with enough
+contrast in its own right, **one asset works on both light and dark
+backgrounds** — no separate light/dark files needed.
 
-| Version | File | Use on |
-|---|---|---|
-| **Light / default** | [`brand/logo-primary.jpg`](../brand/logo-primary.jpg) | Light and neutral backgrounds — the self-contained teal badge. |
-| **Dark / reversed** | [`brand/logo-reversed.png`](../brand/logo-reversed.png) | Dark or teal backgrounds (footer, dark theme) — transparent, so the white ring + wordmark show. **Do not place on white** (they'd disappear). |
-
-Other assets in [`brand/`](../brand/): `logo-variant-orange-cap.jpg` and product
-mockups.
+| File | Use |
+|---|---|
+| [`brand/logo.svg`](../brand/logo.svg) | Full lockup — mark + wordmark. Primary logo for header, footer, print. |
+| [`brand/logo-mark.svg`](../brand/logo-mark.svg) | Mark only, no wordmark. Square-ish crop, for contexts too narrow for the full lockup (social avatar, app icon). |
+| [`brand/favicon.svg`](../brand/favicon.svg) / `favicon-32.png` / `favicon-180.png` / `favicon-512.png` | Browser tab / bookmark / home-screen icons. |
 
 - **Clear space:** padding equal to the ring's stroke height around the mark.
-- **Minimum size:** ~140px wide so the illustration stays legible.
-- **Don't:** recolour, stretch, add effects, or place the light badge on a busy
-  photo.
-- **Practical note:** these files are raster (detailed faces). For small sizes,
-  favicons, and single-colour uses we should commission a **simplified vector
-  version** (ring + cross + wordmark) — the family illustration doesn't reproduce
-  well below ~80px, and the reversed PNG is auto-generated from the raster.
-  _Vector export still needed._
+- **Minimum size:** ~140px wide for the full lockup so the illustration stays
+  legible.
+- **Don't:** recolour, stretch, or add effects.
+- **Known limitation:** the illustration has real detail (individual faces, a
+  polka-dot pattern) that gets muddy at 32px — the 32px favicon export is
+  usable but not crisp. If a cleaner tiny-icon treatment is ever needed,
+  a deliberately simplified icon (ring + cross only) would read better than
+  shrinking the full mark further.
+
+### Legacy raster assets
+
+[`brand/logo-primary.jpg`](../brand/logo-primary.jpg) and
+[`brand/logo-reversed.png`](../brand/logo-reversed.png) are the original raster
+files the vector assets above were traced from — kept for reference, superseded
+by the SVGs for all actual use. Other assets in [`brand/`](../brand/):
+`logo-variant-orange-cap.jpg` and product mockups.
 
 ## 2. Colour palette
 
@@ -59,13 +69,23 @@ All values sampled from `brand/logo-primary.jpg`.
 | Pale Aqua | `#A0E0E8` | The "CLINICS" tone. Light accent + highlights **on dark** — not small text on light |
 | Aqua Tint | `#E4F4F6` | Soft section backgrounds, dividers |
 
-### Accent — coral (the cross & heart)
+### Accent — coral (the cross & heart only)
 
 | Token | Hex | Role |
 |---|---|---|
-| Coral | `#EF5148` | Brand accent; medical-cross & heart motif; **primary call-to-action (Donate)** |
-| Coral Deep | `#D83A30` | Coral button fills / hover (better text contrast) |
+| Coral | `#EF5148` | Brand accent; medical-cross & heart motif **only** — not for buttons or CTAs |
+| Coral Deep | `#D83A30` | Coral fills / hover, where coral is used decoratively |
 | Peach | `#F0B878` | Illustration warmth; optional soft wash. Decorative only |
+
+### Accent — amber (Donate call-to-action)
+
+Coral read as alarming/negative for a donation ask, so Donate gets its own warm,
+welcoming accent instead — coral stays reserved for the cross/heart motif.
+
+| Token | Hex | Role |
+|---|---|---|
+| Amber (light) | `#CE8A2C` | **Primary Donate CTA** on light backgrounds |
+| Amber (dark) | `#E8B04A` | **Primary Donate CTA** on dark backgrounds — lighter for contrast |
 
 ### Neutrals (cyan-teal biased, so they read as chosen)
 
@@ -84,8 +104,11 @@ All values sampled from `brand/logo-primary.jpg`.
 - ✅ **White on Teal Brand / Teal Deep** — safe for buttons and dark sections.
 - ✅ **Teal Deep on white** — safe for links/headings; use Teal Deep (not Teal
   Brand) for small text on white to stay above 4.5:1.
-- ⚠️ **Coral** — use **Coral Deep** for button fills, with **white bold ≥16px**
-  text (large-text AA). Coral is not for small body text on white.
+- ⚠️ **Coral** — decorative use only (cross/heart motif); if ever used as a fill,
+  use **Coral Deep** with **white bold ≥16px** text (large-text AA). Not for
+  small body text on white.
+- ⚠️ **Amber** — use **Amber (dark) `#E8B04A`** with dark ink text, or **Amber
+  (light) `#CE8A2C`** with white text, to stay above 4.5:1 for the Donate CTA.
 - ⚠️ **Pale Aqua / Peach** — decorative / on-dark only; never body text on light.
 - "Free / Zakat beneficiary" badges use **Teal**, not a new colour.
 
@@ -105,8 +128,8 @@ open-source (SIL OFL), free, and self-hostable.
 | Urdu (Nastaliq) | **Noto Nastaliq Urdu** | Headings/quotes: چراغ شفا, صحت سب کے لیے. |
 | Urdu / Arabic (UI) | **Noto Naskh Arabic** | Inline labels where Nastaliq is too tall. |
 
-Wordmark styling echoes the logo: small "THE", heavy "THANDKOI", lighter "CLINICS"
-in Pale Aqua on teal.
+Wordmark styling echoes the logo: small "THE", heavy "THANDKOI" in Teal Brand,
+lighter "CLINICS" in Pale Aqua.
 
 **Type scale** (1.25): 0.8 / 1.0 / 1.25 / 1.563 / 1.953 / 2.441 rem. Running text
 ~65 characters wide; `text-wrap: balance` on headings; uppercase labels ~0.14em
@@ -139,16 +162,18 @@ _Serif is optional for long-form editorial only; the default UI is sans._
 
 ## 7. Do / Don't
 
-- ✅ Anchor on Teal Brand; use Coral for the donate action and the cross/heart.
+- ✅ Anchor on Teal Brand; use Amber for the donate action, Coral only for the
+  cross/heart motif.
 - ✅ Let whitespace and type carry the page.
 - ✅ Give Urdu the same care as English (RTL, proper Nastaliq).
-- ❌ Don't reintroduce navy/mint/amber — they aren't in the logo.
+- ❌ Don't reintroduce navy/mint — they aren't in the logo.
+- ❌ Don't use Amber anywhere except the Donate CTA — it's a deliberate, scoped
+  exception, not a general brand colour.
 - ❌ Don't use Coral, Pale Aqua, or Peach for small body text.
 - ❌ Don't add gradients, heavy shadows, or emoji as section markers.
 
 ## 8. Open items
 
-- Commission a **vector version** of the logo (colour / reversed / single-colour)
-  for small sizes and favicons.
-- Confirm **Coral** as the donate/CTA colour (replaces the earlier amber idea).
-- Confirm the **sans** type direction (Archivo + Public Sans).
+- None outstanding — logo (vector, §1), colour palette incl. Donate accent
+  (§2), and type direction (§3, Archivo + Public Sans) are all confirmed.
+  This document can move from draft to final on sign-off.
