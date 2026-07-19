@@ -19,6 +19,7 @@ The project has two parts:
 ## Docs
 
 - [Architecture & AI Capability Brief](docs/architecture-and-ai-brief.md)
+- [Brand Guidelines](docs/brand-guidelines.md)
 
 ## Status
 
