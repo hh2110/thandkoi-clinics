@@ -225,8 +225,6 @@ not the test suite.
   free). Since anyone who can run a workflow already has write access to
   the repo, "who's the required reviewer" is now moot — it's whoever has
   repo write access, same as who can merge a PR.
-
-## Open questions for the maintainer
-
-- Confirm Render Starter ($7/mo) for production is acceptable, or prefer to
-  stay fully free and accept production cold-starts for now.
+- **Production compute tier**: resolved — **Render Starter ($7/mo)**. The
+  maintainer chose to try it and reassess rather than stay on the free tier
+  with cold-starts; revisit only if cost or performance warrants it.

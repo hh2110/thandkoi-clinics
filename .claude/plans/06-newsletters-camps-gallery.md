@@ -76,7 +76,7 @@ here.
 |---|---|---|
 | Page structure | Index + child pages (Wagtail's standard archive pattern) for both Newsletter and Camp Report | Each issue/camp is independently linkable, shareable, and gets its own SEO metadata — unlike Plan 04's Team/Service children, these need real page-ness. |
 | Gallery structure | One `GalleryPage`, orderable `GalleryImage` children (not separate pages) | Mirrors Plan 04's Team/Service pattern — gallery images don't need their own URL or preview. |
-| Camp Report fields | Structured, not just a rich-text blob: date, location, patients-served (number), services offered (list), partner credits (text/list), narrative body, photos | Structured fields let a future plan (if ever wanted) aggregate across camps without re-parsing prose; costs nothing now since the source content is already this shape. |
+| Camp Report fields | Structured, not just a rich-text blob: date, location, **patients-served split by category** (e.g. children / general / Welfare-free-service — matching the PDF's own breakdown, with a derived total), services offered (list), partner credits (text/list), narrative body, photos | **Maintainer decision:** split patients-served by category rather than a single total — the clinic already tracks it that way. Structured category fields let a future plan aggregate across camps without re-parsing prose; costs nothing now since the source content is already this shape. |
 | Consent field | `consent_confirmed` required (not just present) on every `GalleryImage` and every Camp Report photo before publish | Plan 04 introduced this as a convention; this is the plan where it's actually load-bearing — these are exactly the photos likely to show identifiable patients. |
 | Home teaser wiring | Query the latest published `NewsletterPage`; leave the Report half of the teaser exactly as Plan 04 left it (hidden) until Plan 08 | Partial wiring is fine — the teaser was built to degrade gracefully per-content-type, not all-or-nothing. |
 
@@ -100,7 +100,9 @@ HomePage
    first) + `NewsletterPage` (issue date, `StreamField` body for rich
    content + inline images).
 2. **Camp Report models** — `CampReportIndexPage` + `CampReportPage` (date,
-   location, patients-served integer field(s), services-offered list,
+   location, **patients-served as per-category integer fields** — e.g.
+   children / general / Welfare-free-service — with the total derived from
+   them rather than entered separately, services-offered list,
    partner-credits field, narrative `RichTextField`/`StreamField`, photo
    block using the consent-required image pattern).
 3. **Gallery model** — `GalleryPage` + `GalleryImage` orderable child
@@ -140,11 +142,14 @@ HomePage
 - `ruff check` and `pytest` (including the draft-visibility and consent
   tests) pass in CI.
 
-## Open questions for the maintainer
+## Resolved questions (answered by the maintainer)
 
-- Do back-issues of the existing newsletters (mentioned in the architecture
-  brief as already produced) exist as files somewhere, or does the archive
-  start empty at launch?
-- Camp Report "patients served" — one total figure, or split by category
-  like the PDF's own numbers (e.g. children vs. general vs. Welfare/free
-  service)? The PDF suggests the clinic already tracks it by category.
+- **Newsletter back-issues** → **yes, they exist** and will populate the
+  archive: the `NewsletterIndexPage` is built to hold back-issues, entered as
+  a content-entry step once the source files are gathered (the org-profile
+  PDF isn't the source — see "Source material" above). The archive is not
+  assumed to start empty at launch.
+- **Camp Report "patients served"** → **split by category** (e.g. children /
+  general / Welfare-free-service), matching the PDF's own breakdown, with the
+  total derived — not a single lumped figure. Reflected in the Camp Report
+  fields decision and task checklist above.
