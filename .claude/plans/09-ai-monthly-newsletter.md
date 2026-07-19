@@ -33,8 +33,10 @@ never writes anything an Administrator hasn't seen.
   interface) — never a re-parse of raw exports, never a read of
   `DeidentifiedVisit` directly for the common case (see "Data interface"
   below).
-- An **admin-notes and photos input mechanism** feeding the prompt (mechanism
-  TBD — see Open questions).
+- An **admin-notes and photos input mechanism** feeding the prompt: notes are
+  a file the admin prepares outside the platform and uploads; photos are
+  either picked from the existing Plan 06 gallery or uploaded directly
+  (confirmed by the maintainer on PR #17 — see "Resolved questions" below).
 - The **tool functions** the model calls during drafting: `get_month_stats`,
   `get_trend_vs_last_month`, `get_previous_newsletter` (brief §6.2), all
   read-only over aggregates/published content.
@@ -135,37 +137,27 @@ This plan is a **reader**, not a re-implementer, of Plan 08's data model:
 | Failure handling | If the Anthropic call fails, times out, or the output fails a basic sanity check, **no draft is created** for that month — this is a "try again" / "run again later" situation, not a fallback publish | The opposite of Plan 08's daily page, which must ship its numbers regardless. Here, nothing else on the page depends on the AI call succeeding, so there is nothing to protect by publishing a partial or fallback newsletter. |
 | Testing | Anthropic client mocked in CI via the existing autouse `conftest.py` guard (Plan 02) — real client never constructible in tests; a guardrail test captures the mocked client's tool-call payloads and asserts they contain only real `DailyAggregate`-derived numbers | Zero real API calls in the suite, exactly like every other AI call in this codebase (Plan 02's convention, reused unchanged by Plan 08 and now this plan). |
 | Bilingual scope | English only in this plan | Urdu/Pashto translation of newsletters (and other content) is out of scope for the current roadmap — see [`.claude/plans/README.md`](README.md)'s "Out of scope" section. Not scope-creeping into that here. |
+| Monthly trigger mechanism | A management command run **manually** by an Administrator at month-end — no scheduled/cron job | **Maintainer decision (PR #17).** Drafting is an explicit, human-initiated action, not something that runs unattended. |
+| Admin-notes input | A **file the admin prepares outside the platform and uploads** through the admin — not a live text field filled in in-app | **Maintainer decision (PR #17).** Exact file format/parsing is an implementation detail for the eventual build PR (e.g. plain text/Markdown is the simplest fit); the structural decision is "upload a file", not "type into a form". |
+| Photo input | **Both**: the admin can pick from the existing Plan 06 gallery **or** upload new images directly for the newsletter | **Maintainer decision (PR #17).** Broader than the originally proposed "gallery-only" default — direct upload covers photos that aren't (yet) in the consent-gated gallery; any directly-uploaded photo still needs `consent_confirmed` per Plan 06's convention before it can appear in a published page. |
+| "The month" | Calendar month | **Maintainer decision (PR #17).** Confirms the doc's original assumption — no clinic-specific reporting period. |
+| Failure visibility | **No active notification** (no email/alert) — but a failed run must be visible somewhere in the admin console (e.g. an audit/log record an Administrator can check) | **Maintainer decision (PR #17).** Passive visibility, not push notification — mirrors Plan 08's `IngestRun` audit-row pattern (status visible on inspection, nothing emailed). |
+| `get_previous_newsletter` scope | Just the immediately previous issue | **Maintainer decision (PR #17).** Confirms the doc's original proposal — no need for a last-N window. |
 
-## Open questions for the maintainer
+## Resolved questions (answered by the maintainer on PR #17)
 
-- **Monthly trigger mechanism.** A management command run manually by an
-  Administrator at month-end, or a scheduled job (cron / Render cron / task
-  scheduler) that runs automatically and leaves a draft waiting? Either is
-  compatible with "no auto-publish" — the question is only whether *drafting*
-  itself is manual or scheduled.
-- **Admin-notes input.** How does the admin's monthly context (anecdotes,
-  things to highlight, corrections to tone) reach the prompt? Candidates: a
-  plain text field on a small "monthly newsletter request" admin form/model,
-  reused each month; an existing Wagtail admin rich-text field filled in
-  before running the drafting command; or something lighter-weight like an
-  email/doc pasted in ad hoc. No structural decision has been made yet.
-- **Photo input.** Do photos for the newsletter reuse Plan 06's
-  `GalleryImage`/consent pattern directly (e.g. the admin picks from already
-  consent-checked gallery images for that month), or is there a separate
-  upload step scoped just to the newsletter draft? Reusing Plan 06's
-  consent-gated pattern seems like the natural default, but it hasn't been
-  confirmed with the maintainer.
-- **What counts as "the month."** Calendar month strictly, or a
-  clinic-defined reporting period that might not align to calendar
-  boundaries? Assumed calendar month unless told otherwise.
-- **Retry/notification on failure.** When a drafting run fails (API error,
-  sanity-check rejection), does anything notify the Administrator that no
-  draft was produced, or is "check the admin, see nothing new" the whole
-  mechanism? Worth deciding before implementation, not load-bearing enough
-  to block this plan doc.
-- **`get_previous_newsletter` scope.** Just the immediately previous issue,
-  or the last N issues for a stronger voice-consistency signal? Proposed as
-  "just the previous one" for simplicity, open to revision.
+- **Monthly trigger mechanism** → manual management command run by an
+  Administrator; no scheduled job.
+- **Admin-notes input** → a file the admin creates outside the platform and
+  uploads through the admin, rather than a live in-app text field.
+- **Photo input** → both: pick from the existing Plan 06 gallery, or upload
+  new images directly for the newsletter (still consent-gated per Plan 06 if
+  they're to appear in a published page).
+- **What counts as "the month"** → calendar month.
+- **Retry/notification on failure** → no active notification; a failed run
+  must be visible to an Administrator somewhere in the admin console (an
+  audit/log record, not an email/alert).
+- **`get_previous_newsletter` scope** → just the immediately previous issue.
 
 ## Task checklist (code — this plan's eventual implementation PR)
 
@@ -180,8 +172,10 @@ This plan is a **reader**, not a re-implementer, of Plan 08's data model:
 3. **Tool functions** — `get_month_stats(month)`, `get_trend_vs_last_month(month)`,
    `get_previous_newsletter()`, each a thin, typed, read-only wrapper with
    its own unit test independent of any AI call.
-4. **Admin-notes and photo input** — whatever mechanism is confirmed in the
-   Open questions above (form field, admin model, or reused Plan 06 pattern).
+4. **Admin-notes and photo input** — a file-upload field for the admin's
+   monthly notes (prepared outside the platform), plus a photo-selection step
+   that supports both picking existing Plan 06 `GalleryImage`s and uploading
+   new images directly (consent-gated, per Plan 06's convention).
 5. **Drafting call** — the one-shot prompt-with-tooling Anthropic call
    (`claude-opus-4-8`), assembling the month's data, notes, and photos, and
    producing newsletter body content.
@@ -189,10 +183,12 @@ This plan is a **reader**, not a re-implementer, of Plan 08's data model:
    under `NewsletterIndexPage` via `save_revision()`; no publish call
    anywhere in this code path (Plan 07 permission boundary).
 7. **Failure handling** — no draft on failure/timeout/sanity-check rejection;
-   log the failure for visibility (mechanism per the retry/notification open
-   question).
-8. **Trigger mechanism** — management command (manual or scheduled, per the
-   open question above) that runs the monthly rollup + drafting call.
+   log the failure to an admin-visible record (no email/alert — an
+   Administrator checks the admin console, mirroring Plan 08's `IngestRun`
+   audit-row pattern).
+8. **Trigger mechanism** — a management command, run manually by an
+   Administrator at month-end (no scheduled job), that runs the monthly
+   rollup + drafting call.
 9. **Deterministic-numbers guardrail test** — mocked-client test asserting
    every numeric value in the tool-call payloads and in the resulting draft
    traces back to a real `DailyAggregate`-derived computation, never a
