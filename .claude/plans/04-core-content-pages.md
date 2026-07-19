@@ -253,13 +253,8 @@ real content through `/admin/`. None of this touches git:
   copy.
 - **Team categories**: resolved — Doctors / Staff & Committee, matching the
   PDF's actual grouping (not the earlier Founders/Officers/Committee guess).
-
-## Open questions for the maintainer
-
-- Team member and infrastructure **photos** — the PDF's images aren't
-  pulled out by this plan's text extraction; are originals available
-  separately, or should this launch with placeholder/generic imagery for
-  people missing a photo?
-- Bank details are ready in the source PDF (p.19) to enter into the Contact
-  & Bank Details setting — confirm these are still current before they go
-  live (organisational documents can lag real account changes).
+- **Photos**: resolved (maintainer) — launch with **placeholder/generic
+  imagery** for any team member or infrastructure shot missing a real photo;
+  real originals can be swapped in later via the admin without a code change.
+- **Bank details**: resolved (maintainer) — the source PDF's bank details
+  (p.19) are **current**; use them for the Contact & Bank Details setting.

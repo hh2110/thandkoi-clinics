@@ -21,8 +21,11 @@ matters here too).
 ## Scope
 
 **In scope**
-- A `DonatePage` with Zakat/Sadaqa messaging and a bank-transfer "how to
-  give" section.
+- A `DonatePage` with **distinct Zakat and Sadaqa sections** (each with its
+  own heading and short description) and a bank-transfer "how to give"
+  section.
+- An **in-kind giving section** (medicine, equipment, volunteering, etc.)
+  routing to Contact / `tel:` / `mailto:` to arrange — no form/backend.
 - Reusing Plan 04's **Contact & Bank Details** setting for the actual bank
   fields — not a second copy of them.
 - The Amber donate-CTA styling (brand-guidelines.md §2) applied to this
@@ -67,19 +70,21 @@ pass, not text this plan's PR commits to the repo.
 |---|---|---|
 | Page model | `DonatePage`, plain `RichTextField`s (message, how-to-give steps) | Predictable content, no flexibility needed — same reasoning Plan 04 used for About/Contact. |
 | Bank details | Rendered from Plan 04's existing Contact & Bank Details setting, **not** re-entered as separate fields on `DonatePage` | One source of truth. If it lived in two places, a bank-detail correction would need two edits, and they'd eventually drift. |
-| Zakat vs. Sadaqa framing | One page, explains both (Zakat has specific Islamic eligibility/calculation rules; Sadaqa is general voluntary giving) rather than two separate pages | Matches the source PDF's single unified message; splitting into two pages would be more structure than the content warrants. |
-| "Another way to give" | A CTA to the Contact page (and/or direct `tel:`/`mailto:` links pulled from the same setting) for in-kind gifts, receipts, or questions | Keeps this page from needing any form/backend — consistent with Plan 04's Contact page decision (no contact form, no spam-handling surface). |
+| Zakat vs. Sadaqa framing | **One page, two structurally distinct sections** — a **Zakat** section and a **Sadaqa** section, each with its own heading and a short description (Zakat: specific Islamic eligibility/calculation rules; Sadaqa: general voluntary giving) | **Maintainer decision:** distinguish the two rather than blend them into one message. Still one page (not two), but the reader can clearly tell which form of giving is which. |
+| In-kind giving | **Included** — a dedicated section listing in-kind options (e.g. **medicine donations, equipment, volunteering**) alongside monetary bank transfer, each routing to the Contact page / `tel:` / `mailto:` to arrange | **Maintainer decision:** yes, surface in-kind giving, not monetary-only. Keeps this page form-free/backendless — arranging an in-kind gift is a "contact us" case, consistent with Plan 04's no-contact-form decision. |
+| "Another way to give" | A CTA to the Contact page (and/or direct `tel:`/`mailto:` links pulled from the same setting) for receipts or questions not covered by the giving sections above | Keeps this page from needing any form/backend — consistent with Plan 04's Contact page decision (no contact form, no spam-handling surface). |
 | Donate CTA styling | Amber (`#CE8A2C` light / `#E8B04A` dark) everywhere a donate link appears, per brand-guidelines.md | Already-established brand decision; this plan is what actually wires it into markup. |
 
 ## Task checklist (code — this plan's PR)
 
-1. **`DonatePage` model** — message `RichTextField`, how-to-give
-   `RichTextField` or a short `StreamField` if the steps benefit from
-   structure (numbered list block); no bank-detail fields (reuses the
-   setting).
-2. **Template** — renders the message, then bank details pulled live from
-   the Contact & Bank Details setting, then a "prefer another way to give?"
-   CTA to Contact/`tel:`/`mailto:`. Amber styling on the primary action per
+1. **`DonatePage` model** — separate `RichTextField`s (or a short
+   `StreamField`) for the **Zakat** section and the **Sadaqa** section (each
+   heading + short description), a how-to-give section, and an **in-kind
+   giving** section; no bank-detail fields (reuses the setting).
+2. **Template** — renders the Zakat and Sadaqa sections distinctly, then bank
+   details pulled live from the Contact & Bank Details setting, then the
+   in-kind giving options, then a "prefer another way to give?" CTA to
+   Contact/`tel:`/`mailto:`. Amber styling on the primary action per
    brand-guidelines.md §2/§4.
 3. **Wire up Home's CTA** — confirm `DonateCTABlock`'s link field can target
    this new page type (no code change needed if Plan 04 built it as a
@@ -93,7 +98,8 @@ pass, not text this plan's PR commits to the repo.
 
 ## Content entry checklist (post-deploy, via Wagtail admin — not part of this PR)
 
-1. `DonatePage` message and how-to-give copy, from source PDF p.18.
+1. `DonatePage` copy: the Zakat section, the Sadaqa section, how-to-give
+   steps, and the in-kind giving options — message from source PDF p.18.
 2. Point Home's `DonateCTABlock` at the new Donate page.
 3. Point any header/footer donate link at the new page.
 4. (Bank details themselves were already entered in Plan 04 — nothing to
@@ -110,11 +116,11 @@ pass, not text this plan's PR commits to the repo.
   not Coral or Teal.
 - `ruff check` and `pytest` pass in CI.
 
-## Open questions for the maintainer
+## Resolved questions (answered by the maintainer)
 
-- Is the single-page Zakat + Sadaqa framing right, or does the clinic want
-  them visually/structurally distinguished (e.g. separate sections with
-  their own headings) rather than one blended message?
-- Any specific "in-kind" giving options (medicine donations, equipment,
-  volunteering) to mention alongside bank transfer, or keep this strictly
-  to monetary giving for now?
+- **Zakat + Sadaqa framing** → **distinguish them**: one page, but two
+  structurally distinct sections (each its own heading + short description),
+  not one blended message.
+- **In-kind giving** → **include it**: a dedicated section listing options
+  such as medicine donations, equipment, and volunteering, alongside monetary
+  bank transfer — each routing to Contact to arrange (no form/backend).
