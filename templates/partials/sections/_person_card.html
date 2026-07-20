@@ -1,0 +1,28 @@
+{% load wagtailimages_tags %}
+{% comment %}
+Person-card variant of the Plan 03.5 card grid — the `.card` primitive with a
+portrait slot, name, role and short bio. Used by the Team page; composes the
+same card / card-grid vocabulary as `_card.html`, adding the photo + subtitle
+the roster needs.
+
+Context:
+  member — a TeamMember (name, role, photo, bio).
+
+An unset photo falls back to the shared `.media-placeholder` (square), so the
+grid never shows a broken or empty box (brand-guidelines.md §5: placeholders
+carry no identifiable person). The image alt is the member's name, so every
+portrait is labelled.
+{% endcomment %}
+<article class="card card--interactive person-card">
+  <div class="card__photo">
+    {% if member.photo %}
+      {% image member.photo fill-480x480 as portrait %}
+      <img src="{{ portrait.url }}" alt="{{ member.name }}" />
+    {% else %}
+      {% include "partials/sections/_media_placeholder.html" with caption=member.name ratio="1 / 1" %}
+    {% endif %}
+  </div>
+  {% if member.name %}<h3 class="card__title">{{ member.name }}</h3>{% endif %}
+  {% if member.role %}<p class="card__subtitle">{{ member.role }}</p>{% endif %}
+  {% if member.bio %}<p class="card__body">{{ member.bio }}</p>{% endif %}
+</article>

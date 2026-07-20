@@ -255,6 +255,28 @@
   margin-block: 0;
 }
 
+/* Person / service card photo slot. The image (or, when unset, the shared
+   `.media-placeholder`) fills the slot; the card padding frames it. */
+.card__photo {
+  margin-block-end: var(--space-2);
+}
+
+.card__photo img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--card-radius);
+}
+
+/* Role line on a person card, between the name and the bio. */
+.card__subtitle {
+  color: var(--color-brand);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  margin-block: 0 var(--space-1);
+}
+
 /* Hover lift — interactive cards only, gated below for reduced motion. */
 .card--interactive {
   transition: transform 0.15s ease, box-shadow 0.15s ease;

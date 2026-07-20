@@ -36,7 +36,7 @@ plan from 03.5 onward carries three lifecycle sections:
 | 02 | [Development lifecycle & environments](02-development-lifecycle.md) — staging/production split, CD pipeline, testing strategy, privacy-guardrail tests, mocked-vs-live AI in CI | 🚧 In progress |
 | 03 | [Design system & base templates](03-design-system.md) — brand tokens, self-hosted type, base templates, nav/footer, bilingual (EN/UR) routing + RTL, accessibility | ✅ Done |
 | 03.5 | [Design system enhancements & page layout components](03.5-design-enhancements.md) — reusable page-body kit (hero, stat band, card grid, feature split, CTA band, media grid, section rhythm) on top of the merged Plan 03 chrome | 🚧 In progress |
-| 04 | [Core content pages](04-core-content-pages.md) — Home, About, Team/Management, Our Work/Services, Contact | 📝 Drafted |
+| 04 | [Core content pages](04-core-content-pages.md) — Home, About, Team/Management, Our Work/Services, Contact | 🚧 In progress |
 | 05 | [Donate placeholder](05-donate-placeholder.md) — Zakat/Sadaqa message + bank/contact config | 📝 Drafted |
 | 06 | [Newsletters, Camp Reports & Gallery](06-newsletters-camps-gallery.md) — archive content types, consent-gated photo gallery | 📝 Drafted |
 | 07 | [Accounts & roles](07-accounts-roles.md) — uploaders/approvers | 📝 Drafted |

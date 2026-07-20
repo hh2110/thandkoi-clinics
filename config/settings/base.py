@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     # Wagtail
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
+    "wagtail.contrib.settings",
     "wagtail.embeds",
     "wagtail.sites",
     "wagtail.users",
@@ -100,9 +101,11 @@ TEMPLATES = [
                 # Exposes LANGUAGE_CODE / LANGUAGE_BIDI / LANGUAGES to every
                 # template — base.html's <html lang dir> switch reads these.
                 "django.template.context_processors.i18n",
-                # Contact/bank/social placeholders for the footer — config,
-                # not hardcoded content (see apps/core/context_processors.py).
-                "apps.core.context_processors.org_contact",
+                # Exposes site-wide Wagtail settings (Plan 04's Contact & Bank
+                # Details singleton) to every template as `settings.<app>.<Model>`.
+                # The footer and Contact page read the shared setting from here,
+                # so editing it in /admin/ updates both with no redeploy.
+                "wagtail.contrib.settings.context_processors.settings",
             ],
         },
     },
@@ -197,13 +200,11 @@ WAGTAILADMIN_BASE_URL = env("WAGTAILADMIN_BASE_URL", default="http://localhost:8
 # Restrict document file types to a safe set (no Excel exports, ever).
 WAGTAILDOCS_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "gif", "webp"]
 
-# --- Org contact / bank / socials (site footer placeholders) ---------------
+# --- Org contact / bank / socials ------------------------------------------
 # "Contact and bank details are configured in the running application, not
-# stored in this repository" (architecture brief). Plan 03 wires the footer
-# to read these rather than hardcoding placeholder text; Plan 05 (Donate)
-# will likely move bank details into a proper Wagtail-editable settings model
-# once there's real content to manage — env vars are enough for now.
-ORG_CONTACT_EMAIL = env("ORG_CONTACT_EMAIL", default="")
-ORG_CONTACT_PHONE = env("ORG_CONTACT_PHONE", default="")
-ORG_BANK_DETAILS = env("ORG_BANK_DETAILS", default="")
-ORG_SOCIAL_LINKS = env.dict("ORG_SOCIAL_LINKS", default={})
+# stored in this repository" (architecture brief). Plan 03 read these from
+# env vars as a footer placeholder; Plan 04 replaces that with a proper
+# Wagtail-editable singleton — the ``ContactBankSettings`` site setting in
+# apps/core/models.py — so a non-technical admin edits them in /admin/ and both
+# the footer and the Contact page update with no redeploy. Nothing sensitive
+# lives in the repo or the environment any more.
