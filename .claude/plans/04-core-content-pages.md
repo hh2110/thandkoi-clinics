@@ -203,6 +203,36 @@ Team members and services are child *objects*, not child *pages* — they don't
 need their own URL, preview, or SEO metadata, so modelling them as Wagtail
 pages would be overhead the admin has to navigate around for no benefit.
 
+## Feature flag
+
+**No code flag** — deliberate, but the gate is real: **Wagtail's own
+draft/publish workflow** is the effective flag here. New page models are inert
+additive migrations — nothing is user-visible until a person *creates and
+publishes* a page in `/admin/`. The site is also pre-launch, so a half-entered
+page reaches no one. A code-level feature flag would gate nothing that Wagtail's
+publish step doesn't already gate more naturally. (This is the milestone that
+first makes the site public — see the Release plan for the staged content-entry
+gate that stands in for a flag.)
+
+## Precedent map
+
+New-repo note: this is the first plan to add **page models**, so several elements
+have no in-repo precedent — those are grounded against Wagtail's documented
+idioms (best practice), not invented. Layout and chrome, by contrast, mirror the
+now-merged Plans 03/03.5.
+
+| Element | Precedent to mirror | Where |
+|---|---|---|
+| Page-body layout (hero, stat band, card grid, feature split, CTA band) | Compose Plan 03.5's `templates/partials/sections/*` — do **not** author new section CSS | Plan 03.5 (in repo) |
+| Base template / chrome / footer wiring | `base.html`, `partials/header.html`, `partials/footer.html` | Plan 03 (in repo) |
+| HomePage extension | Plan 01's placeholder `HomePage` | Plan 01 (in repo) |
+| Smoke-test shape (both langs/themes, correct template) | Plan 03's template-render smoke tests | Plan 03 (in repo) |
+| Design target for composed pages | `Thandkoi Clinics Home (Proposed)` mockup | `docs/design/` (in repo) |
+| **Orderable child models** (`TeamMember`, `Service`) | **No in-repo precedent** — ground against Wagtail's `InlinePanel` / `Orderable` (django-modelcluster) idiom | Wagtail docs (best practice) |
+| **`StreamField` body** on Home | **No in-repo precedent** — ground against Wagtail `StreamField` block idiom; each block template `{% include %}`s a 03.5 partial | Wagtail docs (best practice) |
+| **Site-wide singleton setting** (Contact & Bank Details) | **No in-repo precedent** — `wagtail.contrib.settings.BaseSiteSetting`; the brief mandates "configured in the running app, not the repo" | Wagtail docs + architecture brief |
+| **Image consent convention** (`consent_confirmed`) | **No precedent — this plan establishes it** for Plan 06 to reuse; ground against brand-guidelines.md §5 (dignity & consent) + Wagtail's native alt-text support | brand guide (best practice) |
+
 ## Task checklist (code — this plan's PR)
 
 1. **Contact & Bank Details setting** — `apps/core` (or a new `apps/settings`
@@ -300,3 +330,31 @@ real content through `/admin/`. None of this touches git:
   (p.19) are **current**; use them for the Contact & Bank Details setting.
 - **Page look / layout**: resolved — comes from Plan 03.5's layout kit; this
   plan composes it and does not author new section CSS.
+
+## Release plan
+
+This is the milestone that makes the site **public** — so it's the launch
+candidate, and its release is staged in two parts: **code ship**, then
+**content entry**.
+
+- **How it ships (code):** merge → additive migrations → deploy pipeline
+  (staging → verify → production). Models are inert on deploy — no page is
+  visible until published in the admin.
+- **How it ships (content):** the post-deploy content-entry checklist above,
+  done in `/admin/` on production, page-by-page. Each page is published only
+  once its real copy (from the source PDF) is in and it renders correctly —
+  Wagtail's publish step is the per-page go/no-go.
+- **Gating check:** page/setting `pytest` green in CI; on staging, all five
+  pages render in both `/en/` `/ur/` and both themes matching the `Home
+  (Proposed)` target, the footer/Contact reflect the shared setting, and Home's
+  donate CTA + report teaser are **hidden (not broken)** with 05/06 absent.
+- **Who gets access:** the public (everyone) — but only page-by-page as each is
+  published. Nothing is forced live half-finished.
+- **Who's informed:** the maintainer **and the two other Administrators**
+  (`dramanullah07@gmail.com`, `syeddawood.shah93@gmail.com`, per Plan 07) — they
+  do/verify the content entry, so brief them before the entry pass, not after.
+  No external audience beyond the clinic.
+- **Rollback trigger:** a page that renders wrong or has bad copy is
+  **unpublished in the admin instantly** — no redeploy needed (the fast lever).
+  A model/migration defect is a code revert; migrations are additive, so
+  unpublish-first buys time to fix forward.

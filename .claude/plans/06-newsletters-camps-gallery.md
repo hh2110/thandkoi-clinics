@@ -94,6 +94,33 @@ HomePage
     └── (GalleryImage — Orderable child, not a Page)
 ```
 
+## Feature flag
+
+**No flag** — deliberate. Two gates already do the work a flag would: **Wagtail's
+draft/publish** (archives list only *published* items; drafts are invisible, and
+this plan adds a test for exactly that) and the **`consent_confirmed` publish
+block** on any identifiable photo. New content-type models are inert additive
+migrations until an admin creates and publishes an item. Nav/footer links are
+added only now that the sections exist. Ships on merge + deploy; content entered
+post-deploy.
+
+## Precedent map
+
+New-repo note: Plan 04 is merged by now, so the child-object, consent, and teaser
+patterns have in-repo precedent; the **index + child *page*** archive pattern is
+new to the repo and grounded against Wagtail's standard idiom.
+
+| Element | Precedent to mirror | Where |
+|---|---|---|
+| Orderable `GalleryImage` children | Plan 04's `TeamMember`/`Service` `Orderable` child pattern | Plan 04 (in repo) |
+| `consent_confirmed` on photos (now load-bearing) | Plan 04's consent convention (first real use here) | Plan 04 (in repo) |
+| Home teaser wiring (query latest published) | Plan 04's conditionally-rendered teaser | Plan 04 (in repo) |
+| `StreamField` bodies | Plan 04's Home `StreamField` blocks | Plan 04 (in repo) |
+| Archive/listing/detail templates | Plan 03.5 section partials + Plan 03 `base.html` | Plans 03/03.5 (in repo) |
+| **Index + child-page archive pattern** (`NewsletterIndexPage`→`NewsletterPage`, `CampReportIndexPage`→`CampReportPage`) | **No in-repo precedent** — ground against Wagtail's standard index/child archive idiom (independently linkable, own SEO) | Wagtail docs (best practice) |
+| **Structured Camp Report fields** (patients-served split by category) | **No precedent** — grounded in the maintainer decision + the PDF's own breakdown, not invented | maintainer decision |
+| Draft-visibility test (foundation for Plan 09) | Grounds on Wagtail's live/draft mechanism | Wagtail (best practice) |
+
 ## Task checklist (code — this plan's PR)
 
 1. **Newsletter models** — `NewsletterIndexPage` (lists children, newest
@@ -153,3 +180,26 @@ HomePage
   general / Welfare-free-service), matching the PDF's own breakdown, with the
   total derived — not a single lumped figure. Reflected in the Camp Report
   fields decision and task checklist above.
+
+## Release plan
+
+- **How it ships:** merge → additive migrations → deploy pipeline (staging →
+  verify → production). Post-deploy content steps: the first `CampReportPage`
+  (16 May 2026 inauguration, ready-to-enter), gallery images once the actual
+  image files are gathered, and newsletter back-issues as their sources are
+  gathered. Add the real nav/footer links (previously placeholder) as part of
+  the ship.
+- **Gating check:** the **draft-visibility** test (drafts invisible in archives
+  and Home's teaser) and the **consent** test (no photo publishes without
+  `consent_confirmed`) green in CI; on staging, confirm archives list published
+  items newest-first and Home's teaser renders the latest published newsletter.
+- **Privacy note (load-bearing here):** this is where identifiable patient/camp
+  photos first appear. The `consent_confirmed` block is a **privacy gate, not
+  just a feature gate** — no image ships without it, per brand-guidelines.md §5.
+- **Who gets access:** the public (everyone), published items only.
+- **Who's informed:** maintainer **and the other Administrators** — they enter
+  content *and* must understand the consent gate before uploading any camp/
+  patient photo. Brief them on the consent rule specifically, not just the pages.
+- **Rollback trigger:** unpublish any item in the admin (instant); code revert
+  for a model/migration defect. A consent concern about a live photo is an
+  immediate unpublish, no redeploy.

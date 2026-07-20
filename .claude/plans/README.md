@@ -7,6 +7,27 @@ See [CLAUDE.md](../../CLAUDE.md) for the non-negotiable privacy invariants and
 [docs/architecture-and-ai-brief.md](../../docs/architecture-and-ai-brief.md) for
 the overall design.
 
+## Plan structure
+
+Each drafted plan follows the development lifecycle in `~/.claude/CLAUDE.md`.
+Alongside goal / scope / decisions / task-checklist / acceptance-criteria, every
+plan from 03.5 onward carries three lifecycle sections:
+
+- **Precedent map** (Stage 7) — for each element, the in-repo file/pattern it
+  mirrors, or — where this greenfield repo has none yet — the authoritative
+  reference (Wagtail/Django idiom, the brand guide, a maintainer decision) it's
+  grounded against. Gaps with no precedent are flagged as best-practice grounding,
+  never invention.
+- **Feature flag** (Stage 6) — the deliberate flag decision and why. This is a
+  brand-new, pre-launch repo, so **no plan uses a runtime flag** — there are no
+  existing users a partial slice could reach. The natural gates do the work
+  (Wagtail's own draft/publish, the `can_upload_export` permission, and a phased
+  staging-first rollout for the PHI pipeline). The decision is still recorded per
+  plan, so adding a flag later — if the site is live and one becomes warranted —
+  stays a deliberate choice rather than an afterthought.
+- **Release plan** (Stage 10) — how it ships, who gets access, who's informed, the
+  gating check, and the rollback trigger.
+
 ## Roadmap
 
 | # | Plan | Status |

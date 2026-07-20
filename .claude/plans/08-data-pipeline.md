@@ -222,6 +222,49 @@ Three tables, all PHI-free:
   plug into later. For now, a new format is a code change (new subclass + test),
   which for a clinic that changes export format rarely is the right trade.
 
+## Feature flag
+
+**No flag** — consistent with the rest of the roadmap: this is a **brand-new,
+pre-launch repo**, so there are no existing users a partial slice could reach and
+nothing in production a runtime toggle would protect. That said, Plan 08 is the
+**highest-risk surface in the project** — it ingests raw PHI and its daily report
+page auto-publishes — so the safety a flag might provide is supplied instead by
+mechanisms that don't need one:
+
+- The `can_upload_export` permission (Plan 07) limits *who* can ingest to the
+  three Administrators.
+- The **phased release** (below) proves the first parser against synthetic data
+  on **staging** before any real export flows — the parser is verified, not
+  toggled.
+- Rollback is a **PR revert / permission removal / unpublish / purge-and-
+  recompute** (see Release plan), not a flag flip — and because raw PHI is never
+  persisted, there is no raw data to clean up.
+
+If the site is already live by the time this ships and a runtime kill switch
+becomes worth it, adding one is a deliberate decision to make *then*, not a
+default this greenfield plan assumes.
+
+## Precedent map
+
+New-repo note: the load-bearing privacy mechanisms (in-memory upload handler,
+parser registry, de-identification) are **new to the repo and the riskiest
+part** — every one is grounded against an authoritative reference or a maintainer
+decision, never invented. Wiring and page patterns reuse merged plans.
+
+| Element | Precedent to mirror | Where |
+|---|---|---|
+| `apps/pipeline` app scaffold | Plan 01's app/settings structure | Plan 01 (in repo) |
+| pandas + openpyxl/xlrd parsing | Stack decision (brief §3) — already chosen | architecture brief |
+| Custom Wagtail admin view (`register_admin_urls`, menu item) + HTMX | Wagtail admin-hooks idiom + the HTMX stack decision | Wagtail docs + brief §3 |
+| `can_upload_export`-gated view | Plan 07's permission | Plan 07 (in repo) |
+| `ReportIndexPage` + per-date `DailyReportPage` | Plan 06's index + child-page archive pattern | Plan 06 (in repo) |
+| Home Report-teaser wiring (the half left waiting) | Plan 04/06's conditional teaser | Plans 04/06 (in repo) |
+| AI summary-sentence call (mocked in CI, autouse guard, aggregates-only payload) | **Plan 02's AI-call test convention** — first real use | Plan 02 (in repo) + Anthropic SDK docs |
+| Privacy-guardrail tests (no file on disk, no identifier in DB, deterministic numbers) | **Plan 02's promised guardrail tests** — placeholders become real here | Plan 02 (in repo) |
+| **In-memory-only upload handler** (`MemoryFileUploadHandler`, no temp-file fallback) | **No precedent — load-bearing privacy mechanism** — ground against Django's upload-handler docs; this is what makes invariant #1 structural | Django docs (best practice) |
+| **Parser registry / `BaseExportParser` contract** | **No precedent** — ground against the abstract-base + registry pattern described in brief §6; hand-written parsers only (agentic inference deferred) | architecture brief + best practice |
+| **De-identification rules** (age bands, coarse location, free-text-diagnosis → fixed category, drop identifiers pre-persist) | **No precedent** — grounded in maintainer decisions (PR #15 / post-PR-15) + brief §4, not invented | maintainer decisions + brief |
+
 ## Task checklist (code — this plan's PR)
 
 1. **`apps/pipeline` scaffold** — app, registered upstream of any `ai` module.
@@ -323,3 +366,42 @@ Three tables, all PHI-free:
   from the canonical `DeidentifiedVisit` row table ("the latter").
 - **Re-upload behaviour** → **replace**: a same-day corrected export supersedes the
   prior one for that date (atomic delete-and-reinsert + recompute).
+
+## Release plan
+
+This plan handles PHI and auto-publishes to production, so it ships in **explicit
+phases across environments** — no runtime flag (see Feature flag), but the hard
+gate stands: **prove no PHI persists, using synthetic/de-identified data on
+staging, before a single real export touches production.**
+
+- **Phase 0 — merge, models only.** Merge → migrations → deploy. The upload view
+  is live but reachable only by holders of `can_upload_export` (the three
+  Administrators); nothing else changes for anyone.
+- **Phase 1 — staging, synthetic data (the privacy gate).** On **staging**,
+  upload the de-identified/synthetic sample and verify, as automated tests plus a
+  manual check: **no raw file on disk / in MEDIA** after the request; **zero
+  direct-identifier values** anywhere in the DB; no raw diagnosis text (only
+  mapped categories); aggregates equal a deterministic Python recompute; the AI
+  summary payload contains **only that page's aggregates**; the fallback
+  publishes numbers when the AI client is forced to fail; a
+  non-`can_upload_export` user is denied. **Success criterion: every guardrail
+  green on staging with synthetic data.** No real data yet.
+- **Phase 2 — production, first real upload by the maintainer alone.** Only after
+  Phase 1 passes, the **maintainer** does the first real export upload on
+  production personally and confirms the same guarantees hold against prod
+  (success summary shows counts only; the daily page auto-publishes numbers
+  correctly). Success criterion: one clean real ingest with no PHI persisted.
+- **Phase 3 — routine use.** The other Administrators begin daily uploads.
+- **Who gets access:** the three Administrators (`can_upload_export`, Plan 07)
+  for *uploading*; the **public** for the auto-published daily report pages
+  (numbers + the one AI sentence).
+- **Who's informed:** the three Administrators — brief them specifically on the
+  PHI discipline (raw exports are never committed and never persisted; only
+  de-identified aggregates and rows survive a request) before Phase 3, not after.
+- **Rollback trigger:** **revert the PR** (removes the upload view and daily
+  auto-publish) or **remove `can_upload_export`** from the Administrator group —
+  either takes the surface down without a runtime flag. Because raw PHI is never
+  persisted, there is **no raw data to clean up**; if a de-identification defect
+  is found, the affected `DeidentifiedVisit`/`DailyAggregate`/report pages are
+  purged and rebuilt via the recompute command after the fix. Any concern about a
+  published daily page → unpublish in the admin immediately.
