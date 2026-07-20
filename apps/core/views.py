@@ -9,22 +9,29 @@ from django.utils.safestring import mark_safe
 # Small, author-controlled inline SVGs for the service-card icon slots. Trusted
 # markup only (rendered via |safe in _card.html) — never user input. Coral is
 # used solely for the cross/heart motif, per brand-guidelines.md §2/§7.
+#
+# Colours are set via a `style="..."` attribute, not an SVG presentation
+# attribute (fill="..."/stroke="..."): CSS custom properties only resolve inside
+# a CSS declaration, so `fill="var(--color-coral)"` would render black/none —
+# a `style` declaration resolves the token correctly.
 _ICON_CROSS = mark_safe(  # noqa: S308 - static, author-authored markup
     '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">'
-    '<rect x="8" y="3" width="4" height="14" rx="1" fill="var(--color-coral)"></rect>'
-    '<rect x="3" y="8" width="14" height="4" rx="1" fill="var(--color-coral)"></rect>'
+    '<rect x="8" y="3" width="4" height="14" rx="1" '
+    'style="fill:var(--color-coral)"></rect>'
+    '<rect x="3" y="8" width="14" height="4" rx="1" '
+    'style="fill:var(--color-coral)"></rect>'
     "</svg>"
 )
 _ICON_CIRCLE = mark_safe(  # noqa: S308 - static, author-authored markup
     '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">'
-    '<circle cx="10" cy="10" r="7" fill="none" '
-    'stroke="var(--color-brand)" stroke-width="2.5"></circle>'
+    '<circle cx="10" cy="10" r="7" '
+    'style="fill:none;stroke:var(--color-brand)" stroke-width="2.5"></circle>'
     "</svg>"
 )
 _ICON_DIAMOND = mark_safe(  # noqa: S308 - static, author-authored markup
     '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">'
     '<rect x="4" y="4" width="12" height="12" rx="2" transform="rotate(45 10 10)" '
-    'fill="none" stroke="var(--color-brand)" stroke-width="2.5"></rect>'
+    'style="fill:none;stroke:var(--color-brand)" stroke-width="2.5"></rect>'
     "</svg>"
 )
 
@@ -58,6 +65,8 @@ def styleguide(request):
     CTA band, media grid) with dummy context so the kit is reviewable before
     Plan 04 composes real pages from it. This view and its template are
     throwaway — removed/replaced when Plan 04 lands (see the plan's task 9).
+    Its route is registered only when ``settings.DEBUG`` is true (see
+    ``config/urls.py``), so it is dev-only and never served in production.
 
     All numbers and copy below are illustrative demo data only, exactly like
     the docs/design/ mockups — the components themselves bake in nothing.

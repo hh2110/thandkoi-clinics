@@ -33,18 +33,23 @@ urlpatterns = [
     path("documents/", include(wagtaildocs_urls)),
 ]
 
-# Serve user-uploaded media in development only.
+# Development-only routes.
 if settings.DEBUG:
+    # Serve user-uploaded media in development only.
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Temporary Plan 03.5 preview of the page-body layout kit — dev-only via
+    # DEBUG, never registered in production. Language-prefixed so it exercises
+    # the real bilingual/RTL chrome; registered before the Wagtail catch-all
+    # below. Throwaway: removed when Plan 04 composes real pages from the kit.
+    urlpatterns += i18n_patterns(
+        path("styleguide/", core_views.styleguide, name="styleguide"),
+        prefix_default_language=True,
+    )
 
 # Wagtail's page serving — must come last (catch-all). Language-prefixed:
 # visiting "/" 404s here and LocaleMiddleware redirects to "/en/" (or the
 # visitor's detected language) — see apps/core/tests.py.
 urlpatterns += i18n_patterns(
-    # Temporary Plan 03.5 preview of the page-body layout kit — language-prefixed
-    # so it exercises the real bilingual/RTL chrome. Throwaway: removed when
-    # Plan 04 composes real pages from the kit. Kept above the Wagtail catch-all.
-    path("styleguide/", core_views.styleguide, name="styleguide"),
     path("", include(wagtail_urls)),
     prefix_default_language=True,
 )

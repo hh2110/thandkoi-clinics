@@ -7,13 +7,15 @@ anti-FOUC/theme-toggle markup added in that plan.
 """
 
 import re
+from contextlib import contextmanager
+from importlib import reload
 from pathlib import Path
 
 import pytest
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import override_settings
-from django.urls import reverse
+from django.urls import clear_url_caches, reverse
 from wagtail.models import Page, Site
 
 from apps.core.factories import HomePageFactory
@@ -159,30 +161,35 @@ def test_no_third_party_font_or_cdn_requests(client, home_page):
 
 # --- Plan 03.5: page-body layout kit -----------------------------------------
 
-SECTION_PARTIALS = [
-    "partials/sections/hero.html",
-    "partials/sections/stat_band.html",
-    "partials/sections/card_grid.html",
-    "partials/sections/feature_split.html",
-    "partials/sections/cta_band.html",
-    "partials/sections/media_grid.html",
-    "partials/sections/section_header.html",
-    "partials/sections/_media_placeholder.html",
-    "partials/sections/_card.html",
+# (template, minimal context, a substring the render must contain). The
+# context is intentionally minimal — sections are driven entirely by block data
+# (Plan 04 wires the real values), so each must degrade to its empty/placeholder
+# state rather than raise when fields are unset. The marker proves the render
+# actually produced the section's own markup, not just a non-None string.
+SECTION_PARTIAL_CASES = [
+    ("partials/sections/hero.html", {"title": "Care for all"}, "Care for all"),
+    ("partials/sections/stat_band.html", {}, "stat-band"),
+    ("partials/sections/card_grid.html", {}, "card-grid"),
+    ("partials/sections/feature_split.html", {}, "feature-split"),
+    ("partials/sections/cta_band.html", {}, "cta-band"),
+    ("partials/sections/media_grid.html", {}, "media-grid"),
+    ("partials/sections/section_header.html", {"heading": "Our work"}, "Our work"),
+    ("partials/sections/_media_placeholder.html", {}, "media-placeholder"),
+    ("partials/sections/_card.html", {"card": {"title": "OPD clinic"}}, "OPD clinic"),
 ]
 
 
-@pytest.mark.parametrize("template_name", SECTION_PARTIALS)
-def test_section_partial_renders_with_empty_context(template_name):
-    """Every section partial renders without error given no context.
+@pytest.mark.parametrize(("template_name", "context", "marker"), SECTION_PARTIAL_CASES)
+def test_section_partial_renders(template_name, context, marker):
+    """Every section partial renders to a string containing its own markup.
 
-    Sections are driven entirely by context/block data (Plan 04 wires the real
-    values), so each must degrade gracefully to its empty state rather than
-    raise when a field is unset — the "renders correctly with fields unset"
-    contract Plan 04 depends on.
+    Sections are driven entirely by context/block data, so each must render
+    (degrading to its empty/placeholder state where fields are unset) — the
+    "renders correctly with fields unset" contract Plan 04 depends on.
     """
-    html = render_to_string(template_name, {})
-    assert html is not None
+    html = render_to_string(template_name, context)
+    assert isinstance(html, str)
+    assert marker in html
 
 
 def test_stat_band_shows_empty_state_when_no_stats():
@@ -248,6 +255,50 @@ def test_layout_css_uses_tokens_only_no_hardcoded_colours():
     assert "var(--color-" in css_no_comments
 
 
+def test_styleguide_icons_colour_via_style_declaration_not_presentation_attr():
+    """Icon colours resolve — set via a `style` declaration, not fill=/stroke=.
+
+    A CSS custom property only resolves inside a CSS declaration; as a raw SVG
+    presentation attribute (fill="var(--color-coral)") it renders black/none.
+    Assert the tokened colour lives in a `style` attribute and that no tokened
+    presentation attribute remains, so the three service-card icons actually
+    show their intended coral/teal.
+    """
+    from apps.core.views import _ICON_CIRCLE, _ICON_CROSS, _ICON_DIAMOND
+
+    assert 'style="fill:var(--color-coral)"' in _ICON_CROSS
+    assert 'style="fill:none;stroke:var(--color-brand)"' in _ICON_CIRCLE
+    assert 'style="fill:none;stroke:var(--color-brand)"' in _ICON_DIAMOND
+    for icon in (_ICON_CROSS, _ICON_CIRCLE, _ICON_DIAMOND):
+        assert 'fill="var(' not in icon
+        assert 'stroke="var(' not in icon
+
+
+@contextmanager
+def _debug_urls():
+    """Register the DEBUG-only styleguide route for the duration of a test.
+
+    ``config/urls.py`` registers the throwaway styleguide route only under
+    ``settings.DEBUG``, evaluated once at urlconf import. pytest-django runs the
+    suite with ``DEBUG=False`` (its ``django_debug_mode`` default), so the route
+    is absent by default and the URL would 404. This flips DEBUG on and rebuilds
+    the urlconf so the gated route is exercised for real, then restores the
+    DEBUG=False urlconf afterwards so no other test is affected.
+    """
+    import config.urls
+
+    override = override_settings(DEBUG=True)
+    override.enable()
+    clear_url_caches()
+    reload(config.urls)
+    try:
+        yield
+    finally:
+        override.disable()
+        clear_url_caches()
+        reload(config.urls)
+
+
 @pytest.mark.parametrize(
     ("url", "lang", "direction"),
     [("/en/styleguide/", "en", "ltr"), ("/ur/styleguide/", "ur", "rtl")],
@@ -258,9 +309,11 @@ def test_styleguide_composes_sections_in_both_languages(
     """A page composed of the section partials returns 200 with correct lang/dir.
 
     Exercises the whole kit through the real bilingual/RTL chrome in both
-    languages — the Plan 04 "compose a page from the kit" path.
+    languages — the Plan 04 "compose a page from the kit" path — via the
+    DEBUG-gated styleguide route.
     """
-    response = client.get(url)
+    with _debug_urls():
+        response = client.get(url)
     assert response.status_code == 200
     content = response.content.decode()
     assert f'<html lang="{lang}" dir="{direction}">' in content
@@ -271,6 +324,16 @@ def test_styleguide_composes_sections_in_both_languages(
     assert "feature-split" in content
     assert "cta-band" in content
     assert "media-grid" in content
+
+
+def test_styleguide_route_absent_without_debug(client, db):
+    """The styleguide route is DEBUG-gated — absent in production (DEBUG off).
+
+    pytest-django runs with DEBUG=False, matching production, so the route must
+    not resolve; it 404s through the Wagtail catch-all like any unknown path.
+    """
+    response = client.get("/en/styleguide/")
+    assert response.status_code == 404
 
 
 def test_styleguide_template_file_is_present():

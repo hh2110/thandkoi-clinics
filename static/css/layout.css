@@ -224,7 +224,7 @@
 .card__icon {
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: 10px;
+  border-radius: var(--card-radius);
   background-color: var(--color-accent-soft-bg);
   display: flex;
   align-items: center;
