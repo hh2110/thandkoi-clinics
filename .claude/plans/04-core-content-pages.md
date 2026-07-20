@@ -1,6 +1,6 @@
 # Plan 04 — Core Content Pages
 
-_Status: Drafted · Depends on: 01 Project foundation, 03 Design system & base templates · Next: 05 Donate placeholder_
+_Status: Drafted · Depends on: 01 Project foundation, 03 Design system & base templates, **03.5 Design system enhancements & page layout components** · Next: 05 Donate placeholder_
 
 ## Goal
 
@@ -45,6 +45,28 @@ be a one-time bootstrapping convenience — the resulting rows are exactly as
 CMS-editable afterward as anything typed in by hand, and that's a Plan 04
 implementation detail to decide then, not a reason to treat this content as
 code now.
+
+## Where the *look* comes from: Plan 03.5 layout kit
+
+A third thing, distinct from both above: the **visual layout** of each page.
+That is neither free from Wagtail nor entered in the admin — it's code, and it
+comes from **Plan 03.5's page-body layout components** (hero, stat band, card
+grid, feature split, CTA band, media grid, section rhythm). Plan 04 does **not**
+author new section markup or CSS; it **composes** the 03.5 partials and maps
+page/block data onto them. Concretely:
+
+- Home's `HeroBlock` → renders through `partials/sections/hero.html`.
+- Home's `ImpactStatsBlock` → `stat_band.html`.
+- Home's report/newsletter teaser → `feature_split.html`.
+- Home's `DonateCTABlock` → `cta_band.html`.
+- Our Work services → `card_grid.html` (with the `Planned` status tag).
+- Team roster → `card_grid.html` (person card variant).
+- Any unset image → 03.5's `.media-placeholder`.
+
+The design target for how these composed pages should look is the
+**`Thandkoi Clinics Home (Proposed)`** mockup referenced in Plan 03.5. If a
+page needs a section 03.5 didn't provide, add it to 03.5 (or a follow-up), not
+ad-hoc here — keep one layout vocabulary.
 
 ## Source material
 
@@ -114,6 +136,11 @@ pulls exact wording rather than paraphrasing from this plan:
 **In scope**
 - Wagtail page models + templates for: Home, About, Team/Management, Our Work
   (services), Contact.
+- **Templates that compose Plan 03.5's layout components** rather than
+  authoring new section markup/CSS — each page's template maps its
+  fields/blocks onto the 03.5 partials (see "Where the look comes from"), so
+  the launched pages match the `Home (Proposed)` design target in both themes
+  and both languages.
 - A site-wide **Contact & Bank Details** setting (singleton, Wagtail admin
   editable) — the architecture brief is explicit that these are "configured
   in the running application, not stored in this repository," so they can't
@@ -124,6 +151,8 @@ pulls exact wording rather than paraphrasing from this plan:
   resolve, footer contact block pulling from the new setting).
 
 **Out of scope** (later plans)
+- **New section layouts/CSS** → Plan 03.5 owns the layout kit; if a page needs
+  a section the kit lacks, extend 03.5, don't hand-roll it here.
 - Donate page itself → Plan 05 (Home's donate CTA links to it once it exists;
   built as a configurable link so it doesn't hard-fail before Plan 05 lands).
   The source PDF's "Giving with Purpose" copy (p.18) is noted above for
@@ -143,15 +172,16 @@ pulls exact wording rather than paraphrasing from this plan:
 - Team member and infrastructure **photos** — the source PDF has them as
   images, not extractable as files from this plan's text-extraction pass;
   getting the actual photo assets (or requesting fresh ones) is a launch
-  task, not a plan decision.
+  task, not a plan decision. Until then, 03.5's `.media-placeholder` shows.
 
 ## Proposed decisions (confirm before building)
 
 | Choice | Proposed | Notes |
 |---|---|---|
 | Content modelling | Standard Wagtail fields (`RichTextField`, `StreamField` where flexibility is actually needed) | Predictable pages (About, Contact) use plain fields; Home uses a `StreamField` body so Plan 05/06 can add new block types (donate CTA, report teaser) without restructuring the page model. |
+| Block → template | Each StreamField block's template `{% include %}`s the matching Plan 03.5 section partial | One markup source serves both the block and any plain view; no duplicate section HTML/CSS in this plan. |
 | Team members | `Orderable` child model on `TeamPage` (django-modelcluster pattern) — name, role, category (**Doctors** / **Staff & Committee**, matching the real roster), photo, short bio | Standard Wagtail idiom; admin adds/reorders team members inline on the Team page, no separate admin screen to learn. Categories match the source PDF's actual two groupings, not a generic Founders/Officers/Committee guess. |
-| Services | Same `Orderable` child pattern on `OurWorkPage` — name, short description, icon/image, **status** (`Active` / `Planned`) | Mirrors Team's pattern so there's one convention, not two. The status field exists because the real service list has two "aiming to introduce" entries (Laboratory & Pharmacy, Radiology/Imaging) — the template must not present those as already available. |
+| Services | Same `Orderable` child pattern on `OurWorkPage` — name, short description, icon/image, **status** (`Active` / `Planned`) | Mirrors Team's pattern so there's one convention, not two. The status field exists because the real service list has two "aiming to introduce" entries (Laboratory & Pharmacy, Radiology/Imaging) — the template must not present those as already available (03.5 card grid renders the `Planned` tag). |
 | Contact & bank details | `wagtail.contrib.settings` `BaseSiteSetting` singleton — phone, email, socials, bank account details, address/map | Editable in Wagtail admin under Settings; consumed by both the Contact page and Plan 03's footer partial. This is what makes it "configured in the running app," not committed to the repo. |
 | Home's donate CTA | A Wagtail `PageChooserBlock`/URL field, not a hardcoded link | Points at nothing (hidden) until Plan 05 exists, then an admin points it at the real Donate page — no code change needed to wire it up. |
 | Home's report/newsletter teaser | Conditionally rendered — queries for a "latest published" item of that content type; renders nothing if none exists | Avoids a broken or empty-looking section before Plan 06 ships, and avoids the Home template needing a code change when Plan 06 lands (it starts rendering the moment content exists). |
@@ -183,7 +213,9 @@ pages would be overhead the admin has to navigate around for no benefit.
    `HeroBlock` (mission statement), `ImpactStatsBlock` (admin-editable number
    + label pairs), `DonateCTABlock` (link field, renders nothing if unset),
    and a "latest report/newsletter" teaser section (queries, renders nothing
-   if no matching content exists yet).
+   if no matching content exists yet). Each block template `{% include %}`s
+   the matching Plan 03.5 section partial (hero / stat_band / cta_band /
+   feature_split).
 3. **About page** — `RichTextField`s for vision, mission, objectives,
    quality-of-care model, and the founding/inauguration story; a simple
    `StreamField` or child-list for partner logos/names if there are any at
@@ -191,13 +223,13 @@ pages would be overhead the admin has to navigate around for no benefit.
    see Content entry below.)
 4. **Team page** — `TeamPage` + `TeamMember` orderable child model (name,
    role, category, photo w/ required alt text, short bio); template groups
-   members by category (Doctors, Staff & Committee). (Model only — the real
-   roster is entered later.)
+   members by category (Doctors, Staff & Committee) and renders them through
+   03.5's card grid (person-card variant, `.media-placeholder` when no photo).
 5. **Our Work page** — `OurWorkPage` + `Service` orderable child model (name,
-   description, icon/image, status); template renders as a grid/list per
-   brand-guidelines.md §4 layout rules, visually distinguishing `Planned`
-   services (e.g. a "coming soon" tag) from `Active` ones. (Model only — the
-   real service/infrastructure content is entered later.)
+   description, icon/image, status); template renders through 03.5's card grid,
+   visually distinguishing `Planned` services (the "coming soon" tag) from
+   `Active` ones. (Model only — the real service/infrastructure content is
+   entered later.)
 6. **Contact page** — renders the Contact & Bank Details setting; a simple
    "email us" `mailto:` link rather than a contact form (no form backend
    needed at this stage — matches "no analytics or third-party scripts by
@@ -212,7 +244,8 @@ pages would be overhead the admin has to navigate around for no benefit.
 9. **Tests** — smoke tests per page (renders 200, correct template used);
    a test that the Contact page reflects a change to the setting; a test
    that Home's donate CTA and report teaser are absent/hidden when unset
-   rather than broken.
+   rather than broken; a test that pages render in both `/en/` and `/ur/`,
+   both themes, using the 03.5 partials.
 
 ## Content entry checklist (post-deploy, via Wagtail admin — not part of this PR)
 
@@ -235,6 +268,9 @@ real content through `/admin/`. None of this touches git:
 
 - All five pages are creatable in the Wagtail admin, render correctly, and
   are reachable from the primary nav.
+- The launched pages **match the `Home (Proposed)` design target** (Plan 03.5),
+  composed from the 03.5 layout partials — no bespoke section CSS added in
+  this plan.
 - Editing the Contact & Bank Details setting changes both the Contact page
   and the footer, with no code change or redeploy.
 - Team members and services can be added, removed, and reordered from the
@@ -242,7 +278,10 @@ real content through `/admin/`. None of this touches git:
 - Home renders correctly with the donate CTA and report teaser both unset
   (current state) — no broken links, no empty-looking placeholder boxes.
 - Every image has alt text; any non-staff person photo has a ticked
-  `consent_confirmed` field before it can be published.
+  `consent_confirmed` field before it can be published; unset images fall back
+  to 03.5's placeholder.
+- All pages render in both `/en/` and `/ur/` and both themes with correct
+  `lang`/`dir`.
 - `ruff check` and `pytest` (including the new page/setting tests) pass in
   CI.
 
@@ -254,7 +293,10 @@ real content through `/admin/`. None of this touches git:
 - **Team categories**: resolved — Doctors / Staff & Committee, matching the
   PDF's actual grouping (not the earlier Founders/Officers/Committee guess).
 - **Photos**: resolved (maintainer) — launch with **placeholder/generic
-  imagery** for any team member or infrastructure shot missing a real photo;
-  real originals can be swapped in later via the admin without a code change.
+  imagery** (Plan 03.5's `.media-placeholder`) for any team member or
+  infrastructure shot missing a real photo; real originals can be swapped in
+  later via the admin without a code change.
 - **Bank details**: resolved (maintainer) — the source PDF's bank details
   (p.19) are **current**; use them for the Contact & Bank Details setting.
+- **Page look / layout**: resolved — comes from Plan 03.5's layout kit; this
+  plan composes it and does not author new section CSS.

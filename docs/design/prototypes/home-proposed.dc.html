@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600&family=Noto+Nastaliq+Urdu&family=Noto+Naskh+Arabic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    .tk-root {
+      --color-teal-brand:#086c7e; --color-teal-deep:#0a3e48; --color-teal-bright:#12879b;
+      --color-pale-aqua:#a0e0e8; --color-aqua-tint:#e4f4f6;
+      --color-coral:#ef5148; --color-coral-deep:#d83a30; --color-peach:#f0b878;
+      --color-amber-on-light:#ce8a2c; --color-amber-on-dark:#e8b04a;
+      --color-ink:#0e2025; --color-ink-soft:#3e5257; --color-ink-faint:#728a8f;
+      --color-border:#e0e7e8; --color-paper:#f2f6f6; --color-card:#ffffff;
+      --color-bg:var(--color-paper); --color-surface:var(--color-card);
+      --color-text:var(--color-ink); --color-text-soft:var(--color-ink-soft);
+      --color-text-faint:var(--color-ink-faint); --color-border-default:var(--color-border);
+      --color-brand:var(--color-teal-brand); --color-brand-hover:var(--color-teal-bright);
+      --color-brand-deep:var(--color-teal-deep); --color-accent-soft-bg:var(--color-aqua-tint);
+      --color-on-brand:#ffffff; --color-donate-bg:var(--color-amber-on-light); --color-donate-text:#ffffff;
+      --color-footer-bg:var(--color-teal-deep); --color-footer-text:var(--color-paper);
+      --color-footer-text-soft:#abb4b6; --color-footer-border:#195a67;
+      --link-color:var(--color-teal-deep);
+      --card-shadow:0 1px 2px rgba(10,62,72,.06),0 4px 12px rgba(10,62,72,.08);
+      --font-heading:"Archivo",sans-serif; --font-body:"Public Sans",sans-serif;
+      --font-urdu:"Noto Nastaliq Urdu","Noto Naskh Arabic",serif;
+    }
+    .tk-root[data-theme="dark"] {
+      --color-ink:#f2f6f6; --color-ink-soft:#abb4b6; --color-ink-faint:#9ea0a1;
+      --color-border:#195a67; --color-paper:#0a3e48; --color-card:#0d4f5c;
+      --color-donate-bg:var(--color-amber-on-dark); --color-donate-text:var(--color-ink);
+      --color-accent-soft-bg:var(--color-teal-deep);
+      --link-color:var(--color-pale-aqua);
+    }
+    .tk-root a { color: var(--link-color); }
+    .tk-root a:hover { color: var(--color-teal-bright); }
+    .tk-nav-link:hover { color: var(--color-brand-hover) !important; }
+    .tk-footer a { color: var(--color-pale-aqua) !important; }
+    .tk-card { transition: transform .15s ease, box-shadow .15s ease; }
+    .tk-card:hover { transform: translateY(-3px); box-shadow: 0 6px 22px rgba(10,62,72,.14); }
+    .tk-ph { background-image: repeating-linear-gradient(135deg, rgba(8,108,126,.08) 0 10px, rgba(8,108,126,.03) 10px 20px); }
+    body { margin:0; }
+  </style>
+</helmet>
+<div class="tk-root" data-theme="{{ theme }}" style="background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); font-size:16px; line-height:1.6; min-height:100vh; display:flex; flex-direction:column; transition:background-color .15s ease, color .15s ease;">
+
+  <!-- ============ HEADER ============ -->
+  <header style="border-bottom:1px solid var(--color-border-default); background:var(--color-surface); position:sticky; top:0; z-index:20;">
+    <div style="max-width:72rem; margin-inline:auto; padding-inline:1.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding-block:.85rem;">
+      <a href="#" aria-label="The Thandkoi Clinics — home" style="display:flex; align-items:center; text-decoration:none;">
+        <img src="static/images/logo.svg" alt="The Thandkoi Clinics" width="192" height="144" style="height:2.75rem; width:auto; display:block;">
+      </a>
+      <nav aria-label="Primary" style="display:flex; align-items:center; gap:1.5rem;">
+        <a class="tk-nav-link" href="#" style="color:var(--color-brand); text-decoration:none; font-weight:600; font-size:.95rem;">Home</a>
+        <a class="tk-nav-link" href="#" style="color:var(--color-text); text-decoration:none; font-weight:600; font-size:.95rem;">About</a>
+        <a class="tk-nav-link" href="#" style="color:var(--color-text); text-decoration:none; font-weight:600; font-size:.95rem;">Our Work</a>
+        <a class="tk-nav-link" href="#" style="color:var(--color-text); text-decoration:none; font-weight:600; font-size:.95rem;">Reports</a>
+        <a class="tk-nav-link" href="#" style="color:var(--color-text); text-decoration:none; font-weight:600; font-size:.95rem;">Gallery</a>
+        <a class="tk-nav-link" href="#" style="color:var(--color-text); text-decoration:none; font-weight:600; font-size:.95rem;">Contact</a>
+      </nav>
+      <div style="display:flex; align-items:center; gap:.85rem;">
+        <nav aria-label="Language" style="display:flex; gap:.4rem; font-size:.8rem;">
+          <a href="#" style="padding:.25rem .5rem; border:1px solid var(--color-brand); background:var(--color-brand); color:var(--color-on-brand); border-radius:6px; text-decoration:none;">EN</a>
+          <a href="#" lang="ur" dir="rtl" style="padding:.25rem .5rem; border:1px solid var(--color-border-default); border-radius:6px; text-decoration:none; color:var(--color-text-soft); font-family:var(--font-urdu);">اردو</a>
+        </nav>
+        <button type="button" onClick="{{ toggleTheme }}" aria-label="Toggle theme" style="display:inline-flex; align-items:center; gap:.4em; border:1px solid var(--color-border-default); border-radius:999px; background:transparent; color:var(--color-text); padding:.35rem .6rem; font:inherit; font-size:.8rem; cursor:pointer;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="width:1em; height:1em; display:block;">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+          </svg>
+        </button>
+        <a href="#" style="display:inline-block; font-weight:600; text-decoration:none; border-radius:8px; padding:.55em 1.1em; font-size:.95rem; background:var(--color-donate-bg); color:var(--color-donate-text);">Donate</a>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex:1;">
+    <!-- ============ HERO ============ -->
+    <section style="max-width:72rem; margin-inline:auto; padding:4rem 1.5rem 3rem; display:grid; grid-template-columns:1.05fr .95fr; gap:3.5rem; align-items:center;">
+      <div>
+        <p style="display:inline-flex; align-items:center; gap:.5rem; text-transform:uppercase; letter-spacing:.14em; font-size:.8rem; font-weight:600; color:var(--color-teal-brand); margin:0 0 1.25rem;">
+          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" style="display:block;"><rect x="8" y="2" width="4" height="16" rx="1" fill="#ef5148"></rect><rect x="2" y="8" width="16" height="4" rx="1" fill="#ef5148"></rect></svg>
+          Primary care · Thandkoi, Swabi
+        </p>
+        <h1 style="font-family:var(--font-heading); font-weight:800; line-height:1.08; font-size:3.3rem; margin:0 0 1.25rem; text-wrap:balance; letter-spacing:-.01em;">Compassionate care for our community — free at the point of need.</h1>
+        <p style="font-size:1.2rem; color:var(--color-text-soft); max-width:34rem; margin:0 0 2rem;">A not-for-profit, family-run primary care clinic in Thandkoi, funded on a Zakat &amp; Sadaqa model. Everyone is seen with dignity, regardless of ability to pay.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:1rem; align-items:center;">
+          <a href="#" style="display:inline-block; font-weight:600; text-decoration:none; border-radius:8px; padding:.8em 1.6em; font-size:1.05rem; background:var(--color-donate-bg); color:var(--color-donate-text);">Give Zakat / Sadaqa</a>
+          <a href="#" style="display:inline-block; font-weight:600; text-decoration:none; border-radius:8px; padding:.8em 1.6em; font-size:1.05rem; background:transparent; border:1px solid currentColor; color:var(--color-text);">See our work →</a>
+        </div>
+        <p lang="ur" dir="rtl" style="font-family:var(--font-urdu); font-size:1.5rem; color:var(--color-teal-brand); margin:2.25rem 0 0;">صحت سب کے لیے · چراغ شفا</p>
+      </div>
+      <div style="position:relative;">
+        <div class="tk-ph" style="border-radius:16px; aspect-ratio:4/5; border:1px solid var(--color-border-default); display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          <span style="font-family:ui-monospace,Menlo,monospace; font-size:.8rem; color:var(--color-teal-brand); text-align:center; padding:1rem;">clinic / community photo<br>warm natural light · 4:5</span>
+        </div>
+        <div class="tk-card" style="position:absolute; inset-inline-start:-1.5rem; bottom:1.75rem; background:var(--color-surface); border:1px solid var(--color-border-default); border-radius:12px; box-shadow:var(--card-shadow); padding:1rem 1.25rem;">
+          <p style="margin:0; font-family:var(--font-heading); font-weight:800; font-size:1.6rem; color:var(--color-teal-brand); font-variant-numeric:tabular-nums;">Free</p>
+          <p style="margin:0; font-size:.85rem; color:var(--color-text-soft);">for every Zakat beneficiary</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ IMPACT STATS ============ -->
+    <section style="background:var(--color-accent-soft-bg);">
+      <div style="max-width:72rem; margin-inline:auto; padding:3rem 1.5rem;">
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:2rem; text-align:center;">
+          <div>
+            <p style="margin:0; font-family:var(--font-heading); font-weight:800; font-size:2.6rem; color:var(--color-teal-brand); font-variant-numeric:tabular-nums; line-height:1;">120<span style="font-size:1.4rem;">/day</span></p>
+            <p style="margin:.5rem 0 0; font-size:.9rem; color:var(--color-text-soft);">patients seen at the OPD</p>
+          </div>
+          <div>
+            <p style="margin:0; font-family:var(--font-heading); font-weight:800; font-size:2.6rem; color:var(--color-teal-brand); font-variant-numeric:tabular-nums; line-height:1;">36k+</p>
+            <p style="margin:.5rem 0 0; font-size:.9rem; color:var(--color-text-soft);">consultations a year</p>
+          </div>
+          <div>
+            <p style="margin:0; font-family:var(--font-heading); font-weight:800; font-size:2.6rem; color:var(--color-teal-brand); font-variant-numeric:tabular-nums; line-height:1;">24</p>
+            <p style="margin:.5rem 0 0; font-size:.9rem; color:var(--color-text-soft);">free medical camps held</p>
+          </div>
+          <div>
+            <p style="margin:0; font-family:var(--font-heading); font-weight:800; font-size:2.6rem; color:var(--color-teal-brand); font-variant-numeric:tabular-nums; line-height:1;">100%</p>
+            <p style="margin:.5rem 0 0; font-size:.9rem; color:var(--color-text-soft);">donor-funded, no fees</p>
+          </div>
+        </div>
+        <p style="text-align:center; margin:1.75rem 0 0; font-size:.78rem; color:var(--color-text-faint);">Sample figures — real numbers are published from the daily pipeline.</p>
+      </div>
+    </section>
+
+    <!-- ============ WHAT WE DO ============ -->
+    <section style="max-width:72rem; margin-inline:auto; padding:4rem 1.5rem 1rem;">
+      <p style="text-transform:uppercase; letter-spacing:.14em; font-size:.8rem; font-weight:600; color:var(--color-teal-brand); margin:0 0 .5rem;">What we do</p>
+      <h2 style="font-family:var(--font-heading); font-weight:700; font-size:2rem; margin:0 0 2.5rem; max-width:30rem; text-wrap:balance;">Everyday primary care, plus outreach where it's needed.</h2>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1.5rem;">
+        <article class="tk-card" style="background:var(--color-surface); border:1px solid var(--color-border-default); border-radius:12px; box-shadow:var(--card-shadow); padding:1.75rem;">
+          <div style="width:2.75rem; height:2.75rem; border-radius:10px; background:var(--color-accent-soft-bg); display:flex; align-items:center; justify-content:center; margin-bottom:1.1rem;">
+            <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="8" y="3" width="4" height="14" rx="1" fill="#ef5148"></rect><rect x="3" y="8" width="14" height="4" rx="1" fill="#ef5148"></rect></svg>
+          </div>
+          <h3 style="font-family:var(--font-heading); font-weight:700; font-size:1.25rem; margin:0 0 .5rem;">Daily OPD clinic</h3>
+          <p style="margin:0; color:var(--color-text-soft); font-size:.95rem;">General consultations, chronic-disease follow-up, and basic diagnostics six days a week.</p>
+        </article>
+        <article class="tk-card" style="background:var(--color-surface); border:1px solid var(--color-border-default); border-radius:12px; box-shadow:var(--card-shadow); padding:1.75rem;">
+          <div style="width:2.75rem; height:2.75rem; border-radius:10px; background:var(--color-accent-soft-bg); display:flex; align-items:center; justify-content:center; margin-bottom:1.1rem;">
+            <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="#086c7e" stroke-width="2.5"></circle></svg>
+          </div>
+          <h3 style="font-family:var(--font-heading); font-weight:700; font-size:1.25rem; margin:0 0 .5rem;">Medical camps</h3>
+          <p style="margin:0; color:var(--color-text-soft); font-size:.95rem;">Periodic outreach camps bringing screening and treatment to surrounding villages.</p>
+        </article>
+        <article class="tk-card" style="background:var(--color-surface); border:1px solid var(--color-border-default); border-radius:12px; box-shadow:var(--card-shadow); padding:1.75rem;">
+          <div style="width:2.75rem; height:2.75rem; border-radius:10px; background:var(--color-accent-soft-bg); display:flex; align-items:center; justify-content:center; margin-bottom:1.1rem;">
+            <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2" transform="rotate(45 10 10)" fill="none" stroke="#086c7e" stroke-width="2.5"></rect></svg>
+          </div>
+          <h3 style="font-family:var(--font-heading); font-weight:700; font-size:1.25rem; margin:0 0 .5rem;">Zakat-funded care</h3>
+          <p style="margin:0; color:var(--color-text-soft); font-size:.95rem;">Your Zakat and Sadaqa cover medicines and treatment for those who cannot pay.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ LATEST REPORT ============ -->
+    <section style="max-width:72rem; margin-inline:auto; padding:4rem 1.5rem;">
+      <div style="display:grid; grid-template-columns:1fr 1.15fr; gap:2.5rem; align-items:stretch;">
+        <div class="tk-ph" style="border-radius:16px; min-height:19rem; border:1px solid var(--color-border-default); display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:ui-monospace,Menlo,monospace; font-size:.8rem; color:var(--color-teal-brand); text-align:center; padding:1rem;">clinic day photo<br>16:9</span>
+        </div>
+        <div style="align-self:center;">
+          <p style="text-transform:uppercase; letter-spacing:.14em; font-size:.8rem; font-weight:600; color:var(--color-teal-brand); margin:0 0 .5rem;">Latest daily report</p>
+          <h2 style="font-family:var(--font-heading); font-weight:700; font-size:1.95rem; margin:0 0 1rem; text-wrap:balance;">Yesterday at the clinic</h2>
+          <div style="display:flex; gap:2.5rem; margin:0 0 1.25rem;">
+            <div><p style="margin:0; font-family:var(--font-heading); font-weight:800; font-size:2rem; color:var(--color-teal-brand); font-variant-numeric:tabular-nums;">128</p><p style="margin:0; font-size:.85rem; color:var(--color-text-soft);">patients seen</p></div>
+            <div><p style="margin:0; font-family:var(--font-heading); font-weight:800; font-size:2rem; color:var(--color-teal-brand); font-variant-numeric:tabular-nums;">61 / 67</p><p style="margin:0; font-size:.85rem; color:var(--color-text-soft);">women / men</p></div>
+          </div>
+          <p style="margin:0 0 1.5rem; color:var(--color-text-soft);">A steady day at the outpatient department, with respiratory complaints leading presentations as the season turns. De-identified aggregates only — no patient data leaves the clinic.</p>
+          <a href="#" style="font-weight:600; text-decoration:none; color:var(--color-brand-deep);">Read the full report →</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ GALLERY PREVIEW ============ -->
+    <section style="max-width:72rem; margin-inline:auto; padding:1rem 1.5rem 4rem;">
+      <div style="display:flex; align-items:end; justify-content:space-between; gap:1rem; margin-bottom:1.5rem;">
+        <div>
+          <p style="text-transform:uppercase; letter-spacing:.14em; font-size:.8rem; font-weight:600; color:var(--color-teal-brand); margin:0 0 .5rem;">From the community</p>
+          <h2 style="font-family:var(--font-heading); font-weight:700; font-size:1.95rem; margin:0;">Our work in pictures</h2>
+        </div>
+        <a href="#" style="font-weight:600; text-decoration:none; color:var(--color-brand-deep); white-space:nowrap;">View gallery →</a>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;">
+        <div class="tk-ph" style="border-radius:12px; aspect-ratio:1; border:1px solid var(--color-border-default);"></div>
+        <div class="tk-ph" style="border-radius:12px; aspect-ratio:1; border:1px solid var(--color-border-default);"></div>
+        <div class="tk-ph" style="border-radius:12px; aspect-ratio:1; border:1px solid var(--color-border-default);"></div>
+        <div class="tk-ph" style="border-radius:12px; aspect-ratio:1; border:1px solid var(--color-border-default);"></div>
+      </div>
+    </section>
+
+    <!-- ============ DONATE BAND ============ -->
+    <section style="background:var(--color-teal-deep); color:var(--color-paper);">
+      <div style="max-width:72rem; margin-inline:auto; padding:4rem 1.5rem; display:grid; grid-template-columns:1.2fr .8fr; gap:2.5rem; align-items:center;">
+        <div>
+          <h2 style="font-family:var(--font-heading); font-weight:800; font-size:2.2rem; margin:0 0 .75rem; color:#fff; text-wrap:balance;">Your Zakat keeps the doors open.</h2>
+          <p style="margin:0; font-size:1.1rem; color:var(--color-pale-aqua); max-width:34rem;">Every rupee goes directly to medicines and care. Give once, or set up a monthly Sadaqa.</p>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:1rem; align-items:flex-start;">
+          <a href="#" style="display:inline-block; font-weight:600; text-decoration:none; border-radius:8px; padding:.85em 1.8em; font-size:1.1rem; background:var(--color-amber-on-dark); color:var(--color-teal-deep);">Donate now</a>
+          <p style="margin:0; font-size:.85rem; color:var(--color-footer-text-soft);">Bank &amp; Zakat account details on the Donate page.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="tk-footer" style="background:var(--color-footer-bg); color:var(--color-footer-text); font-family:var(--font-body);">
+    <div style="max-width:72rem; margin-inline:auto; padding-inline:1.5rem; display:grid; gap:2rem; padding-block:3rem; grid-template-columns:1.4fr 1fr 1fr 1fr;">
+      <div>
+        <img src="static/images/logo-mark.svg" alt="" width="56" height="56" style="height:3rem; width:auto; margin-bottom:1rem;">
+        <p style="margin:0; max-width:20rem; color:var(--color-footer-text-soft); font-size:.9rem;">A not-for-profit primary care clinic in Thandkoi, Swabi — صحت سب کے لیے.</p>
+      </div>
+      <div>
+        <h2 style="font-family:var(--font-heading); font-size:.9rem; text-transform:uppercase; letter-spacing:.14em; color:var(--color-pale-aqua); margin:0 0 .75rem;">Contact</h2>
+        <p style="margin:0; color:var(--color-footer-text-soft); font-size:.9rem;">Contact details coming soon.</p>
+      </div>
+      <div>
+        <h2 style="font-family:var(--font-heading); font-size:.9rem; text-transform:uppercase; letter-spacing:.14em; color:var(--color-pale-aqua); margin:0 0 .75rem;">Zakat &amp; Sadaqa</h2>
+        <p style="margin:0; color:var(--color-footer-text-soft); font-size:.9rem;">Bank details coming soon.</p>
+      </div>
+      <div>
+        <h2 style="font-family:var(--font-heading); font-size:.9rem; text-transform:uppercase; letter-spacing:.14em; color:var(--color-pale-aqua); margin:0 0 .75rem;">Follow</h2>
+        <p style="margin:0; color:var(--color-footer-text-soft); font-size:.9rem;">Social links coming soon.</p>
+      </div>
+    </div>
+    <div style="max-width:72rem; margin-inline:auto; padding-inline:1.5rem; border-block-start:1px solid var(--color-footer-border); padding-block:1rem; font-size:.8rem; color:var(--color-footer-text-soft); display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:space-between;">
+      <p style="margin:0;">© 2026 The Thandkoi Clinics</p>
+      <p lang="ur" dir="rtl" style="margin:0; font-family:var(--font-urdu);">صحت سب کے لیے · چراغ شفا</p>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;1280px&quot;,&quot;height&quot;:&quot;900px&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'light' | 'dark'&quot;}}">
+class Component extends DCLogic {
+  state = { theme: this.props.theme ?? "light" };
+  componentDidUpdate(prev) {
+    if (this.props.theme && this.props.theme !== prev.theme && this.props.theme !== this.state.theme) {
+      this.setState({ theme: this.props.theme });
+    }
+  }
+  renderVals() {
+    return {
+      theme: this.state.theme,
+      toggleTheme: () => this.setState(s => ({ theme: s.theme === "dark" ? "light" : "dark" })),
+    };
+  }
+}
+</script>
+</body>
+</html>
