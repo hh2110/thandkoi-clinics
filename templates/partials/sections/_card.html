@@ -1,0 +1,21 @@
+{% comment %}
+A single service/feature card for the card grid. `.card` itself is defined in
+components.css; this adds the optional icon slot, status tag, heading and body.
+
+Context:
+  card.icon_svg — optional trusted inline SVG for the icon slot. Rendered with
+                  |safe, so it must be author-controlled markup (a fixed icon
+                  set), never user input.
+  card.tag      — optional status tag, e.g. "Planned".
+  card.title    — card heading.
+  card.body     — card body text.
+
+`.card--interactive` opts the card into the hover lift (layout.css), which is
+removed under prefers-reduced-motion.
+{% endcomment %}
+<article class="card card--interactive">
+  {% if card.icon_svg %}<div class="card__icon">{{ card.icon_svg|safe }}</div>{% endif %}
+  {% if card.tag %}<span class="card__tag">{{ card.tag }}</span>{% endif %}
+  {% if card.title %}<h3 class="card__title">{{ card.title }}</h3>{% endif %}
+  {% if card.body %}<p class="card__body">{{ card.body }}</p>{% endif %}
+</article>

@@ -37,6 +37,11 @@
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}" />
     <link rel="stylesheet" href="{% static 'css/base.css' %}" />
     <link rel="stylesheet" href="{% static 'css/components.css' %}" />
+    {% comment %}
+    Page-body layout kit (Plan 03.5) — loaded after components.css so its
+    section vocabulary builds on the chrome + primitives above.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/layout.css' %}" />
     {% block extra_head %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">

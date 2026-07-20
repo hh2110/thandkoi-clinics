@@ -6,10 +6,16 @@ cover the bilingual routing, RTL layout, brand-styled error pages, and the
 anti-FOUC/theme-toggle markup added in that plan.
 """
 
+import re
+from contextlib import contextmanager
+from importlib import reload
+from pathlib import Path
+
 import pytest
+from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import override_settings
-from django.urls import reverse
+from django.urls import clear_url_caches, reverse
 from wagtail.models import Page, Site
 
 from apps.core.factories import HomePageFactory
@@ -151,3 +157,193 @@ def test_no_third_party_font_or_cdn_requests(client, home_page):
     content = response.content.decode()
     assert "fonts.googleapis.com" not in content
     assert "fonts.gstatic.com" not in content
+
+
+# --- Plan 03.5: page-body layout kit -----------------------------------------
+
+# (template, minimal context, a substring the render must contain). The
+# context is intentionally minimal — sections are driven entirely by block data
+# (Plan 04 wires the real values), so each must degrade to its empty/placeholder
+# state rather than raise when fields are unset. The marker proves the render
+# actually produced the section's own markup, not just a non-None string.
+SECTION_PARTIAL_CASES = [
+    ("partials/sections/hero.html", {"title": "Care for all"}, "Care for all"),
+    ("partials/sections/stat_band.html", {}, "stat-band"),
+    ("partials/sections/card_grid.html", {}, "card-grid"),
+    ("partials/sections/feature_split.html", {}, "feature-split"),
+    ("partials/sections/cta_band.html", {}, "cta-band"),
+    ("partials/sections/media_grid.html", {}, "media-grid"),
+    ("partials/sections/section_header.html", {"heading": "Our work"}, "Our work"),
+    ("partials/sections/_media_placeholder.html", {}, "media-placeholder"),
+    ("partials/sections/_card.html", {"card": {"title": "OPD clinic"}}, "OPD clinic"),
+]
+
+
+@pytest.mark.parametrize(("template_name", "context", "marker"), SECTION_PARTIAL_CASES)
+def test_section_partial_renders(template_name, context, marker):
+    """Every section partial renders to a string containing its own markup.
+
+    Sections are driven entirely by context/block data, so each must render
+    (degrading to its empty/placeholder state where fields are unset) — the
+    "renders correctly with fields unset" contract Plan 04 depends on.
+    """
+    html = render_to_string(template_name, context)
+    assert isinstance(html, str)
+    assert marker in html
+
+
+def test_stat_band_shows_empty_state_when_no_stats():
+    """With no stats the band shows its coming-soon line, not an empty grid."""
+    html = render_to_string("partials/sections/stat_band.html", {})
+    assert "stat-band__empty" in html
+
+
+def test_stat_band_renders_supplied_numbers_only():
+    """Numbers are template inputs — the band shows exactly what it's given."""
+    html = render_to_string(
+        "partials/sections/stat_band.html",
+        {"stats": [{"value": "128", "label": "patients seen"}]},
+    )
+    assert "128" in html
+    assert "patients seen" in html
+    assert 'class="stat__value"' in html
+
+
+def test_media_placeholder_shows_when_image_absent():
+    """A media grid with imageless items renders the intentional placeholder."""
+    html = render_to_string(
+        "partials/sections/media_grid.html",
+        {"items": [{"caption": "clinic photo"}]},
+    )
+    assert "media-placeholder" in html
+    assert 'role="img"' in html
+    assert "clinic photo" in html
+
+
+def test_media_grid_uses_real_image_when_present():
+    """When an image is set, the grid renders it instead of the placeholder."""
+    html = render_to_string(
+        "partials/sections/media_grid.html",
+        {"items": [{"image": "/media/x.jpg", "alt": "A clinic day"}]},
+    )
+    assert "/media/x.jpg" in html
+    assert 'alt="A clinic day"' in html
+    assert "media-placeholder" not in html
+
+
+def test_layout_css_linked_after_components_in_base(client, home_page):
+    """base.html loads layout.css, and it comes after components.css."""
+    content = client.get("/en/").content.decode()
+    assert "css/layout.css" in content
+    assert content.index("css/components.css") < content.index("css/layout.css")
+
+
+def test_layout_css_uses_tokens_only_no_hardcoded_colours():
+    """layout.css reads only tokens — no literal hex/rgb colours.
+
+    Enforces the acceptance criterion "no new hard-coded colours": a token
+    change must reflow the whole kit and both themes come for free. Translucent
+    tints are derived with color-mix() from a token, so no rgba()/hex appears.
+    """
+    css = (settings.BASE_DIR / "static" / "css" / "layout.css").read_text()
+    # Strip block comments so the explanatory prose (which mentions rgba) and
+    # any hex in comments don't trip the check.
+    css_no_comments = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    assert "rgba(" not in css_no_comments
+    assert "rgb(" not in css_no_comments
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b", css_no_comments)
+    assert "var(--color-" in css_no_comments
+
+
+def test_styleguide_icons_colour_via_style_declaration_not_presentation_attr():
+    """Icon colours resolve — set via a `style` declaration, not fill=/stroke=.
+
+    A CSS custom property only resolves inside a CSS declaration; as a raw SVG
+    presentation attribute (fill="var(--color-coral)") it renders black/none.
+    Assert the tokened colour lives in a `style` attribute and that no tokened
+    presentation attribute remains, so the three service-card icons actually
+    show their intended coral/teal.
+    """
+    from apps.core.views import _ICON_CIRCLE, _ICON_CROSS, _ICON_DIAMOND
+
+    assert 'style="fill:var(--color-coral)"' in _ICON_CROSS
+    assert 'style="fill:none;stroke:var(--color-brand)"' in _ICON_CIRCLE
+    assert 'style="fill:none;stroke:var(--color-brand)"' in _ICON_DIAMOND
+    for icon in (_ICON_CROSS, _ICON_CIRCLE, _ICON_DIAMOND):
+        assert 'fill="var(' not in icon
+        assert 'stroke="var(' not in icon
+
+
+@contextmanager
+def _debug_urls():
+    """Register the DEBUG-only styleguide route for the duration of a test.
+
+    ``config/urls.py`` registers the throwaway styleguide route only under
+    ``settings.DEBUG``, evaluated once at urlconf import. pytest-django runs the
+    suite with ``DEBUG=False`` (its ``django_debug_mode`` default), so the route
+    is absent by default and the URL would 404. This flips DEBUG on and rebuilds
+    the urlconf so the gated route is exercised for real, then restores the
+    DEBUG=False urlconf afterwards so no other test is affected.
+    """
+    import config.urls
+
+    override = override_settings(DEBUG=True)
+    override.enable()
+    clear_url_caches()
+    reload(config.urls)
+    try:
+        yield
+    finally:
+        override.disable()
+        clear_url_caches()
+        reload(config.urls)
+
+
+@pytest.mark.parametrize(
+    ("url", "lang", "direction"),
+    [("/en/styleguide/", "en", "ltr"), ("/ur/styleguide/", "ur", "rtl")],
+)
+def test_styleguide_composes_sections_in_both_languages(
+    client, db, url, lang, direction
+):
+    """A page composed of the section partials returns 200 with correct lang/dir.
+
+    Exercises the whole kit through the real bilingual/RTL chrome in both
+    languages — the Plan 04 "compose a page from the kit" path — via the
+    DEBUG-gated styleguide route.
+    """
+    with _debug_urls():
+        response = client.get(url)
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert f'<html lang="{lang}" dir="{direction}">' in content
+    # A representative sampling of the composed sections is present.
+    assert "hero" in content
+    assert "stat-band" in content
+    assert "card-grid" in content
+    assert "feature-split" in content
+    assert "cta-band" in content
+    assert "media-grid" in content
+
+
+def test_styleguide_route_absent_without_debug(client, db):
+    """The styleguide route is DEBUG-gated — absent in production (DEBUG off).
+
+    pytest-django runs with DEBUG=False, matching production, so the route must
+    not resolve; it 404s through the Wagtail catch-all like any unknown path.
+    """
+    response = client.get("/en/styleguide/")
+    assert response.status_code == 404
+
+
+def test_styleguide_template_file_is_present():
+    """The throwaway styleguide template exists where the view expects it."""
+    template = (
+        Path(settings.BASE_DIR)
+        / "apps"
+        / "core"
+        / "templates"
+        / "core"
+        / "styleguide.html"
+    )
+    assert template.exists()

@@ -1,0 +1,413 @@
+/*
+ * Page-body layout kit (Plan 03.5).
+ *
+ * Where components.css is "chrome + primitives" (header, nav, footer, buttons,
+ * cards), this file is "page-body sections": the reusable vocabulary that
+ * Plan 04+ compose pages from — section rhythm, hero, impact-stat band, card
+ * grid, feature split, CTA band and media/gallery grid.
+ *
+ * Same rules as the rest of the project's CSS:
+ *   - Every colour comes from a tokens.css custom property — never a literal
+ *     hex, never rgba(), never the dark-mode media query. Translucent tints are
+ *     derived from a token with color-mix(), so a token change reflows the whole
+ *     kit and both themes come for free.
+ *   - All directional spacing uses CSS logical properties (inline/block-start
+ *     /end), so dir="rtl" mirrors every section automatically — no RTL sheet.
+ *   - Motion is limited to a hover lift on interactive cards and is removed
+ *     under prefers-reduced-motion (brand-guidelines.md §7).
+ */
+
+/* --- Section rhythm --------------------------------------------------------
+   Page-body sections get a more generous vertical rhythm than the base
+   `section` rule (base.css) — healthcare calm, whitespace carrying the page
+   (brand-guidelines.md §4). Backgrounds are full-bleed; an inner `.wrapper`
+   (base.css) holds the max-width and inline padding. */
+.section {
+  padding-block: var(--space-8);
+}
+
+.section--tinted {
+  background-color: var(--color-accent-soft-bg);
+}
+
+/* The Teal-Deep "dark band" (donate band family) — always the deep teal
+   ground in both themes, like the footer, so it reads as one visual family
+   rather than "dark mode" logic. Text/links switch to the light-on-dark
+   footer tokens. */
+.section--dark {
+  background-color: var(--color-teal-deep);
+  color: var(--color-footer-text);
+}
+
+.section--dark a {
+  color: var(--color-pale-aqua);
+}
+
+/* --- Eyebrow + section header ---------------------------------------------- */
+.eyebrow {
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-brand);
+  margin-block: 0 var(--space-1);
+}
+
+.section-header {
+  margin-block-end: var(--space-4);
+}
+
+.section-header__title {
+  max-width: 32rem;
+  margin-block: 0;
+}
+
+/* Header row with a trailing "view all" link (media grid, etc.). */
+.section-header--inline {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.section-link {
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* --- Hero -----------------------------------------------------------------
+   Single column by default (mobile-first); two columns from the primary-nav
+   breakpoint up (56rem, matching components.css). */
+.hero__inner {
+  display: grid;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.hero__title {
+  margin-block: 0 var(--space-2);
+}
+
+.hero__intro {
+  font-size: var(--font-size-md);
+  color: var(--color-text-soft);
+  max-width: 34rem;
+  margin-block: 0 var(--space-4);
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.hero__tagline {
+  font-family: var(--font-urdu-display);
+  font-size: var(--font-size-lg);
+  color: var(--color-brand);
+  margin-block: var(--space-4) 0;
+}
+
+.hero__media {
+  position: relative;
+}
+
+/* Floating stat card, tucked over the media's leading edge. Uses logical
+   `inset-inline-start` so it flips to the right under RTL. */
+.hero__stat-card {
+  position: absolute;
+  inset-inline-start: calc(-1 * var(--space-3));
+  inset-block-end: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.hero__stat-value {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-lg);
+  color: var(--color-brand);
+  font-variant-numeric: tabular-nums;
+  margin-block: 0;
+}
+
+.hero__stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+  margin-block: 0;
+}
+
+@media (min-width: 56rem) {
+  .hero__inner {
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: var(--space-8);
+  }
+}
+
+/* --- Impact-stat band ------------------------------------------------------ */
+.stat-band__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4) var(--space-2);
+  text-align: center;
+}
+
+.stat__value {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+  color: var(--color-brand);
+  font-variant-numeric: tabular-nums;
+  margin-block: 0;
+}
+
+.stat__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+  margin-block: var(--space-1) 0;
+}
+
+.stat-band__caption {
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  margin-block: var(--space-3) 0;
+}
+
+.stat-band__empty {
+  text-align: center;
+  margin-block: 0;
+}
+
+@media (min-width: 56rem) {
+  .stat-band__grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+/* --- Card grid ------------------------------------------------------------
+   `.card` itself lives in components.css; this arranges it into a responsive
+   2/3/4-up grid and adds the icon slot, status tag and hover lift. */
+.card-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr;
+}
+
+.card-grid__empty {
+  margin-block: 0;
+}
+
+@media (min-width: 40rem) {
+  .card-grid--2,
+  .card-grid--3,
+  .card-grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 56rem) {
+  .card-grid--3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .card-grid--4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.card__icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--card-radius);
+  background-color: var(--color-accent-soft-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-block-end: var(--space-2);
+}
+
+.card__tag {
+  display: inline-block;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-brand);
+  background-color: var(--color-accent-soft-bg);
+  border-radius: 999px;
+  padding: 0.15em 0.75em;
+  margin-block-end: var(--space-1);
+}
+
+.card__title {
+  margin-block: 0 var(--space-1);
+}
+
+.card__body {
+  color: var(--color-text-soft);
+  margin-block: 0;
+}
+
+/* Hover lift — interactive cards only, gated below for reduced motion. */
+.card--interactive {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card--interactive:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--color-teal-deep) 16%, transparent);
+}
+
+/* --- Feature split --------------------------------------------------------
+   Media beside text; `--reverse` swaps their order (uses `order`, which the
+   grid honours in both LTR and RTL). */
+.feature-split {
+  display: grid;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.feature-split__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-block: var(--space-2) var(--space-3);
+}
+
+.feature-split__body p {
+  color: var(--color-text-soft);
+}
+
+.feature-split__link {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (min-width: 56rem) {
+  .feature-split {
+    grid-template-columns: 1fr 1.15fr;
+    gap: var(--space-6);
+  }
+
+  .feature-split--reverse .feature-split__media {
+    order: 2;
+  }
+}
+
+/* --- CTA band ------------------------------------------------------------- */
+.cta-band__inner {
+  display: grid;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.cta-band__heading {
+  color: var(--color-footer-text);
+  margin-block: 0 var(--space-2);
+}
+
+.cta-band__body {
+  color: var(--color-pale-aqua);
+  max-width: 34rem;
+  margin-block: 0;
+}
+
+.cta-band__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.cta-band__note {
+  font-size: var(--font-size-xs);
+  color: var(--color-footer-text-soft);
+  margin-block: 0;
+}
+
+@media (min-width: 56rem) {
+  .cta-band__inner {
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: var(--space-6);
+  }
+}
+
+/* --- Media / gallery grid -------------------------------------------------- */
+.media-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.media-grid__empty {
+  margin-block: 0;
+}
+
+@media (min-width: 56rem) {
+  .media-grid--3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .media-grid--4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.media-grid__item {
+  aspect-ratio: 1 / 1;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+}
+
+.media-grid__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* --- Image placeholder ----------------------------------------------------
+   The intentional "photo goes here" treatment — a soft diagonal stripe (a
+   functional hatch pattern, not a decorative gradient) with a monospace
+   caption, shown until a real image field is populated so a page never renders
+   a broken or empty box (brand-guidelines.md §5 consent rule: placeholders
+   carry no identifiable person). Stripe tints are derived from a token with
+   color-mix() so there is no hard-coded colour. */
+.media-placeholder {
+  aspect-ratio: var(--placeholder-ratio, 1 / 1);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--card-radius);
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-brand) 8%, transparent) 0 10px,
+    color-mix(in srgb, var(--color-brand) 3%, transparent) 10px 20px
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.media-placeholder__caption {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: var(--font-size-xs);
+  color: var(--color-brand);
+  text-align: center;
+  padding: var(--space-2);
+}
+
+/* --- Reduced motion -------------------------------------------------------
+   base.css already near-zeroes transition/animation durations globally; this
+   additionally removes the hover displacement itself, so the lift is fully
+   absent (not just instant) for visitors who ask for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .card--interactive:hover {
+    transform: none;
+  }
+}

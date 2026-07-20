@@ -1,0 +1,29 @@
+{% load i18n %}
+{% comment %}
+Impact-stat band: a responsive row of number/label pairs, figures set in
+Archivo with tabular-nums so columns of digits line up.
+
+Context:
+  stats            — a list of {value, label} dicts. Values are strings so the
+                     caller controls formatting ("120/day", "36k+", "100%").
+  caption          — optional small print under the row.
+  section_modifier — background modifier; defaults to "section--tinted".
+
+Numbers are inputs only — never baked in (they come from the CMS/pipeline).
+Empty state: with no stats it shows a "coming soon" line, not an empty band.
+{% endcomment %}
+<section class="section {{ section_modifier|default:'section--tinted' }} stat-band">
+  <div class="wrapper">
+    <div class="stat-band__grid">
+      {% for stat in stats %}
+        <div class="stat">
+          <p class="stat__value">{{ stat.value }}</p>
+          {% if stat.label %}<p class="stat__label">{{ stat.label }}</p>{% endif %}
+        </div>
+      {% empty %}
+        <p class="stat-band__empty text-faint">{% translate "Figures coming soon." %}</p>
+      {% endfor %}
+    </div>
+    {% if caption %}<p class="stat-band__caption">{{ caption }}</p>{% endif %}
+  </div>
+</section>

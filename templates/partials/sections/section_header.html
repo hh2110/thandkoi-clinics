@@ -1,0 +1,19 @@
+{% comment %}
+Eyebrow (uppercase label) + h2 section heading — the standard section opener.
+
+Context:
+  eyebrow      — optional uppercase label above the heading.
+  heading      — optional section heading (rendered as <h2>).
+  heading_tag  — optional heading level, defaults to "h2".
+
+Both are optional so a section can carry just an eyebrow, just a heading, or
+neither (an all-visual section) without emitting empty tags.
+{% endcomment %}
+{% if eyebrow %}<p class="eyebrow">{{ eyebrow }}</p>{% endif %}
+{% if heading %}
+  {% if heading_tag == "h1" %}
+    <h1 class="section-header__title">{{ heading }}</h1>
+  {% else %}
+    <h2 class="section-header__title">{{ heading }}</h2>
+  {% endif %}
+{% endif %}

@@ -1,0 +1,44 @@
+{% load i18n %}
+{% comment %}
+Media-beside-text block (the latest-report teaser and any "X beside a photo"
+section). Two columns from 56rem up; `reverse` puts the media on the trailing
+side. Collapses to one column below that.
+
+Context (all optional):
+  reverse       — truthy to render media on the trailing (inline-end) side.
+  media_image / media_alt   — image; falls back to the placeholder.
+  media_caption — caption for the placeholder when no image is set.
+  eyebrow       — uppercase label.
+  heading       — section heading.
+  stats         — optional inline {value, label} pairs (e.g. "128 patients").
+  body          — body paragraph.
+  cta_label / cta_url   — optional trailing link ("Read the full report →").
+{% endcomment %}
+<section class="section">
+  <div class="wrapper">
+    <div class="feature-split {% if reverse %}feature-split--reverse{% endif %}">
+      <div class="feature-split__media">
+        {% if media_image %}
+          <img class="media-grid__item" src="{{ media_image }}" alt="{{ media_alt|default:'' }}" />
+        {% else %}
+          {% include "partials/sections/_media_placeholder.html" with caption=media_caption ratio="16 / 9" %}
+        {% endif %}
+      </div>
+      <div class="feature-split__body">
+        {% include "partials/sections/section_header.html" %}
+        {% if stats %}
+          <div class="feature-split__stats">
+            {% for stat in stats %}
+              <div class="stat">
+                <p class="stat__value">{{ stat.value }}</p>
+                {% if stat.label %}<p class="stat__label">{{ stat.label }}</p>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if body %}<p>{{ body }}</p>{% endif %}
+        {% if cta_label %}<a class="feature-split__link" href="{{ cta_url|default:'#' }}">{{ cta_label }}</a>{% endif %}
+      </div>
+    </div>
+  </div>
+</section>

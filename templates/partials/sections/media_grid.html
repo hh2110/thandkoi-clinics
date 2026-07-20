@@ -1,0 +1,40 @@
+{% load i18n %}
+{% comment %}
+Responsive square grid of image slots (gallery preview / gallery page). Each
+item shows its image, or the intentional placeholder when the image is unset.
+
+Context:
+  eyebrow    — optional uppercase label.
+  heading    — optional section heading.
+  link_label / link_url   — optional trailing "View gallery →" link.
+  columns    — 3 or 4 (wide-viewport column count); defaults to 4.
+  items      — a list of {image, alt, caption} dicts. Any item without `image`
+               renders the placeholder (caption shown inside it).
+
+Empty state: with no items it shows a "coming soon" line, not an empty grid.
+{% endcomment %}
+<section class="section">
+  <div class="wrapper">
+    {% if eyebrow or heading or link_label %}
+      <div class="section-header section-header--inline">
+        <div>
+          {% include "partials/sections/section_header.html" %}
+        </div>
+        {% if link_label %}<a class="section-link" href="{{ link_url|default:'#' }}">{{ link_label }}</a>{% endif %}
+      </div>
+    {% endif %}
+    <div class="media-grid media-grid--{{ columns|default:4 }}">
+      {% for item in items %}
+        <div class="media-grid__item">
+          {% if item.image %}
+            <img src="{{ item.image }}" alt="{{ item.alt|default:'' }}" />
+          {% else %}
+            {% include "partials/sections/_media_placeholder.html" with caption=item.caption %}
+          {% endif %}
+        </div>
+      {% empty %}
+        <p class="media-grid__empty text-faint">{% translate "Photos coming soon." %}</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
