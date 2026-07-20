@@ -75,6 +75,28 @@ pass, not text this plan's PR commits to the repo.
 | "Another way to give" | A CTA to the Contact page (and/or direct `tel:`/`mailto:` links pulled from the same setting) for receipts or questions not covered by the giving sections above | Keeps this page from needing any form/backend — consistent with Plan 04's Contact page decision (no contact form, no spam-handling surface). |
 | Donate CTA styling | Amber (`#CE8A2C` light / `#E8B04A` dark) everywhere a donate link appears, per brand-guidelines.md | Already-established brand decision; this plan is what actually wires it into markup. |
 
+## Feature flag
+
+**No flag** — deliberate, same reasoning as Plan 04: a single Wagtail page,
+invisible until published in `/admin/`, so Wagtail's publish step is the gate.
+Reuses Plan 04's existing setting (no new data surface). No online payment path
+exists to gate. Ships on merge + deploy; the page is published and Home's donate
+CTA pointed at it as post-deploy content steps.
+
+## Precedent map
+
+New-repo note: by this plan Plan 04 is merged, so nearly everything mirrors an
+existing in-repo pattern — this is a small plan precisely because it reuses.
+
+| Element | Precedent to mirror | Where |
+|---|---|---|
+| Plain `RichTextField` page model | Plan 04's About / Contact page models | Plan 04 (in repo) |
+| Reusing the Contact & Bank Details setting (not re-entering fields) | Plan 04's `BaseSiteSetting` singleton | Plan 04 (in repo) |
+| Section layout (CTA band, section rhythm) | Plan 03.5's `partials/sections/cta_band.html` + section classes | Plan 03.5 (in repo) |
+| Amber donate-CTA styling | Plan 03 button styles + brand-guidelines.md §2/§4 (amber = Donate only) | Plan 03 + brand guide (in repo) |
+| Setting-match guard test | Plan 04's "Contact page reflects the setting" test | Plan 04 (in repo) |
+| **Zakat vs. Sadaqa two-section structure** | **No precedent** — a straightforward structural split; grounded in the maintainer decision + source PDF p.18, not invention | maintainer decision |
+
 ## Task checklist (code — this plan's PR)
 
 1. **`DonatePage` model** — separate `RichTextField`s (or a short
@@ -124,3 +146,19 @@ pass, not text this plan's PR commits to the repo.
 - **In-kind giving** → **include it**: a dedicated section listing options
   such as medicine donations, equipment, and volunteering, alongside monetary
   bank transfer — each routing to Contact to arrange (no form/backend).
+
+## Release plan
+
+- **How it ships:** merge → additive migration → deploy pipeline (staging →
+  verify → production). Post-deploy content steps: enter the Donate copy (source
+  PDF p.18), then point Home's `DonateCTABlock` and any header/footer donate link
+  at the new page (content edits, no redeploy).
+- **Gating check:** smoke test + the bank-details-match-the-setting guard test
+  green in CI; on staging, confirm the bank details render live from the shared
+  setting, the primary action is **amber** (not coral/teal), and there is no
+  form, payment widget, or third-party script on the page.
+- **Who gets access:** the public (everyone), once published.
+- **Who's informed:** maintainer (and whichever Administrator enters the copy).
+  No external audience.
+- **Rollback trigger:** unpublish the page or unset the CTA link in the admin
+  (instant, no redeploy); code revert only for a model/migration defect.

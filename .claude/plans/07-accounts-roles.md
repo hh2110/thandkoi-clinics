@@ -172,6 +172,32 @@ enforced by two facts, one unchanged and one clarified on PR #15:
 | Password policy | Django's `AUTH_PASSWORD_VALIDATORS` (length, common-password, numeric) enabled; HTTPS-only session cookies | Baseline already available from Django; just confirm it's on in prod settings. |
 | 2FA | **Not adopted** (maintainer decision) — rely on strong passwords + HTTPS | `wagtail-2fa` is not added; the extra dependency and login step aren't worth it for three trusted accounts. |
 
+## Feature flag
+
+**No flag** — deliberate, and a flag would be nonsensical here: this is auth
+**infrastructure** (one group + one custom permission, created by a data
+migration), internal-only, with no public-facing surface. A migration either
+applies or it doesn't — there is no partial slice to gate, no user-visible
+behaviour to toggle. The one thing this plan *guards* (the raw-export upload) is
+Plan 08's view, which is itself gated by the `can_upload_export` permission —
+the permission is the gate. Ships on merge + deploy; accounts provisioned by
+hand post-deploy.
+
+## Precedent map
+
+New-repo note: this is the first auth plan, so the group/permission model has no
+in-repo precedent — it's grounded against Django/Wagtail's built-in auth
+primitives (best practice), which the "Why not a custom auth system" section
+already argues for at length. Only the prod-settings audit reuses existing code.
+
+| Element | Precedent to mirror | Where |
+|---|---|---|
+| Reusing Django auth + Wagtail Groups/permissions (no custom framework) | Wagtail's built-in Users/Groups/permissions (starter "Editors"/"Moderators" groups) | Wagtail docs (best practice) |
+| Group + permission set as a **data migration** | Django data-migration idiom; migrations already exist from Plan 01 | Django docs + Plan 01 (in repo) |
+| Custom `can_upload_export` permission | Django `Meta.permissions` idiom | Django docs (best practice) |
+| Prod-settings audit (secure/HttpOnly cookies, password validators) | Plan 01's settings module — confirm, don't re-add | Plan 01 (in repo) |
+| **Invariant-#4 permission-boundary test** (automation can't publish) | **No precedent** — grounds on Wagtail `save_revision()` (draft, no publish perm) vs. a human publish | Wagtail (best practice) |
+
 ## What gets built (code — this plan's PR)
 
 The deliverable is small and mostly declarative:
@@ -246,3 +272,33 @@ decisions" at the top:
   all three named accounts; no separation of duties.
 - **2FA** → not adopted; strong passwords + HTTPS only.
 - **Custom user model** → stay on Django's default `auth.User`.
+
+## Release plan
+
+- **How it ships:** merge → the groups/permissions **data migration** runs in
+  every environment (local, CI, staging, production), creating the single
+  **Administrator** group with its permission set — no manual clicking, no user
+  rows. Then deploy.
+- **How access is granted (post-deploy, by hand):** an Administrator creates the
+  three real accounts in `/admin/` (Settings → Users), assigns each to the
+  Administrator group, and sends each person through Django's password-reset flow
+  to set their own password. No seeded or shared passwords.
+- **Gating check:** the **invariant-#4 boundary test** (automation calling
+  `save_revision()` creates a draft and **cannot** publish; an Administrator can)
+  and the group-exists-after-migration assertion green in CI; on staging, confirm
+  the group + permissions are present and a user *without* `can_upload_export` is
+  denied.
+- **Who gets access:** exactly the three named Administrators
+  (`hikmatyarhasan@gmail.com`, `dramanullah07@gmail.com`,
+  `syeddawood.shah93@gmail.com`). No public/self-signup accounts, by design.
+- **Who's informed:** those three people — brief them on the account model
+  (one Administrator role), the password-reset first-login step, and the
+  deliberate **no-2FA / strong-password + HTTPS** policy, so the security posture
+  is understood, not just imposed.
+- **Rollback trigger:** the migration is reversible (drops the group); blast
+  radius is low because it seeds **no user rows** and no credentials. A
+  compromised or departed account is deactivated in the admin immediately — no
+  redeploy.
+- **Security guardrail on release:** verify **no credentials, passwords, or user
+  rows** are committed anywhere (migration, fixture, settings) — the real emails
+  live only in this plan's provisioning checklist.

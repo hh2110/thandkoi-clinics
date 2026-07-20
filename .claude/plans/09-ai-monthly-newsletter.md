@@ -159,6 +159,38 @@ This plan is a **reader**, not a re-implementer, of Plan 08's data model:
   audit/log record, not an email/alert).
 - **`get_previous_newsletter` scope** → just the immediately previous issue.
 
+## Feature flag
+
+**No flag** — deliberate, and here the gates are stronger than a flag would be:
+this is a **management command an Administrator chooses to run** (no scheduled/
+unattended job), and it **only ever creates an unpublished draft** (no publish
+permission, per Plan 07). "Don't run the command" is a more absolute off-switch
+than a flag, and the human review-before-publish step means nothing reaches the
+public without a person's action. The one external dependency — the live
+Anthropic call — is already neutralised in tests by Plan 02's autouse mock
+(a real client is never constructible in CI). So a flag would gate nothing the
+manual trigger and the draft-only boundary don't already gate.
+
+## Precedent map
+
+New-repo note: by Plan 09 almost everything has in-repo precedent — this plan is
+a **reader and composer** of Plans 06/07/08, not a new subsystem. Only the
+prompt/tooling shape grounds against an external reference.
+
+| Element | Precedent to mirror | Where |
+|---|---|---|
+| `ai` module (extend Plan 08's, don't fork) | Plan 08's `ai` module for its summary sentence | Plan 08 (in repo) |
+| Anthropic call: mocked in CI, autouse guard, aggregates-only | Plan 02's AI-call convention + Plan 08's summary call | Plans 02/08 (in repo) |
+| Read-only tools over `DailyAggregate` | Plan 08's documented `DailyAggregate` read interface | Plan 08 (in repo) |
+| Monthly rollup (aggregate over `DailyAggregate`) | Plan 08's aggregate shape (named columns + category JSON) | Plan 08 (in repo) |
+| Draft via `save_revision()` into `NewsletterPage` | Plan 06's `NewsletterPage` + draft-visibility mechanism | Plan 06 (in repo) |
+| No-publish-permission boundary | Plan 07's "automation holds no publish permission" | Plan 07 (in repo) |
+| Failure → passive, admin-visible audit record (no email/alert) | Plan 08's `IngestRun` audit-row pattern | Plan 08 (in repo) |
+| Photo picker from gallery / direct upload (consent-gated) | Plan 06's `GalleryImage` + `consent_confirmed` | Plan 06 (in repo) |
+| Numbers-guardrail test (every figure traces to `DailyAggregate`) | Plan 08's guardrail-test shape | Plan 08 (in repo) |
+| **One-shot prompt-with-tooling shape** | **No in-repo precedent for tool-use** — ground against brief §6.2 + Anthropic SDK tool-use docs | architecture brief + SDK docs |
+| **Admin-notes file upload** (prepared outside the platform) | **No precedent** — simplest fit (plain text/Markdown) via standard Django file handling; format is a build-PR detail | Django docs (best practice) |
+
 ## Task checklist (code — this plan's eventual implementation PR)
 
 1. **`ai` module scaffold** (or extend one if Plan 08 already started one for
@@ -223,3 +255,32 @@ This plan is a **reader**, not a re-implementer, of Plan 08's data model:
   convention — no real API call anywhere in the suite).
 - `ruff check` and `pytest` (including the guardrail and draft-visibility
   tests) pass in CI.
+
+## Release plan
+
+The failure mode here is benign — nothing auto-publishes — so this ships more
+simply than Plan 08, gated by the human review step rather than a kill switch.
+
+- **How it ships:** merge → deploy (the management command + read-only tools). No
+  scheduled job, no public surface — the command is dormant until an
+  Administrator runs it.
+- **Phased first run:** the **maintainer** runs the command for the first month
+  personally against real `DailyAggregate` data, reviews the drafted
+  `NewsletterPage` for **quality and numeric fidelity**, edits if needed, and
+  publishes it — the trial that proves the drafting flow before others use it.
+  Routine monthly use by the Administrators follows.
+- **Gating check:** the numbers-guardrail test (every figure traces to a
+  `DailyAggregate` computation, never a model-invented figure), the
+  draft-visibility test (the draft is invisible until published), and the
+  permission test (the code path cannot publish) all green in CI.
+- **Who gets access:** Administrators run the command and review/publish the
+  draft; the **public** sees only the published newsletter. No auto-publish —
+  the invariant-#4 **general** rule applies here (Plan 08's exception explicitly
+  does not extend to this narrative).
+- **Who's informed:** the three Administrators — brief them that every AI-drafted
+  newsletter is a **draft they must review and publish**, and that a figure that
+  looks off means stop and check the guardrail, not hand-edit the number.
+- **Rollback trigger:** none needed as a live switch — a bad or unwanted draft is
+  simply **not published** (or discarded in the admin), and the command is re-run
+  or skipped. A failed run leaves no draft and an admin-visible audit record; it
+  is a "run again later," never a regression.
