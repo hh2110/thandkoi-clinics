@@ -1,0 +1,22 @@
+{% load i18n %}
+{% comment %}
+Intentional "photo goes here" placeholder — the empty/unset-image state shared
+by the hero, feature split and media grid. Shown until a real image field is
+populated so a page never renders a broken or empty box.
+
+Context:
+  caption  — optional monospace caption ("clinic / community photo · 4:5").
+  ratio    — optional CSS aspect-ratio value (e.g. "4 / 5"); defaults to 1 / 1.
+
+Carries no identifiable person (brand-guidelines.md §5 consent rule). Exposed as
+role="img" with a label so assistive tech announces it as pending imagery.
+{% endcomment %}
+{% translate "Photograph coming soon" as ph_default %}
+<div
+  class="media-placeholder"
+  {% if ratio %}style="--placeholder-ratio: {{ ratio }};"{% endif %}
+  role="img"
+  aria-label="{{ caption|default:ph_default }}"
+>
+  {% if caption %}<span class="media-placeholder__caption">{{ caption }}</span>{% endif %}
+</div>

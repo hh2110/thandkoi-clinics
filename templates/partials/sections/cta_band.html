@@ -1,0 +1,25 @@
+{% comment %}
+Full-width Teal-Deep band with a heading and a primary action — the Donate ask
+and similar. The action uses the amber donate button, which is the one place
+amber is allowed alongside the Donate page (brand-guidelines.md §2/§7).
+
+Context (all optional):
+  heading   — band heading.
+  body      — supporting paragraph.
+  cta_label / cta_url   — the primary action (amber donate button).
+  note      — small print under the action (e.g. "Bank details on the Donate page").
+{% endcomment %}
+<section class="section section--dark cta-band">
+  <div class="wrapper cta-band__inner">
+    <div class="cta-band__text">
+      {% if heading %}<h2 class="cta-band__heading">{{ heading }}</h2>{% endif %}
+      {% if body %}<p class="cta-band__body">{{ body }}</p>{% endif %}
+    </div>
+    {% if cta_label or note %}
+      <div class="cta-band__actions">
+        {% if cta_label %}<a class="button button--donate" href="{{ cta_url|default:'#' }}">{{ cta_label }}</a>{% endif %}
+        {% if note %}<p class="cta-band__note">{{ note }}</p>{% endif %}
+      </div>
+    {% endif %}
+  </div>
+</section>

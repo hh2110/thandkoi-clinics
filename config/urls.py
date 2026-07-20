@@ -41,6 +41,10 @@ if settings.DEBUG:
 # visiting "/" 404s here and LocaleMiddleware redirects to "/en/" (or the
 # visitor's detected language) — see apps/core/tests.py.
 urlpatterns += i18n_patterns(
+    # Temporary Plan 03.5 preview of the page-body layout kit — language-prefixed
+    # so it exercises the real bilingual/RTL chrome. Throwaway: removed when
+    # Plan 04 composes real pages from the kit. Kept above the Wagtail catch-all.
+    path("styleguide/", core_views.styleguide, name="styleguide"),
     path("", include(wagtail_urls)),
     prefix_default_language=True,
 )

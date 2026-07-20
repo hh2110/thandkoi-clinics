@@ -1,0 +1,29 @@
+{% load i18n %}
+{% comment %}
+A responsive 2/3/4-up grid of `.card`s with an optional eyebrow + heading.
+
+Context:
+  eyebrow  — optional uppercase label.
+  heading  — optional section heading.
+  columns  — 2, 3 or 4 (the wide-viewport column count); defaults to 3.
+  cards    — a list of card dicts; see _card.html for each card's keys.
+
+Empty state: with no cards it shows a "coming soon" line rather than an empty
+grid, so a page composed before its content is entered still reads intentionally.
+{% endcomment %}
+<section class="section">
+  <div class="wrapper">
+    {% if eyebrow or heading %}
+      <div class="section-header">
+        {% include "partials/sections/section_header.html" %}
+      </div>
+    {% endif %}
+    <div class="card-grid card-grid--{{ columns|default:3 }}">
+      {% for card in cards %}
+        {% include "partials/sections/_card.html" %}
+      {% empty %}
+        <p class="card-grid__empty text-faint">{% translate "Content coming soon." %}</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>

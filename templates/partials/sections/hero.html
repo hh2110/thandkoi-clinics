@@ -1,0 +1,55 @@
+{% load i18n %}
+{% comment %}
+Two-column hero: headline + intro + CTA cluster + Urdu tagline on one side, an
+optional media slot with a floating stat card on the other. Collapses to one
+column below 56rem (layout.css).
+
+Context (all optional — a section renders whatever it's given):
+  eyebrow              — uppercase label above the headline.
+  title                — the <h1> headline.
+  intro                — lead paragraph.
+  primary_cta_label / primary_cta_url    — main call to action.
+  primary_cta_class    — button class for it; defaults to "button--primary".
+                         Pass "button--donate" only for the Zakat/Sadaqa ask
+                         (amber is Donate-only, brand-guidelines.md §7).
+  secondary_cta_label / secondary_cta_url — optional outline action.
+  tagline              — Urdu tagline, rendered lang="ur" dir="rtl".
+  media_image / media_alt   — hero image; falls back to the placeholder.
+  media_caption        — caption for the placeholder when no image is set.
+  stat_value / stat_label   — optional floating stat card over the media.
+
+Numbers and copy are inputs only — nothing here is baked in.
+{% endcomment %}
+<section class="section hero">
+  <div class="wrapper hero__inner">
+    <div class="hero__content">
+      {% if eyebrow %}<p class="eyebrow">{{ eyebrow }}</p>{% endif %}
+      {% if title %}<h1 class="hero__title">{{ title }}</h1>{% endif %}
+      {% if intro %}<p class="hero__intro">{{ intro }}</p>{% endif %}
+      {% if primary_cta_label or secondary_cta_label %}
+        <div class="hero__actions">
+          {% if primary_cta_label %}
+            <a class="button {{ primary_cta_class|default:'button--primary' }}" href="{{ primary_cta_url|default:'#' }}">{{ primary_cta_label }}</a>
+          {% endif %}
+          {% if secondary_cta_label %}
+            <a class="button button--outline" href="{{ secondary_cta_url|default:'#' }}">{{ secondary_cta_label }}</a>
+          {% endif %}
+        </div>
+      {% endif %}
+      {% if tagline %}<p class="hero__tagline" lang="ur" dir="rtl">{{ tagline }}</p>{% endif %}
+    </div>
+    <div class="hero__media">
+      {% if media_image %}
+        <img class="media-grid__item" src="{{ media_image }}" alt="{{ media_alt|default:'' }}" />
+      {% else %}
+        {% include "partials/sections/_media_placeholder.html" with caption=media_caption ratio="4 / 5" %}
+      {% endif %}
+      {% if stat_value %}
+        <div class="card hero__stat-card">
+          <p class="hero__stat-value">{{ stat_value }}</p>
+          {% if stat_label %}<p class="hero__stat-label">{{ stat_label }}</p>{% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
