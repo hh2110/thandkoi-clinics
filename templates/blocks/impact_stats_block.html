@@ -1,0 +1,6 @@
+{% comment %}
+ImpactStatsBlock → the Plan 03.5 stat-band partial. `value.stats` is a list of
+{value, label} StructValues, which stat_band.html iterates directly. With no
+figures it shows its own "coming soon" empty state.
+{% endcomment %}
+{% include "partials/sections/stat_band.html" with stats=value.stats caption=value.caption %}

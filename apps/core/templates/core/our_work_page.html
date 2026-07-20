@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Our Work page — the services rendered through the Plan 03.5 card grid (with the
+"Planned" tag distinguishing services the clinic is still aiming to introduce),
+plus an infrastructure section. Composes the layout kit; no new section CSS.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper">
+      <div class="prose">
+        <h1>{{ page.title }}</h1>
+        {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrapper">
+      <div class="section-header">
+        {% include "partials/sections/section_header.html" with eyebrow=_("What we do") heading=_("Our services") %}
+      </div>
+      <div class="card-grid card-grid--3">
+        {% for service in page.services.all %}
+          {% include "partials/sections/_service_card.html" %}
+        {% empty %}
+          <p class="card-grid__empty text-faint">{% translate "Services coming soon." %}</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  {% if page.infrastructure %}
+    <section class="section section--tinted">
+      <div class="wrapper prose">
+        {% include "partials/sections/section_header.html" with eyebrow=_("Where we work") heading=_("Our infrastructure") %}
+        {{ page.infrastructure|richtext }}
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

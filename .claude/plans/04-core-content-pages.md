@@ -1,6 +1,6 @@
 # Plan 04 — Core Content Pages
 
-_Status: Drafted · Depends on: 01 Project foundation, 03 Design system & base templates, **03.5 Design system enhancements & page layout components** · Next: 05 Donate placeholder_
+_Status: In progress · Depends on: 01 Project foundation, 03 Design system & base templates, **03.5 Design system enhancements & page layout components** · Next: 05 Donate placeholder_
 
 ## Goal
 

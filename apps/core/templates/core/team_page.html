@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Team page — the roster grouped Doctors / Staff & Committee, each group rendered
+through the Plan 03.5 card grid's person-card variant. An unset portrait falls
+back to the shared placeholder. The `doctors` / `staff` lists come from the
+page's get_context.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper">
+      <div class="prose">
+        <h1>{{ page.title }}</h1>
+        {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  {% if doctors %}
+    <section class="section">
+      <div class="wrapper">
+        <div class="section-header">
+          {% include "partials/sections/section_header.html" with eyebrow=_("Meet our team") heading=_("Doctors") %}
+        </div>
+        <div class="card-grid card-grid--3">
+          {% for member in doctors %}
+            {% include "partials/sections/_person_card.html" %}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if staff %}
+    <section class="section section--tinted">
+      <div class="wrapper">
+        <div class="section-header">
+          {% include "partials/sections/section_header.html" with heading=_("Staff & Committee") %}
+        </div>
+        <div class="card-grid card-grid--3">
+          {% for member in staff %}
+            {% include "partials/sections/_person_card.html" %}
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if not doctors and not staff %}
+    <section class="section">
+      <div class="wrapper">
+        <p class="text-faint">{% translate "Team members coming soon." %}</p>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,10 @@
+{% comment %}
+DonateCTABlock → the Plan 03.5 CTA band. The whole band is hidden until its CTA
+points somewhere (an internal page or an external URL), so Home shows no dead
+"Donate" button before the Plan 05 Donate page exists (Plan 04 decision:
+"points at nothing (hidden) until Plan 05 exists").
+{% endcomment %}
+{% if value.cta_page or value.cta_url %}
+  {% firstof value.cta_page.url value.cta_url as donate_url %}
+  {% include "partials/sections/cta_band.html" with heading=value.heading body=value.body cta_label=value.cta_label cta_url=donate_url note=value.note %}
+{% endif %}

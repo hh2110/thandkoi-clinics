@@ -1,0 +1,23 @@
+{% load wagtailimages_tags i18n %}
+{% comment %}
+Service-card variant of the Plan 03.5 card grid — the `.card` primitive for one
+service on the Our Work page. Composes the same card vocabulary as `_card.html`.
+
+Context:
+  service — a Service (name, description, image, status).
+
+A "Planned" service (one the clinic is "aiming to introduce") gets the card's
+status tag so it never reads as already available (PDF p.15). The image slot is
+optional — a service card can be text-only.
+{% endcomment %}
+<article class="card card--interactive">
+  {% if service.image %}
+    <div class="card__photo">
+      {% image service.image fill-640x400 as service_img %}
+      <img src="{{ service_img.url }}" alt="{{ service.name }}" />
+    </div>
+  {% endif %}
+  {% if service.status == "planned" %}<span class="card__tag">{% translate "Planned" %}</span>{% endif %}
+  {% if service.name %}<h3 class="card__title">{{ service.name }}</h3>{% endif %}
+  {% if service.description %}<p class="card__body">{{ service.description }}</p>{% endif %}
+</article>

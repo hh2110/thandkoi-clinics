@@ -7,19 +7,24 @@ anti-FOUC/theme-toggle markup added in that plan.
 """
 
 import re
-from contextlib import contextmanager
-from importlib import reload
-from pathlib import Path
 
 import pytest
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import override_settings
-from django.urls import clear_url_caches, reverse
+from django.urls import reverse
 from wagtail.models import Page, Site
 
-from apps.core.factories import HomePageFactory
-from apps.core.models import HomePage
+from apps.core.factories import (
+    AboutPageFactory,
+    ContactPageFactory,
+    HomePageFactory,
+    OurWorkPageFactory,
+    ServiceFactory,
+    TeamMemberFactory,
+    TeamPageFactory,
+)
+from apps.core.models import ContactBankSettings, HomePage, Service, TeamMember
 
 
 @pytest.fixture
@@ -255,95 +260,173 @@ def test_layout_css_uses_tokens_only_no_hardcoded_colours():
     assert "var(--color-" in css_no_comments
 
 
-def test_styleguide_icons_colour_via_style_declaration_not_presentation_attr():
-    """Icon colours resolve — set via a `style` declaration, not fill=/stroke=.
+# --- Plan 04: core content pages ---------------------------------------------
 
-    A CSS custom property only resolves inside a CSS declaration; as a raw SVG
-    presentation attribute (fill="var(--color-coral)") it renders black/none.
-    Assert the tokened colour lives in a `style` attribute and that no tokened
-    presentation attribute remains, so the three service-card icons actually
-    show their intended coral/teal.
+
+def test_home_page_composes_layout_kit_sections(client, home_page):
+    """Home renders the 03.5 kit sections from its StreamField body.
+
+    The default factory body is hero + impact-stat band + an unlinked donate
+    CTA, so the composed markup (hero, stat-band) is present — the Plan 04
+    "compose a page from the kit" path, exercised through the real chrome.
     """
-    from apps.core.views import _ICON_CIRCLE, _ICON_CROSS, _ICON_DIAMOND
-
-    assert 'style="fill:var(--color-coral)"' in _ICON_CROSS
-    assert 'style="fill:none;stroke:var(--color-brand)"' in _ICON_CIRCLE
-    assert 'style="fill:none;stroke:var(--color-brand)"' in _ICON_DIAMOND
-    for icon in (_ICON_CROSS, _ICON_CIRCLE, _ICON_DIAMOND):
-        assert 'fill="var(' not in icon
-        assert 'stroke="var(' not in icon
-
-
-@contextmanager
-def _debug_urls():
-    """Register the DEBUG-only styleguide route for the duration of a test.
-
-    ``config/urls.py`` registers the throwaway styleguide route only under
-    ``settings.DEBUG``, evaluated once at urlconf import. pytest-django runs the
-    suite with ``DEBUG=False`` (its ``django_debug_mode`` default), so the route
-    is absent by default and the URL would 404. This flips DEBUG on and rebuilds
-    the urlconf so the gated route is exercised for real, then restores the
-    DEBUG=False urlconf afterwards so no other test is affected.
-    """
-    import config.urls
-
-    override = override_settings(DEBUG=True)
-    override.enable()
-    clear_url_caches()
-    reload(config.urls)
-    try:
-        yield
-    finally:
-        override.disable()
-        clear_url_caches()
-        reload(config.urls)
+    content = client.get("/en/").content.decode()
+    assert "hero" in content
+    assert "stat-band" in content
+    assert "467+" in content  # a supplied impact figure renders verbatim
 
 
 @pytest.mark.parametrize(
     ("url", "lang", "direction"),
-    [("/en/styleguide/", "en", "ltr"), ("/ur/styleguide/", "ur", "rtl")],
+    [("/en/", "en", "ltr"), ("/ur/", "ur", "rtl")],
 )
-def test_styleguide_composes_sections_in_both_languages(
-    client, db, url, lang, direction
-):
-    """A page composed of the section partials returns 200 with correct lang/dir.
-
-    Exercises the whole kit through the real bilingual/RTL chrome in both
-    languages — the Plan 04 "compose a page from the kit" path — via the
-    DEBUG-gated styleguide route.
-    """
-    with _debug_urls():
-        response = client.get(url)
+def test_home_renders_in_both_languages(client, home_page, url, lang, direction):
+    """The composed Home page renders correctly in both languages / directions."""
+    response = client.get(url)
     assert response.status_code == 200
     content = response.content.decode()
     assert f'<html lang="{lang}" dir="{direction}">' in content
-    # A representative sampling of the composed sections is present.
     assert "hero" in content
-    assert "stat-band" in content
-    assert "card-grid" in content
-    assert "feature-split" in content
-    assert "cta-band" in content
-    assert "media-grid" in content
 
 
-def test_styleguide_route_absent_without_debug(client, db):
-    """The styleguide route is DEBUG-gated — absent in production (DEBUG off).
+def test_home_donate_cta_and_report_teaser_hidden_when_unset(client, home_page):
+    """With no donate link and no report, neither section renders (hidden, not broken).
 
-    pytest-django runs with DEBUG=False, matching production, so the route must
-    not resolve; it 404s through the Wagtail catch-all like any unknown path.
+    The factory body's donate CTA has no cta_page/cta_url, and there is no report
+    content type yet, so the CTA band and the feature-split teaser are both
+    absent — no dead "Donate" button, no empty placeholder box.
     """
-    response = client.get("/en/styleguide/")
-    assert response.status_code == 404
+    content = client.get("/en/").content.decode()
+    assert "cta-band" not in content
+    assert "feature-split" not in content
 
 
-def test_styleguide_template_file_is_present():
-    """The throwaway styleguide template exists where the view expects it."""
-    template = (
-        Path(settings.BASE_DIR)
-        / "apps"
-        / "core"
-        / "templates"
-        / "core"
-        / "styleguide.html"
+def test_donate_cta_block_renders_when_linked():
+    """When the donate CTA points somewhere, the band renders (regression guard)."""
+    from wagtail.blocks import StreamValue
+
+    from apps.core.models import HomePage as _HP
+
+    body = _HP().body.stream_block
+    value = StreamValue(
+        body,
+        [
+            (
+                "donate_cta",
+                {
+                    "heading": "Give",
+                    "cta_label": "Donate now",
+                    "cta_url": "https://example.org/donate",
+                },
+            )
+        ],
     )
-    assert template.exists()
+    html = value.render_as_block()
+    assert "cta-band" in html
+    assert "https://example.org/donate" in html
+
+
+@pytest.mark.parametrize(
+    ("factory", "slug", "template"),
+    [
+        (AboutPageFactory, "about", "core/about_page.html"),
+        (TeamPageFactory, "team", "core/team_page.html"),
+        (OurWorkPageFactory, "our-work", "core/our_work_page.html"),
+        (ContactPageFactory, "contact", "core/contact_page.html"),
+    ],
+)
+def test_core_pages_render_with_correct_template(
+    client, home_page, factory, slug, template
+):
+    """Each core page is creatable under Home, returns 200, uses its template."""
+    factory(parent=home_page, slug=slug)
+    response = client.get(f"/en/{slug}/")
+    assert response.status_code == 200
+    assert template in [t.name for t in response.templates]
+
+
+def test_core_pages_render_in_urdu_with_rtl(client, home_page):
+    """A representative content page renders lang="ur" dir="rtl"."""
+    AboutPageFactory(parent=home_page, slug="about")
+    content = client.get("/ur/about/").content.decode()
+    assert '<html lang="ur" dir="rtl">' in content
+
+
+def test_team_page_groups_members_and_shows_placeholder(client, home_page):
+    """The team page groups by category and shows the placeholder for no photo."""
+    team = TeamPageFactory(parent=home_page, slug="team")
+    TeamMemberFactory(page=team, name="Dr Doctor One", category=TeamMember.DOCTORS)
+    TeamMemberFactory(page=team, name="Ataullah Khan", category=TeamMember.STAFF)
+    content = client.get("/en/team/").content.decode()
+    assert "Doctors" in content
+    assert "Committee" in content  # the "Staff & Committee" group heading
+    assert "Dr Doctor One" in content
+    assert "Ataullah Khan" in content
+    # No photos set → the intentional placeholder stands in for each portrait.
+    assert "media-placeholder" in content
+
+
+def test_our_work_planned_service_shows_tag(client, home_page):
+    """A Planned service renders the coming-soon tag; an Active one does not."""
+    work = OurWorkPageFactory(parent=home_page, slug="our-work")
+    ServiceFactory(page=work, name="Telemedicine", status=Service.ACTIVE)
+    ServiceFactory(page=work, name="Laboratory & Pharmacy", status=Service.PLANNED)
+    content = client.get("/en/our-work/").content.decode()
+    assert "Telemedicine" in content
+    assert "Laboratory &amp; Pharmacy" in content
+    assert "card__tag" in content  # the Planned tag is present
+
+
+def test_contact_page_and_footer_reflect_the_setting(client, home_page):
+    """Editing the Contact & Bank Details setting updates the Contact page + footer.
+
+    One shared singleton drives both surfaces, so a single edit is visible in the
+    Contact page body and the site footer with no code change or redeploy.
+    """
+    ContactPageFactory(parent=home_page, slug="contact")
+    site = Site.objects.get(is_default_site=True)
+    contact = ContactBankSettings.for_site(site)
+    contact.email = "info.thandkoiclinics@example.org"
+    contact.phone = "+92 344 4111235"
+    contact.bank_account_title = "The Thandkoi Clinics"
+    contact.bank_iban = "PK00EXMP0000000000000000"
+    contact.save()
+
+    page = client.get("/en/contact/").content.decode()
+    assert "info.thandkoiclinics@example.org" in page
+    assert "+92 344 4111235" in page
+    assert "PK00EXMP0000000000000000" in page
+
+    # The same values appear in the footer (rendered on every page).
+    home = client.get("/en/").content.decode()
+    assert "info.thandkoiclinics@example.org" in home
+    assert "+92 344 4111235" in home
+
+
+def test_footer_shows_placeholder_when_setting_empty(client, home_page):
+    """With the setting unset, the footer shows its coming-soon placeholders."""
+    content = client.get("/en/").content.decode()
+    assert "Contact details coming soon." in content
+    assert "Bank details coming soon." in content
+
+
+def test_consent_block_requires_confirmation(db):
+    """The reusable consent image block refuses an image without ticked consent.
+
+    Establishes the brand-guidelines.md §5 convention Plan 06 reuses: an
+    identifiable-person photo cannot be saved unless consent is confirmed.
+    """
+    from wagtail.blocks import StructBlockValidationError
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    from apps.core.blocks import ConsentedImageBlock
+
+    image = Image.objects.create(title="A person", file=get_test_image_file())
+    block = ConsentedImageBlock()
+    with pytest.raises(StructBlockValidationError):
+        block.clean(block.to_python({"image": image.pk, "consent_confirmed": False}))
+    # With consent ticked it validates cleanly.
+    cleaned = block.clean(
+        block.to_python({"image": image.pk, "consent_confirmed": True})
+    )
+    assert cleaned["consent_confirmed"] is True

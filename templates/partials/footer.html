@@ -1,35 +1,44 @@
 {% load i18n %}
 {% comment %}
 Dark section (Teal Deep ground, in both themes — brand-guidelines.md's
-"Footer / deepest ground"). Contact/bank/social blocks read config (see
-apps/core/context_processors.py), never hardcoded values — they render a
-"coming soon" placeholder until real values are configured.
+"Footer / deepest ground"). Contact/bank/social blocks read the site-wide
+Contact & Bank Details setting (settings.core.ContactBankSettings, Plan 04),
+never hardcoded values — editing that singleton in /admin/ updates the footer
+with no redeploy.
+
+500.html is rendered by Django's error handler with NO context (not even
+`request`), so the `settings` context processor doesn't run there and
+`settings` is absent — every block below then degrades to its "coming soon"
+placeholder rather than raising. That graceful-degradation is relied on by
+apps/core/tests.py::test_500_page_is_branded_and_has_no_stack_trace.
 {% endcomment %}
+{% with contact=settings.core.ContactBankSettings %}
 <footer class="site-footer">
   <div class="wrapper site-footer__grid">
     <div>
       <h2 class="site-footer__heading">{% translate "Contact" %}</h2>
-      {% if ORG_CONTACT_EMAIL or ORG_CONTACT_PHONE %}
-        {% if ORG_CONTACT_EMAIL %}<p><a href="mailto:{{ ORG_CONTACT_EMAIL }}">{{ ORG_CONTACT_EMAIL }}</a></p>{% endif %}
-        {% if ORG_CONTACT_PHONE %}<p>{{ ORG_CONTACT_PHONE }}</p>{% endif %}
+      {% if contact.email or contact.phone %}
+        {% if contact.email %}<p><a href="mailto:{{ contact.email }}">{{ contact.email }}</a></p>{% endif %}
+        {% if contact.phone %}<p>{{ contact.phone }}</p>{% endif %}
       {% else %}
         <p>{% translate "Contact details coming soon." %}</p>
       {% endif %}
     </div>
     <div>
       <h2 class="site-footer__heading">{% translate "Zakat & Sadaqa" %}</h2>
-      {% if ORG_BANK_DETAILS %}
-        <p>{{ ORG_BANK_DETAILS|linebreaksbr }}</p>
+      {% if contact.bank_account_title or contact.bank_iban %}
+        {% if contact.bank_account_title %}<p>{{ contact.bank_account_title }}</p>{% endif %}
+        {% if contact.bank_iban %}<p>{% translate "IBAN" %}: {{ contact.bank_iban }}</p>{% endif %}
       {% else %}
         <p>{% translate "Bank details coming soon." %}</p>
       {% endif %}
     </div>
     <div>
       <h2 class="site-footer__heading">{% translate "Follow" %}</h2>
-      {% if ORG_SOCIAL_LINKS %}
+      {% if contact.social_links.all %}
         <ul class="site-footer__socials">
-          {% for name, url in ORG_SOCIAL_LINKS.items %}
-            <li><a href="{{ url }}">{{ name }}</a></li>
+          {% for link in contact.social_links.all %}
+            <li><a href="{{ link.url }}">{{ link.label }}</a></li>
           {% endfor %}
         </ul>
       {% else %}
@@ -42,3 +51,4 @@ apps/core/context_processors.py), never hardcoded values — they render a
     <p lang="ur" dir="rtl">صحت سب کے لیے · چراغ شفا</p>
   </div>
 </footer>
+{% endwith %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Contact page — renders the shared Contact & Bank Details setting
+(settings.core.ContactBankSettings). Editing that singleton in /admin/ updates
+this page and the footer with no redeploy. A plain mailto: link, no contact form
+(no form backend / spam surface / third-party scripts — CLAUDE.md privacy
+guardrails). Each block renders only when its field is set.
+{% endcomment %}
+
+{% block content %}
+  {% with contact=settings.core.ContactBankSettings %}
+  <section class="section">
+    <div class="wrapper">
+      <div class="prose">
+        <h1>{{ page.title }}</h1>
+        {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+      </div>
+
+      <div class="card-grid card-grid--3">
+        <article class="card">
+          <h2 class="card__title">{% translate "Get in touch" %}</h2>
+          {% if contact.email %}
+            <p><a href="mailto:{{ contact.email }}">{{ contact.email }}</a></p>
+          {% endif %}
+          {% if contact.phone %}<p>{{ contact.phone }}</p>{% endif %}
+          {% if contact.address %}<p>{{ contact.address|linebreaksbr }}</p>{% endif %}
+          {% if not contact.email and not contact.phone and not contact.address %}
+            <p class="text-faint">{% translate "Contact details coming soon." %}</p>
+          {% endif %}
+        </article>
+
+        <article class="card">
+          <h2 class="card__title">{% translate "Zakat & Sadaqa" %}</h2>
+          {% if contact.bank_account_title or contact.bank_iban %}
+            {% if contact.bank_account_title %}<p>{{ contact.bank_account_title }}</p>{% endif %}
+            {% if contact.bank_name %}<p>{{ contact.bank_name }}</p>{% endif %}
+            {% if contact.bank_iban %}<p>{% translate "IBAN" %}: {{ contact.bank_iban }}</p>{% endif %}
+            {% if contact.bank_account_number %}<p>{% translate "Account" %}: {{ contact.bank_account_number }}</p>{% endif %}
+            {% if contact.bank_branch %}<p>{{ contact.bank_branch }}</p>{% endif %}
+          {% else %}
+            <p class="text-faint">{% translate "Bank details coming soon." %}</p>
+          {% endif %}
+        </article>
+
+        <article class="card">
+          <h2 class="card__title">{% translate "Follow" %}</h2>
+          {% if contact.social_links.all %}
+            <ul class="site-footer__socials">
+              {% for link in contact.social_links.all %}
+                <li><a href="{{ link.url }}">{{ link.label }}</a></li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-faint">{% translate "Social links coming soon." %}</p>
+          {% endif %}
+        </article>
+      </div>
+
+      {% if contact.map_embed_url %}
+        <div class="section" style="--placeholder-ratio: 16 / 9;">
+          <iframe
+            title="{% translate 'Map to The Thandkoi Clinics' %}"
+            src="{{ contact.map_embed_url }}"
+            loading="lazy"
+            style="width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: var(--card-radius);"
+          ></iframe>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endwith %}
+{% endblock %}

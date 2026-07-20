@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+About page — the clinic's story. Composed from the Plan 03.5 section rhythm
+(`.section`, `.wrapper`, `.eyebrow`, section headers); no new section CSS. Each
+block renders only when its field has content, so a half-entered page still
+reads intentionally.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>{{ page.title }}</h1>
+      {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+    </div>
+  </section>
+
+  {% if page.vision or page.mission or page.objectives %}
+    <section class="section section--tinted">
+      <div class="wrapper prose">
+        {% if page.vision %}
+          {% include "partials/sections/section_header.html" with eyebrow=_("Our vision") heading=_("Vision") %}
+          {{ page.vision|richtext }}
+        {% endif %}
+        {% if page.mission %}
+          {% include "partials/sections/section_header.html" with eyebrow=_("Our mission") heading=_("Mission") %}
+          {{ page.mission|richtext }}
+        {% endif %}
+        {% if page.objectives %}
+          {% include "partials/sections/section_header.html" with eyebrow=_("What we set out to do") heading=_("Objectives") %}
+          {{ page.objectives|richtext }}
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
+  {% if page.quality_of_care %}
+    <section class="section">
+      <div class="wrapper prose">
+        {% include "partials/sections/section_header.html" with heading=_("Quality of care") %}
+        {{ page.quality_of_care|richtext }}
+      </div>
+    </section>
+  {% endif %}
+
+  {% if page.founding_story %}
+    <section class="section section--tinted">
+      <div class="wrapper prose">
+        {% include "partials/sections/section_header.html" with eyebrow=_("How we began") heading=_("Our founding") %}
+        {{ page.founding_story|richtext }}
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

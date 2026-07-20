@@ -1,0 +1,9 @@
+{% load wagtailimages_tags %}
+{% comment %}
+HeroBlock → the Plan 03.5 hero partial. This template authors no markup of its
+own; it only maps block fields onto hero.html's context. The Zakat/Sadaqa ask is
+the one place the amber donate button is allowed (brand-guidelines.md §7), so the
+primary CTA uses `button--donate`.
+{% endcomment %}
+{% if value.image %}{% image value.image fill-760x950 as hero_img %}{% endif %}
+{% include "partials/sections/hero.html" with eyebrow=value.eyebrow title=value.headline intro=value.intro primary_cta_label=value.primary_cta_label primary_cta_url=value.primary_cta_page.url primary_cta_class="button--donate" secondary_cta_label=value.secondary_cta_label secondary_cta_url=value.secondary_cta_page.url tagline=value.tagline media_image=hero_img.url media_alt=value.image.title media_caption=value.media_caption stat_value=value.stat_value stat_label=value.stat_label %}

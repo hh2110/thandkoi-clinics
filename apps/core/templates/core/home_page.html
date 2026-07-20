@@ -1,12 +1,18 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Home page — composed entirely from the Plan 03.5 layout kit. The StreamField
+body renders through the block templates (each of which includes a 03.5 section
+partial); the latest-daily-report teaser renders beneath it only when a report
+exists (Plan 06), degrading to nothing until then.
+{% endcomment %}
 
 {% block content %}
-  <section class="prose">
-    <h1>{{ page.title }}</h1>
-    {% if page.intro %}
-      <div class="intro">{{ page.intro|richtext }}</div>
-    {% endif %}
-    <p lang="ur" dir="rtl">صحت سب کے لیے · چراغ شفا</p>
-  </section>
+  {% for block in page.body %}
+    {% include_block block %}
+  {% endfor %}
+
+  {% if latest_report %}
+    {% include "partials/sections/feature_split.html" with eyebrow=_("Latest daily report") heading=latest_report.title body=latest_report.summary stats=latest_report.headline_stats cta_label=_("Read the full report →") cta_url=latest_report.url %}
+  {% endif %}
 {% endblock %}
