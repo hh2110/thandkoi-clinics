@@ -38,6 +38,10 @@ class HomePage(Page):
     ``None`` until then, so the section stays hidden rather than broken).
     """
 
+    # Legacy Plan 01 field, retained for data safety but no longer surfaced in
+    # the admin (no FieldPanel below) — the StreamField ``body`` drives the page,
+    # so an editable ``intro`` panel would silently discard anything typed into
+    # it. The field definition is kept unchanged so no migration is generated.
     intro = RichTextField(
         blank=True,
         help_text="Optional short lead text (legacy Plan 01 field; the body "
@@ -55,7 +59,6 @@ class HomePage(Page):
 
     content_panels = [
         *Page.content_panels,
-        FieldPanel("intro"),
         FieldPanel("body"),
     ]
 

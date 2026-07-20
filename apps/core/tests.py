@@ -326,6 +326,67 @@ def test_donate_cta_block_renders_when_linked():
     assert "https://example.org/donate" in html
 
 
+def test_hero_cta_target_guard_and_donate_only_amber(home_page):
+    """The hero primary CTA is guarded on a target and amber is Donate-only.
+
+    (a) A label with no target is not rendered (no dead "#" link); (b) a
+    non-donate CTA with a real target uses button--primary, never the amber
+    button--donate (brand-guidelines.md §7); (c) a CTA explicitly marked as the
+    donate ask uses button--donate.
+    """
+    from wagtail.blocks import StreamValue
+
+    from apps.core.models import HomePage as _HP
+
+    target = AboutPageFactory(parent=home_page, slug="hero-target")
+    body = _HP().body.stream_block
+
+    # (a) Label but no target → the button is suppressed entirely.
+    ghost = StreamValue(
+        body, [("hero", {"headline": "Hi", "primary_cta_label": "Ghost link"})]
+    )
+    ghost_html = ghost.render_as_block()
+    assert "Ghost link" not in ghost_html
+
+    # (b) A non-donate CTA with a real target → button--primary, not amber.
+    plain = StreamValue(
+        body,
+        [
+            (
+                "hero",
+                {
+                    "headline": "Hi",
+                    "primary_cta_label": "Learn more",
+                    "primary_cta_page": target,
+                    "primary_cta_donate": False,
+                },
+            )
+        ],
+    )
+    plain_html = plain.render_as_block()
+    assert "Learn more" in plain_html
+    assert "button--primary" in plain_html
+    assert "button--donate" not in plain_html
+
+    # (c) The donate ask, explicitly marked → the amber button.
+    donate = StreamValue(
+        body,
+        [
+            (
+                "hero",
+                {
+                    "headline": "Hi",
+                    "primary_cta_label": "Give Zakat / Sadaqa",
+                    "primary_cta_page": target,
+                    "primary_cta_donate": True,
+                },
+            )
+        ],
+    )
+    donate_html = donate.render_as_block()
+    assert "button--donate" in donate_html
+
+
 @pytest.mark.parametrize(
     ("factory", "slug", "template"),
     [

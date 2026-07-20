@@ -19,15 +19,21 @@ reads intentionally.
     <section class="section section--tinted">
       <div class="wrapper prose">
         {% if page.vision %}
-          {% include "partials/sections/section_header.html" with eyebrow=_("Our vision") heading=_("Vision") %}
+          <div class="section-header">
+            {% include "partials/sections/section_header.html" with eyebrow=_("Our vision") heading=_("Vision") %}
+          </div>
           {{ page.vision|richtext }}
         {% endif %}
         {% if page.mission %}
-          {% include "partials/sections/section_header.html" with eyebrow=_("Our mission") heading=_("Mission") %}
+          <div class="section-header">
+            {% include "partials/sections/section_header.html" with eyebrow=_("Our mission") heading=_("Mission") %}
+          </div>
           {{ page.mission|richtext }}
         {% endif %}
         {% if page.objectives %}
-          {% include "partials/sections/section_header.html" with eyebrow=_("What we set out to do") heading=_("Objectives") %}
+          <div class="section-header">
+            {% include "partials/sections/section_header.html" with eyebrow=_("What we set out to do") heading=_("Objectives") %}
+          </div>
           {{ page.objectives|richtext }}
         {% endif %}
       </div>
@@ -37,7 +43,9 @@ reads intentionally.
   {% if page.quality_of_care %}
     <section class="section">
       <div class="wrapper prose">
-        {% include "partials/sections/section_header.html" with heading=_("Quality of care") %}
+        <div class="section-header">
+          {% include "partials/sections/section_header.html" with heading=_("Quality of care") %}
+        </div>
         {{ page.quality_of_care|richtext }}
       </div>
     </section>
@@ -46,7 +54,9 @@ reads intentionally.
   {% if page.founding_story %}
     <section class="section section--tinted">
       <div class="wrapper prose">
-        {% include "partials/sections/section_header.html" with eyebrow=_("How we began") heading=_("Our founding") %}
+        <div class="section-header">
+          {% include "partials/sections/section_header.html" with eyebrow=_("How we began") heading=_("Our founding") %}
+        </div>
         {{ page.founding_story|richtext }}
       </div>
     </section>

@@ -48,6 +48,12 @@ class HeroBlock(blocks.StructBlock):
     intro = blocks.TextBlock(required=False)
     primary_cta_label = blocks.CharBlock(required=False, max_length=40)
     primary_cta_page = blocks.PageChooserBlock(required=False)
+    primary_cta_donate = blocks.BooleanBlock(
+        required=False,
+        help_text="Style the primary CTA as the amber Zakat/Sadaqa donate button "
+        "(brand-guidelines.md §7). Leave off for any other link — amber is "
+        "Donate-only.",
+    )
     secondary_cta_label = blocks.CharBlock(required=False, max_length=40)
     secondary_cta_page = blocks.PageChooserBlock(required=False)
     tagline = blocks.CharBlock(

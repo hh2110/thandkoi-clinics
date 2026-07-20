@@ -63,6 +63,8 @@ guardrails). Each block renders only when its field is set.
             title="{% translate 'Map to The Thandkoi Clinics' %}"
             src="{{ contact.map_embed_url }}"
             loading="lazy"
+            sandbox="allow-scripts allow-same-origin allow-popups"
+            referrerpolicy="no-referrer-when-downgrade"
             style="width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: var(--card-radius);"
           ></iframe>
         </div>
