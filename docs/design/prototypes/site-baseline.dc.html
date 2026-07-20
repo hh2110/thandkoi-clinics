@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Public+Sans:wght@400;600&family=Noto+Nastaliq+Urdu&family=Noto+Naskh+Arabic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* Design tokens — the site's own tokens.css, verbatim. The only thing
+       that can't be inline: the light/dark cascade driven by data-theme. */
+    .tk-root {
+      --color-teal-brand:#086c7e; --color-teal-deep:#0a3e48; --color-teal-bright:#12879b;
+      --color-pale-aqua:#a0e0e8; --color-aqua-tint:#e4f4f6;
+      --color-coral:#ef5148; --color-amber-on-light:#ce8a2c; --color-amber-on-dark:#e8b04a;
+      --color-ink:#0e2025; --color-ink-soft:#3e5257; --color-ink-faint:#728a8f;
+      --color-border:#e0e7e8; --color-paper:#f2f6f6; --color-card:#ffffff;
+      --color-bg:var(--color-paper); --color-surface:var(--color-card);
+      --color-text:var(--color-ink); --color-text-soft:var(--color-ink-soft);
+      --color-text-faint:var(--color-ink-faint); --color-border-default:var(--color-border);
+      --color-brand:var(--color-teal-brand); --color-brand-hover:var(--color-teal-bright);
+      --color-brand-deep:var(--color-teal-deep); --color-accent-soft-bg:var(--color-aqua-tint);
+      --color-on-brand:#ffffff; --color-donate-bg:var(--color-amber-on-light); --color-donate-text:#ffffff;
+      --color-footer-bg:var(--color-teal-deep); --color-footer-text:var(--color-paper);
+      --color-footer-text-soft:#abb4b6; --color-footer-border:#195a67;
+      --link-color:var(--color-teal-deep);
+      --card-shadow:0 1px 2px rgba(10,62,72,.06),0 4px 12px rgba(10,62,72,.08);
+      --font-heading:"Archivo",sans-serif; --font-body:"Public Sans",sans-serif;
+      --font-urdu:"Noto Nastaliq Urdu","Noto Naskh Arabic",serif;
+    }
+    .tk-root[data-theme="dark"] {
+      --color-ink:#f2f6f6; --color-ink-soft:#abb4b6; --color-ink-faint:#9ea0a1;
+      --color-border:#195a67; --color-paper:#0a3e48; --color-card:#0d4f5c;
+      --color-donate-bg:var(--color-amber-on-dark); --color-donate-text:var(--color-ink);
+      --color-accent-soft-bg:var(--color-teal-deep);
+      --link-color:var(--color-pale-aqua);
+    }
+    .tk-root a { color: var(--link-color); }
+    .tk-root a:hover { color: var(--color-teal-bright); }
+    .tk-nav-link:hover { color: var(--color-brand-hover) !important; }
+    .tk-footer a { color: var(--color-pale-aqua) !important; }
+    body { margin:0; }
+  </style>
+</helmet>
+<div class="tk-root" data-theme="{{ theme }}" style="background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); font-size:16px; line-height:1.6; min-height:100vh; display:flex; flex-direction:column; transition:background-color .15s ease, color .15s ease;">
+
+  <!-- ============ SITE HEADER ============ -->
+  <header style="border-bottom:1px solid var(--color-border-default); background:var(--color-surface);">
+    <div style="max-width:72rem; margin-inline:auto; padding-inline:1rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding-block:1rem;">
+      <a href="#" aria-label="The Thandkoi Clinics — home" style="display:flex; align-items:center; gap:.5rem; text-decoration:none;">
+        <img src="static/images/logo.svg" alt="The Thandkoi Clinics" width="192" height="144" style="height:2.5rem; width:auto; display:block;">
+      </a>
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <nav aria-label="Language" style="display:flex; gap:.5rem; font-size:.8rem;">
+          <a href="#" style="padding:.25rem .5rem; border:1px solid var(--color-brand); background:var(--color-brand); color:var(--color-on-brand); border-radius:6px; text-decoration:none;">EN</a>
+          <a href="#" lang="ur" dir="rtl" style="padding:.25rem .5rem; border:1px solid var(--color-border-default); border-radius:6px; text-decoration:none; color:var(--color-text-soft); font-family:var(--font-urdu);">اردو</a>
+        </nav>
+        <button type="button" onClick="{{ toggleTheme }}" style="display:inline-flex; align-items:center; gap:.4em; border:1px solid var(--color-border-default); border-radius:999px; background:transparent; color:var(--color-text); padding:.35rem .75rem; font:inherit; font-size:.8rem; cursor:pointer;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="width:1em; height:1em; display:block;">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+          </svg>
+          <span>{{ themeLabel }}</span>
+        </button>
+      </div>
+    </div>
+    <!-- Primary nav (desktop inline row) -->
+    <nav aria-label="Primary" style="max-width:72rem; margin-inline:auto; padding-inline:1rem;">
+      <ul style="list-style:none; margin:0; padding:0 0 1rem; display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:1.25rem;">
+        <li><a class="tk-nav-link" href="#" aria-current="page" style="display:block; padding-block:.5rem; color:var(--color-brand); text-decoration:underline; text-underline-offset:.25em; font-weight:600;">Home</a></li>
+        <li><a class="tk-nav-link" href="#" style="display:block; padding-block:.5rem; color:var(--color-text); text-decoration:none; font-weight:600;">About</a></li>
+        <li><a class="tk-nav-link" href="#" style="display:block; padding-block:.5rem; color:var(--color-text); text-decoration:none; font-weight:600;">Team</a></li>
+        <li><a class="tk-nav-link" href="#" style="display:block; padding-block:.5rem; color:var(--color-text); text-decoration:none; font-weight:600;">Our Work</a></li>
+        <li><a class="tk-nav-link" href="#" style="display:block; padding-block:.5rem; color:var(--color-text); text-decoration:none; font-weight:600;">Reports</a></li>
+        <li><a class="tk-nav-link" href="#" style="display:block; padding-block:.5rem; color:var(--color-text); text-decoration:none; font-weight:600;">Newsletters</a></li>
+        <li><a class="tk-nav-link" href="#" style="display:block; padding-block:.5rem; color:var(--color-text); text-decoration:none; font-weight:600;">Gallery</a></li>
+        <li><a class="tk-nav-link" href="#" style="display:block; padding-block:.5rem; color:var(--color-text); text-decoration:none; font-weight:600;">Contact</a></li>
+        <li><a href="#" style="display:inline-block; font-weight:600; text-decoration:none; border-radius:8px; padding:.65em 1.25em; border:1px solid transparent; font-size:1rem; background:var(--color-donate-bg); color:var(--color-donate-text);">Donate</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- ============ MAIN — HOME PAGE ============ -->
+  <main style="flex:1;">
+    <section style="max-width:45rem; margin-inline:auto; padding-block:2rem; padding-inline:1rem;">
+      <h1 style="font-family:var(--font-heading); font-weight:700; line-height:1.2; font-size:2.441rem; margin:0 0 1rem; text-wrap:balance;">Home</h1>
+      <div style="max-width:45rem;">
+        <p style="margin:0 0 1rem;">A not-for-profit, family-run primary care clinic in Thandkoi, Swabi (KPK, Pakistan), funded on a Zakat / Sadaqa model.</p>
+      </div>
+      <p lang="ur" dir="rtl" style="font-family:var(--font-urdu); font-size:1.563rem; line-height:1.6; margin:0;">صحت سب کے لیے · چراغ شفا</p>
+    </section>
+
+    <!-- Empty-state note: the rest of the home page is CMS content that does not exist yet -->
+    <section style="max-width:72rem; margin-inline:auto; padding-block:2rem; padding-inline:1rem;">
+      <div style="background:var(--color-surface); border:1px dashed var(--color-border-default); border-radius:12px; box-shadow:var(--card-shadow); padding:1.5rem; max-width:45rem;">
+        <p class="uppercase" style="text-transform:uppercase; letter-spacing:.14em; font-size:.8rem; color:var(--color-text-faint); margin:0 0 .5rem;">Not built yet</p>
+        <p style="margin:0; color:var(--color-text-soft);">Everything above is what renders in code today: the header, nav, this minimal home shell, and the footer below. The real homepage content — mission, impact numbers, latest report — is Wagtail CMS content added later, so it isn't visible here.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ SITE FOOTER (always dark teal ground) ============ -->
+  <footer class="tk-footer" style="background:var(--color-footer-bg); color:var(--color-footer-text); margin-block-start:4rem; font-family:var(--font-body);">
+    <div style="max-width:72rem; margin-inline:auto; padding-inline:1rem; display:grid; gap:2rem; padding-block:3rem; grid-template-columns:repeat(3,1fr);">
+      <div>
+        <h2 style="font-family:var(--font-heading); font-size:1rem; text-transform:uppercase; letter-spacing:.14em; color:var(--color-pale-aqua); margin:0 0 .5rem;">Contact</h2>
+        <p style="margin:0;">Contact details coming soon.</p>
+      </div>
+      <div>
+        <h2 style="font-family:var(--font-heading); font-size:1rem; text-transform:uppercase; letter-spacing:.14em; color:var(--color-pale-aqua); margin:0 0 .5rem;">Zakat &amp; Sadaqa</h2>
+        <p style="margin:0;">Bank details coming soon.</p>
+      </div>
+      <div>
+        <h2 style="font-family:var(--font-heading); font-size:1rem; text-transform:uppercase; letter-spacing:.14em; color:var(--color-pale-aqua); margin:0 0 .5rem;">Follow</h2>
+        <p style="margin:0;">Social links coming soon.</p>
+      </div>
+    </div>
+    <div style="max-width:72rem; margin-inline:auto; padding-inline:1rem; border-block-start:1px solid var(--color-footer-border); padding-block:1rem; font-size:.8rem; color:var(--color-footer-text-soft); display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; justify-content:space-between;">
+      <p style="margin:0;">© 2026 The Thandkoi Clinics</p>
+      <p lang="ur" dir="rtl" style="margin:0; font-family:var(--font-urdu);">صحت سب کے لیے · چراغ شفا</p>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;1100px&quot;,&quot;height&quot;:&quot;760px&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light' | 'dark'&quot;}}">
+class Component extends DCLogic {
+  state = { theme: this.props.theme ?? "light" };
+  componentDidUpdate(prev) {
+    // Keep the Tweaks `theme` prop working: when it changes, adopt it.
+    if (this.props.theme && this.props.theme !== prev.theme && this.props.theme !== this.state.theme) {
+      this.setState({ theme: this.props.theme });
+    }
+  }
+  renderVals() {
+    const theme = this.state.theme;
+    return {
+      theme,
+      themeLabel: theme === "dark" ? "Dark theme" : "Light theme",
+      toggleTheme: () => this.setState(s => ({ theme: s.theme === "dark" ? "light" : "dark" })),
+    };
+  }
+}
+</script>
+</body>
+</html>
