@@ -13,6 +13,7 @@ from wagtail.models import Page, Site
 from apps.core.models import (
     AboutPage,
     ContactPage,
+    DonatePage,
     HomePage,
     OurWorkPage,
     TeamPage,
@@ -30,7 +31,7 @@ def test_seed_creates_home_and_core_pages():
 
     assert HomePage.objects.count() == 1
     home = HomePage.objects.get()
-    for model in (AboutPage, TeamPage, OurWorkPage, ContactPage):
+    for model in (AboutPage, TeamPage, OurWorkPage, ContactPage, DonatePage):
         assert model.objects.count() == 1, model.__name__
         page = model.objects.get()
         # Child of the home page, published, and reachable.
@@ -47,6 +48,7 @@ def test_seed_uses_nav_slugs():
         TeamPage: "team",
         OurWorkPage: "our-work",
         ContactPage: "contact",
+        DonatePage: "donate",
     }
     for model, slug in slugs.items():
         assert model.objects.get().slug == slug
@@ -73,7 +75,7 @@ def test_seed_is_idempotent():
     assert HomePage.objects.count() == 1
     assert HomePage.objects.get().id == home_id
     assert Page.objects.count() == page_count
-    for model in (AboutPage, TeamPage, OurWorkPage, ContactPage):
+    for model in (AboutPage, TeamPage, OurWorkPage, ContactPage, DonatePage):
         assert model.objects.count() == 1, model.__name__
 
 
@@ -95,5 +97,12 @@ def test_seed_delete_welcome_removes_default_page():
 def test_seeded_pages_resolve_over_http(client):
     """After seeding, the core URLs return 200 under the /en/ i18n prefix."""
     _seed()
-    for path in ("/en/", "/en/about/", "/en/team/", "/en/our-work/", "/en/contact/"):
+    for path in (
+        "/en/",
+        "/en/about/",
+        "/en/team/",
+        "/en/our-work/",
+        "/en/contact/",
+        "/en/donate/",
+    ):
         assert client.get(path).status_code == 200, path

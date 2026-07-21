@@ -31,18 +31,20 @@ from wagtail.models import Page, Site
 from apps.core.models import (
     AboutPage,
     ContactPage,
+    DonatePage,
     HomePage,
     OurWorkPage,
     TeamPage,
 )
 
-# (model, title, slug) for the four core children, in nav order. Slugs MUST match
-# templates/partials/nav.html (/about/, /team/, /our-work/, /contact/).
+# (model, title, slug) for the five core children, in nav order. Slugs MUST match
+# templates/partials/nav.html (/about/, /team/, /our-work/, /contact/, /donate/).
 CORE_CHILDREN = [
     (AboutPage, "About", "about"),
     (TeamPage, "Our Team", "team"),
     (OurWorkPage, "Our Work", "our-work"),
     (ContactPage, "Contact", "contact"),
+    (DonatePage, "Donate", "donate"),
 ]
 
 

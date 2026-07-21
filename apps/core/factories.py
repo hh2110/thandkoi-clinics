@@ -15,6 +15,7 @@ from wagtail.models import Page
 from apps.core.models import (
     AboutPage,
     ContactPage,
+    DonatePage,
     HomePage,
     OurWorkPage,
     Service,
@@ -139,3 +140,13 @@ class ContactPageFactory(_TreePageFactory):
 
     title = "Contact"
     slug = "contact"
+
+
+class DonatePageFactory(_TreePageFactory):
+    class Meta:
+        model = DonatePage
+
+    title = "Donate"
+    slug = "donate"
+    zakat_description = "<p>Specific eligibility and calculation rules.</p>"
+    sadaqa_description = "<p>General voluntary giving, any amount, any time.</p>"

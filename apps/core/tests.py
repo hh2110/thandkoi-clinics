@@ -18,6 +18,7 @@ from wagtail.models import Page, Site
 from apps.core.factories import (
     AboutPageFactory,
     ContactPageFactory,
+    DonatePageFactory,
     HomePageFactory,
     OurWorkPageFactory,
     ServiceFactory,
@@ -394,6 +395,7 @@ def test_hero_cta_target_guard_and_donate_only_amber(home_page):
         (TeamPageFactory, "team", "core/team_page.html"),
         (OurWorkPageFactory, "our-work", "core/our_work_page.html"),
         (ContactPageFactory, "contact", "core/contact_page.html"),
+        (DonatePageFactory, "donate", "core/donate_page.html"),
     ],
 )
 def test_core_pages_render_with_correct_template(
@@ -469,6 +471,103 @@ def test_footer_shows_placeholder_when_setting_empty(client, home_page):
     content = client.get("/en/").content.decode()
     assert "Contact details coming soon." in content
     assert "Bank details coming soon." in content
+
+
+# --- Plan 05: donate placeholder ---------------------------------------------
+
+
+def test_donate_page_shows_distinct_zakat_and_sadaqa_sections(client, home_page):
+    """The Zakat and Sadaqa sections render with their own headings and copy.
+
+    Maintainer decision (Plan 05): one page, but the reader can clearly tell
+    which form of giving is which — never blended into a single message.
+    """
+    DonatePageFactory(
+        parent=home_page,
+        slug="donate",
+        zakat_description="<p>Specific Zakat eligibility rules.</p>",
+        sadaqa_description="<p>General voluntary giving, any amount.</p>",
+    )
+    content = client.get("/en/donate/").content.decode()
+    assert "Zakat" in content
+    assert "Sadaqa" in content
+    assert "Specific Zakat eligibility rules." in content
+    assert "General voluntary giving, any amount." in content
+
+
+def test_donate_page_reflects_the_bank_details_setting(client, home_page):
+    """Bank details on the Donate page match the shared Contact & Bank setting.
+
+    Guards against the field ever being duplicated/hardcoded on DonatePage
+    later — the setting is the one source of truth (Plan 05 decision).
+    """
+    DonatePageFactory(parent=home_page, slug="donate")
+    site = Site.objects.get(is_default_site=True)
+    contact = ContactBankSettings.for_site(site)
+    contact.bank_account_title = "The Thandkoi Clinics"
+    contact.bank_name = "Example Bank"
+    contact.bank_iban = "PK00EXMP0000000000000000"
+    contact.bank_account_number = "0000-1111-2222"
+    contact.bank_branch = "Swabi Branch"
+    contact.save()
+
+    content = client.get("/en/donate/").content.decode()
+    assert "The Thandkoi Clinics" in content
+    assert "Example Bank" in content
+    assert "PK00EXMP0000000000000000" in content
+    assert "0000-1111-2222" in content
+    assert "Swabi Branch" in content
+
+
+def test_donate_page_shows_placeholder_when_bank_details_unset(client, home_page):
+    """With no bank details entered yet, the page shows the coming-soon line."""
+    DonatePageFactory(parent=home_page, slug="donate")
+    content = client.get("/en/donate/").content.decode()
+    assert "Bank details coming soon." in content
+
+
+def test_donate_page_in_kind_giving_links_to_contact_channels(client, home_page):
+    """In-kind giving copy renders alongside tel:/mailto: links from the setting."""
+    DonatePageFactory(
+        parent=home_page,
+        slug="donate",
+        in_kind_giving="<p>Medicine, equipment, and volunteering.</p>",
+    )
+    site = Site.objects.get(is_default_site=True)
+    contact = ContactBankSettings.for_site(site)
+    contact.phone = "+92 344 4111235"
+    contact.email = "info.thandkoiclinics@example.org"
+    contact.save()
+
+    content = client.get("/en/donate/").content.decode()
+    assert "Medicine, equipment, and volunteering." in content
+    # tel: strips spaces (a well-formed URI); the visible text keeps them.
+    assert 'href="tel:+923444111235"' in content
+    assert "+92 344 4111235" in content
+    assert 'href="mailto:info.thandkoiclinics@example.org"' in content
+
+
+def test_donate_page_cta_hidden_without_a_contact_page(db):
+    """No dead "#" link: the closing CTA is omitted until a Contact page exists.
+
+    Mirrors the hero/donate-band guard (Plan 04) that never links to nowhere.
+    """
+    donate = DonatePageFactory()
+    from django.test import RequestFactory
+
+    request = RequestFactory().get("/donate/")
+    context = donate.get_context(request)
+    assert context["contact_page_url"] is None
+
+
+def test_donate_page_cta_links_to_contact_page_when_it_exists(client, home_page):
+    """Once a Contact page exists, the closing CTA links to it."""
+    DonatePageFactory(parent=home_page, slug="donate")
+    ContactPageFactory(parent=home_page, slug="contact")
+    content = client.get("/en/donate/").content.decode()
+    assert "cta-band" in content
+    assert 'href="/en/contact/"' in content
+    assert "button--donate" in content
 
 
 def test_consent_block_requires_confirmation(db):
