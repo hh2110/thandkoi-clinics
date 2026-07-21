@@ -39,7 +39,7 @@ plan from 03.5 onward carries three lifecycle sections:
 | 04 | [Core content pages](04-core-content-pages.md) — Home, About, Team/Management, Our Work/Services, Contact | 🚧 In progress |
 | 05 | [Donate placeholder](05-donate-placeholder.md) — Zakat/Sadaqa message + bank/contact config | 🚧 In progress |
 | 06 | [Newsletters, Camp Reports & Gallery](06-newsletters-camps-gallery.md) — archive content types, consent-gated photo gallery | 🚧 In progress |
-| 07 | [Accounts & roles](07-accounts-roles.md) — uploaders/approvers | 📝 Drafted |
+| 07 | [Accounts & roles](07-accounts-roles.md) — uploaders/approvers | 🚧 In progress |
 | 08 | [Data pipeline](08-data-pipeline.md) — intake, parser registry, aggregate-and-discard, daily report page | 📝 Drafted |
 | 09 | [AI monthly newsletter](09-ai-monthly-newsletter.md) — Anthropic SDK, deterministic-numbers guardrail, draft → review | 📝 Drafted |
 

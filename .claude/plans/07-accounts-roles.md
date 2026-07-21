@@ -1,6 +1,6 @@
 # Plan 07 — Accounts & Roles
 
-_Status: Drafted · Depends on: 01 Project foundation (03 Design system only lightly — see note) · Next: 08 Data pipeline_
+_Status: In progress · Depends on: 01 Project foundation (03 Design system only lightly — see note) · Next: 08 Data pipeline_
 
 ## Goal
 
