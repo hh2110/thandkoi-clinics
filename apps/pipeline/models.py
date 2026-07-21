@@ -360,3 +360,55 @@ class DailyReportPage(Page):
 
     class Meta:
         verbose_name = "Daily report"
+
+
+class NewsletterDraftRun(models.Model):
+    """Audit record for one run of the monthly-newsletter drafting command.
+
+    No patient data and no draft narrative text lives here — only
+    who/when/target-month/outcome, mirroring ``IngestRun``'s audit-only shape
+    (Plan 08). This is Plan 09's "failure visibility" decision (PR #17): no
+    email/alert on failure, but a failed run must be visible to an
+    Administrator somewhere in the admin console — see
+    ``apps.pipeline.wagtail_hooks`` for where this is registered as a
+    (view-only) Wagtail snippet.
+    """
+
+    STATUS_SUCCEEDED = "succeeded"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_SUCCEEDED, "Succeeded (draft created)"),
+        (STATUS_FAILED, "Failed (no draft created)"),
+    ]
+
+    month = models.DateField(help_text="First day of the target calendar month.")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    error_message = models.TextField(
+        blank=True,
+        help_text="What went wrong, for an Administrator to read here. Never "
+        "patient data — this call only ever sees de-identified aggregates "
+        "and admin-supplied notes.",
+    )
+    newsletter_page = models.ForeignKey(
+        "core.NewsletterPage",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="The draft this run created, if it succeeded.",
+    )
+    triggered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="The Administrator who ran the management command.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Newsletter draft run for {self.month:%Y-%m} ({self.status})"
