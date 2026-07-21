@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+One newsletter issue — Plan 06. The body composes rich-text paragraphs and
+consent-gated photos in sequence (ConsentedImageBlock, reused from Plan 04);
+consent is already enforced at save time by that block's own `clean()`, so
+this template only ever renders images that passed that gate.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper prose">
+      <p class="eyebrow">{{ page.issue_date }}</p>
+      <h1>{{ page.title }}</h1>
+      {% if page.summary %}<p class="intro">{{ page.summary }}</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrapper prose">
+      {% for block in page.body %}
+        {% include_block block %}
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

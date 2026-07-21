@@ -9,14 +9,22 @@ this and later plans have one consistent pattern to follow. Content pages
 the home page in the tree.
 """
 
+import datetime
+
 import factory
 from wagtail.models import Page
 
 from apps.core.models import (
     AboutPage,
+    CampReportIndexPage,
+    CampReportPage,
     ContactPage,
     DonatePage,
+    GalleryImage,
+    GalleryPage,
     HomePage,
+    NewsletterIndexPage,
+    NewsletterPage,
     OurWorkPage,
     Service,
     TeamMember,
@@ -150,3 +158,58 @@ class DonatePageFactory(_TreePageFactory):
     slug = "donate"
     zakat_description = "<p>Specific eligibility and calculation rules.</p>"
     sadaqa_description = "<p>General voluntary giving, any amount, any time.</p>"
+
+
+class NewsletterIndexPageFactory(_TreePageFactory):
+    class Meta:
+        model = NewsletterIndexPage
+
+    title = "Newsletters"
+    slug = "newsletters"
+
+
+class NewsletterPageFactory(_TreePageFactory):
+    class Meta:
+        model = NewsletterPage
+
+    title = factory.Sequence(lambda n: f"Newsletter issue {n}")
+    slug = factory.Sequence(lambda n: f"issue-{n}")
+    issue_date = factory.LazyFunction(datetime.date.today)
+    summary = "A short teaser blurb."
+
+
+class CampReportIndexPageFactory(_TreePageFactory):
+    class Meta:
+        model = CampReportIndexPage
+
+    title = "Camp Reports"
+    slug = "camp-reports"
+
+
+class CampReportPageFactory(_TreePageFactory):
+    class Meta:
+        model = CampReportPage
+
+    title = factory.Sequence(lambda n: f"Camp report {n}")
+    slug = factory.Sequence(lambda n: f"camp-{n}")
+    camp_date = factory.LazyFunction(datetime.date.today)
+    location = "Thandkoi, Swabi"
+    patients_children = 100
+    patients_general = 50
+    patients_welfare = 25
+
+
+class GalleryPageFactory(_TreePageFactory):
+    class Meta:
+        model = GalleryPage
+
+    title = "Gallery"
+    slug = "gallery"
+
+
+class GalleryImageFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = GalleryImage
+
+    caption = "A clinic photo."
+    consent_confirmed = True

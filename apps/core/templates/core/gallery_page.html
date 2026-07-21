@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Gallery page — Plan 06. Photos are orderable child objects (GalleryImage),
+each rendered through the Plan 03.5 media grid. `consent_confirmed` is
+mandatory on every image before publish (GalleryImage.clean()); `gallery_items`
+(built in GalleryPage.get_context) only ever includes images that passed that
+gate.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>{{ page.title }}</h1>
+      {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+    </div>
+  </section>
+
+  {% include "partials/sections/media_grid.html" with items=gallery_items columns=3 %}
+{% endblock %}

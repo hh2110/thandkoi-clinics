@@ -12,11 +12,25 @@ from wagtail.models import Page, Site
 
 from apps.core.models import (
     AboutPage,
+    CampReportIndexPage,
     ContactPage,
     DonatePage,
+    GalleryPage,
     HomePage,
+    NewsletterIndexPage,
     OurWorkPage,
     TeamPage,
+)
+
+CORE_CHILD_MODELS = (
+    AboutPage,
+    TeamPage,
+    OurWorkPage,
+    CampReportIndexPage,
+    NewsletterIndexPage,
+    GalleryPage,
+    ContactPage,
+    DonatePage,
 )
 
 
@@ -26,12 +40,12 @@ def _seed(**kwargs):
 
 @pytest.mark.django_db
 def test_seed_creates_home_and_core_pages():
-    """A fresh database gains one HomePage + the four core child pages, all live."""
+    """A fresh database gains one HomePage + the core child pages, all live."""
     _seed()
 
     assert HomePage.objects.count() == 1
     home = HomePage.objects.get()
-    for model in (AboutPage, TeamPage, OurWorkPage, ContactPage, DonatePage):
+    for model in CORE_CHILD_MODELS:
         assert model.objects.count() == 1, model.__name__
         page = model.objects.get()
         # Child of the home page, published, and reachable.
@@ -47,6 +61,9 @@ def test_seed_uses_nav_slugs():
         AboutPage: "about",
         TeamPage: "team",
         OurWorkPage: "our-work",
+        CampReportIndexPage: "camp-reports",
+        NewsletterIndexPage: "newsletters",
+        GalleryPage: "gallery",
         ContactPage: "contact",
         DonatePage: "donate",
     }
@@ -75,7 +92,7 @@ def test_seed_is_idempotent():
     assert HomePage.objects.count() == 1
     assert HomePage.objects.get().id == home_id
     assert Page.objects.count() == page_count
-    for model in (AboutPage, TeamPage, OurWorkPage, ContactPage, DonatePage):
+    for model in CORE_CHILD_MODELS:
         assert model.objects.count() == 1, model.__name__
 
 
@@ -102,6 +119,9 @@ def test_seeded_pages_resolve_over_http(client):
         "/en/about/",
         "/en/team/",
         "/en/our-work/",
+        "/en/camp-reports/",
+        "/en/newsletters/",
+        "/en/gallery/",
         "/en/contact/",
         "/en/donate/",
     ):

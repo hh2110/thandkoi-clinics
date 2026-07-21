@@ -433,3 +433,16 @@
     transform: none;
   }
 }
+
+/* --- Pagination -------------------------------------------------------------
+   Minimal prev/next pager for the Newsletter and Camp Report archives
+   (Plan 06) — plain links and a page-count label, no JS. */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-block-start: var(--space-6);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+}

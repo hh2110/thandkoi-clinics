@@ -1,0 +1,18 @@
+{% load wagtailimages_tags %}
+{% comment %}
+Render for ``ConsentedImageBlock`` (apps/core/blocks.py) — a simple photo +
+caption. Shared by every StreamField that reuses the block (Plan 06's
+Newsletter body and Camp Report photos), so the same markup and consent
+handling serve both rather than each caller inventing its own. Consent is
+already enforced at save time by the block's own ``clean()``; this template
+only ever renders images that passed that gate.
+
+Context: ``value`` — the block's StructValue (image, alt_text, caption).
+{% endcomment %}
+{% if value.image %}
+  <figure class="media-grid__item">
+    {% image value.image fill-640x640 as photo %}
+    <img src="{{ photo.url }}" alt="{{ value.alt_text|default:value.image.title }}" />
+    {% if value.caption %}<figcaption>{{ value.caption }}</figcaption>{% endif %}
+  </figure>
+{% endif %}
