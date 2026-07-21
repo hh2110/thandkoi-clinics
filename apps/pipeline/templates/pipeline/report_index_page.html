@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Daily report archive — Plan 08. Same index + child-page pattern as the
+Newsletter/Camp Report archives (apps/core); lists only published daily
+reports, newest first.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>{{ page.title }}</h1>
+      {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrapper">
+      <div class="card-grid card-grid--3">
+        {% for report in reports %}
+          <article class="card card--interactive">
+            <p class="eyebrow">{{ report.report_date }}</p>
+            <h3 class="card__title"><a href="{{ report.url }}">{{ report.title }}</a></h3>
+            <p class="card__body">
+              {% blocktranslate count total=report.aggregate.total_visits %}{{ total }} patient seen{% plural %}{{ total }} patients seen{% endblocktranslate %}
+            </p>
+          </article>
+        {% empty %}
+          <p class="card-grid__empty text-faint">{% translate "Daily reports coming soon." %}</p>
+        {% endfor %}
+      </div>
+      {% include "partials/pagination.html" with page_obj=reports %}
+    </div>
+  </section>
+{% endblock %}
