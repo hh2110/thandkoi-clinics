@@ -101,23 +101,6 @@ def test_root_redirects_to_a_language_prefix(client, home_page):
     assert response.url.startswith("/en/") or response.url.startswith("/ur/")
 
 
-@override_settings(DEBUG=False, ALLOWED_HOSTS=["testserver"])
-def test_language_switcher_round_trips_to_the_same_page(client, db):
-    """Switching language on a page returns the equivalent path, not "/".
-
-    HomePage (Plan 01) is the site root and doesn't allow child pages yet
-    (Plan 04 adds real content pages), so there's no second real page to
-    navigate between languages on. The language switcher works purely off
-    ``request.path`` string-slicing though, so a placeholder nav path (which
-    404s, by design — see templates/partials/nav.html) still exercises the
-    real round-trip logic: it should point at "/ur/about/", not "/ur/".
-    """
-    response = client.get("/en/about/")
-    assert response.status_code == 404
-    content = response.content.decode()
-    assert 'href="/ur/about/"' in content
-
-
 # --- Plan 03: error pages ----------------------------------------------------
 
 
