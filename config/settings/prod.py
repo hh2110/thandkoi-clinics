@@ -32,6 +32,14 @@ SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
+# HttpOnly: neither cookie needs to be read by JS. Session cookie is HttpOnly
+# by Django default already; CSRF is not (Django's default is False, for
+# apps that read the token from JS) — no template here does that, the CSRF
+# token is always rendered server-side via {% csrf_token %}, so this can be
+# locked down (Plan 07 privacy/security guardrail).
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+
 SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=60 * 60 * 24 * 365)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
