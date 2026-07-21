@@ -126,7 +126,14 @@
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    padding: 0;
+    align-items: center;
+    gap: var(--space-3);
+    /* Align the inline nav with the centered content wrapper (logo + page
+       body) rather than running full-bleed to the viewport edge, and give the
+       row vertical breathing room. */
+    max-width: 72rem;
+    margin-inline: auto;
+    padding: var(--space-1) var(--space-2) var(--space-2);
   }
 
   .primary-nav[open] > summary {
