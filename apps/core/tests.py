@@ -639,6 +639,39 @@ def test_newsletter_page_renders_under_its_index(client, home_page):
     assert "News from the clinic." in content
 
 
+def test_newsletter_body_renders_paragraph_and_consented_photo(client, home_page):
+    """The body StreamField renders both block types it mixes.
+
+    A paragraph (plain RichTextBlock) and a photo (ConsentedImageBlock, reused
+    from Plan 04) — the photo via that block's own render template
+    (templates/blocks/consented_image_block.html), its first real use.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Camp photo", file=get_test_image_file())
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="july-2026",
+        body=[
+            ("paragraph", "<p>Hello from the clinic.</p>"),
+            (
+                "photo",
+                {
+                    "image": image,
+                    "alt_text": "",
+                    "caption": "A caption",
+                    "consent_confirmed": True,
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/july-2026/").content.decode()
+    assert "Hello from the clinic." in content
+    assert "A caption" in content
+    assert 'alt="Camp photo"' in content  # falls back to the image's own title
+
+
 def test_camp_report_page_renders_under_its_index(client, home_page):
     """A camp report is independently linkable and shows the derived total."""
     index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
@@ -660,6 +693,32 @@ def test_camp_report_page_renders_under_its_index(client, home_page):
     assert "Thandkoi, Swabi" in content
     # The derived total (100 + 200 + 79), never entered directly.
     assert "379" in content
+
+
+def test_camp_report_photos_render_through_the_media_grid(client, home_page):
+    """A consent-confirmed camp photo renders via the media grid."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Camp crowd", file=get_test_image_file())
+    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
+    CampReportPageFactory(
+        parent=index,
+        slug="verify-camp",
+        photos=[
+            (
+                "photo",
+                {
+                    "image": image,
+                    "alt_text": "",
+                    "caption": "Crowd at the camp",
+                    "consent_confirmed": True,
+                },
+            )
+        ],
+    )
+    content = client.get("/en/camp-reports/verify-camp/").content.decode()
+    assert "Crowd at the camp" in content
+    assert 'alt="Camp crowd"' in content
 
 
 def test_newsletter_archive_lists_only_published_newest_first(client, home_page):
@@ -747,6 +806,21 @@ def test_home_teaser_shows_latest_published_newsletter_only(client, home_page):
     assert "Published Issue" in content
     assert "Draft Issue" not in content
     assert "feature-split" in content
+
+
+def test_gallery_image_renders_through_the_media_grid(client, home_page):
+    """A consent-confirmed gallery image renders on the Gallery page."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    gallery = GalleryPageFactory(parent=home_page, slug="gallery")
+    image = Image.objects.create(title="Clinic courtyard", file=get_test_image_file())
+    GalleryImageFactory(
+        page=gallery, image=image, caption="The courtyard", consent_confirmed=True
+    )
+
+    content = client.get("/en/gallery/").content.decode()
+    assert "The courtyard" in content
+    assert 'alt="Clinic courtyard"' in content
 
 
 def test_gallery_image_requires_consent_to_publish(home_page):

@@ -394,6 +394,19 @@
   object-fit: cover;
 }
 
+/* The cell wrapping each grid slot (Plan 06) — a plain block, so the grid
+   still sizes columns off `.media-grid`; `.media-grid__item` keeps its own
+   fixed-aspect image treatment, unaffected by whether a caption follows. */
+.media-grid__cell {
+  margin: 0;
+}
+
+.media-grid__caption {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  margin-block: var(--space-1) 0;
+}
+
 /* --- Image placeholder ----------------------------------------------------
    The intentional "photo goes here" treatment — a soft diagonal stripe (a
    functional hatch pattern, not a decorative gradient) with a monospace
