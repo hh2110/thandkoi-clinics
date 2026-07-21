@@ -6,10 +6,12 @@ cover the bilingual routing, RTL layout, brand-styled error pages, and the
 anti-FOUC/theme-toggle markup added in that plan.
 """
 
+import datetime
 import re
 
 import pytest
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.template.loader import render_to_string
 from django.test import override_settings
 from django.urls import reverse
@@ -17,15 +19,28 @@ from wagtail.models import Page, Site
 
 from apps.core.factories import (
     AboutPageFactory,
+    CampReportIndexPageFactory,
+    CampReportPageFactory,
     ContactPageFactory,
     DonatePageFactory,
+    GalleryImageFactory,
+    GalleryPageFactory,
     HomePageFactory,
+    NewsletterIndexPageFactory,
+    NewsletterPageFactory,
     OurWorkPageFactory,
     ServiceFactory,
     TeamMemberFactory,
     TeamPageFactory,
 )
-from apps.core.models import ContactBankSettings, HomePage, Service, TeamMember
+from apps.core.models import (
+    CampReportPage,
+    ContactBankSettings,
+    HomePage,
+    NewsletterPage,
+    Service,
+    TeamMember,
+)
 
 
 @pytest.fixture
@@ -399,6 +414,17 @@ def test_hero_cta_target_guard_and_donate_only_amber(home_page):
         (OurWorkPageFactory, "our-work", "core/our_work_page.html"),
         (ContactPageFactory, "contact", "core/contact_page.html"),
         (DonatePageFactory, "donate", "core/donate_page.html"),
+        (
+            NewsletterIndexPageFactory,
+            "newsletters",
+            "core/newsletter_index_page.html",
+        ),
+        (
+            CampReportIndexPageFactory,
+            "camp-reports",
+            "core/camp_report_index_page.html",
+        ),
+        (GalleryPageFactory, "gallery", "core/gallery_page.html"),
     ],
 )
 def test_core_pages_render_with_correct_template(
@@ -593,3 +619,332 @@ def test_consent_block_requires_confirmation(db):
         block.to_python({"image": image.pk, "consent_confirmed": True})
     )
     assert cleaned["consent_confirmed"] is True
+
+
+# --- Plan 06: Newsletters, Camp Reports & Gallery ----------------------------
+
+
+def test_newsletter_page_renders_under_its_index(client, home_page):
+    """A newsletter issue is independently linkable under its archive index."""
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="july-2026",
+        title="July 2026 Update",
+        issue_date=datetime.date(2026, 7, 1),
+        summary="News from the clinic.",
+    )
+    response = client.get("/en/newsletters/july-2026/")
+    assert response.status_code == 200
+    assert "core/newsletter_page.html" in [t.name for t in response.templates]
+    content = response.content.decode()
+    assert "July 2026 Update" in content
+    assert "News from the clinic." in content
+
+
+def test_newsletter_body_renders_paragraph_and_consented_photo(client, home_page):
+    """The body StreamField renders both block types it mixes.
+
+    A paragraph (plain RichTextBlock) and a photo (ConsentedImageBlock, reused
+    from Plan 04) — the photo via that block's own render template
+    (templates/blocks/consented_image_block.html), its first real use.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Camp photo", file=get_test_image_file())
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="july-2026",
+        body=[
+            ("paragraph", "<p>Hello from the clinic.</p>"),
+            (
+                "photo",
+                {
+                    "image": image,
+                    "alt_text": "",
+                    "caption": "A caption",
+                    "consent_confirmed": True,
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/july-2026/").content.decode()
+    assert "Hello from the clinic." in content
+    assert "A caption" in content
+    assert 'alt="Camp photo"' in content  # falls back to the image's own title
+
+
+def test_newsletter_never_renders_an_unconsented_photo(client, home_page):
+    """A photo block saved without consent_confirmed never reaches the page.
+
+    ConsentedImageBlock.clean() only fires through Wagtail's admin-form
+    StreamField validation, not through Model.full_clean()/.save() — so a
+    write path outside the admin form (a migration, a management command,
+    Plan 09's planned AI-drafting flow) could in principle persist an
+    unconsented photo. consented_image_block.html's own consent_confirmed
+    check is the real guarantee: this asserts it holds even when the save-time
+    guard was bypassed.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Unconsented photo", file=get_test_image_file())
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="unconsented-issue",
+        body=[
+            (
+                "photo",
+                {
+                    "image": image,
+                    "alt_text": "",
+                    "caption": "should never render",
+                    "consent_confirmed": False,
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/unconsented-issue/").content.decode()
+    assert "should never render" not in content
+    assert "Unconsented photo" not in content
+
+
+def test_camp_report_page_renders_under_its_index(client, home_page):
+    """A camp report is independently linkable and shows the derived total."""
+    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
+    CampReportPageFactory(
+        parent=index,
+        slug="inauguration-camp",
+        title="Inauguration Camp",
+        camp_date=datetime.date(2026, 5, 16),
+        location="Thandkoi, Swabi",
+        patients_children=100,
+        patients_general=200,
+        patients_welfare=79,
+    )
+    response = client.get("/en/camp-reports/inauguration-camp/")
+    assert response.status_code == 200
+    assert "core/camp_report_page.html" in [t.name for t in response.templates]
+    content = response.content.decode()
+    assert "Inauguration Camp" in content
+    assert "Thandkoi, Swabi" in content
+    # The derived total (100 + 200 + 79), never entered directly.
+    assert "379" in content
+
+
+def test_camp_report_photos_render_through_the_media_grid(client, home_page):
+    """A consent-confirmed camp photo renders via the media grid."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Camp crowd", file=get_test_image_file())
+    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
+    CampReportPageFactory(
+        parent=index,
+        slug="verify-camp",
+        photos=[
+            (
+                "photo",
+                {
+                    "image": image,
+                    "alt_text": "",
+                    "caption": "Crowd at the camp",
+                    "consent_confirmed": True,
+                },
+            )
+        ],
+    )
+    content = client.get("/en/camp-reports/verify-camp/").content.decode()
+    assert "Crowd at the camp" in content
+    assert 'alt="Camp crowd"' in content
+
+
+def test_newsletter_archive_lists_only_published_newest_first(client, home_page):
+    """Drafts stay invisible in the archive; published issues sort newest first.
+
+    The exact mechanism Plan 09's AI-drafted newsletter content will rely on
+    later (a drafted-but-unpublished revision must not appear here) — worth
+    locking down now while it's cheap to test.
+    """
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="issue-1",
+        title="Issue One",
+        issue_date=datetime.date(2026, 1, 1),
+    )
+    NewsletterPageFactory(
+        parent=index,
+        slug="issue-2",
+        title="Issue Two",
+        issue_date=datetime.date(2026, 6, 1),
+    )
+    NewsletterPageFactory(
+        parent=index,
+        slug="issue-3",
+        title="Draft Issue",
+        issue_date=datetime.date(2026, 7, 1),
+        live=False,
+    )
+    content = client.get("/en/newsletters/").content.decode()
+    assert "Issue One" in content
+    assert "Issue Two" in content
+    assert "Draft Issue" not in content
+    assert content.index("Issue Two") < content.index("Issue One")
+
+
+def test_camp_report_archive_lists_only_published_newest_first(client, home_page):
+    """Same draft-invisibility and newest-first guarantee for Camp Reports."""
+    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
+    CampReportPageFactory(
+        parent=index,
+        slug="camp-1",
+        title="Camp One",
+        camp_date=datetime.date(2026, 1, 1),
+    )
+    CampReportPageFactory(
+        parent=index,
+        slug="camp-2",
+        title="Camp Two",
+        camp_date=datetime.date(2026, 6, 1),
+    )
+    CampReportPageFactory(
+        parent=index,
+        slug="camp-3",
+        title="Draft Camp",
+        camp_date=datetime.date(2026, 7, 1),
+        live=False,
+    )
+    content = client.get("/en/camp-reports/").content.decode()
+    assert "Camp One" in content
+    assert "Camp Two" in content
+    assert "Draft Camp" not in content
+    assert content.index("Camp Two") < content.index("Camp One")
+
+
+def test_home_teaser_shows_latest_published_newsletter_only(client, home_page):
+    """Home's newsletter teaser renders the latest published issue, never a draft."""
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="issue-1",
+        title="Published Issue",
+        issue_date=datetime.date(2026, 1, 1),
+        summary="Published summary.",
+    )
+    NewsletterPageFactory(
+        parent=index,
+        slug="issue-2",
+        title="Draft Issue",
+        issue_date=datetime.date(2026, 7, 1),
+        summary="Draft summary.",
+        live=False,
+    )
+    content = client.get("/en/").content.decode()
+    assert "Published Issue" in content
+    assert "Draft Issue" not in content
+    assert "feature-split" in content
+
+
+def test_gallery_image_renders_through_the_media_grid(client, home_page):
+    """A consent-confirmed gallery image renders on the Gallery page."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    gallery = GalleryPageFactory(parent=home_page, slug="gallery")
+    image = Image.objects.create(title="Clinic courtyard", file=get_test_image_file())
+    GalleryImageFactory(
+        page=gallery, image=image, caption="The courtyard", consent_confirmed=True
+    )
+
+    content = client.get("/en/gallery/").content.decode()
+    assert "The courtyard" in content
+    assert 'alt="Clinic courtyard"' in content
+
+
+def test_gallery_images_query_resolves_image_fk_without_an_extra_query_each(
+    home_page, django_assert_num_queries
+):
+    """GalleryPage's images queryset resolves each image's FK in one query.
+
+    Regression guard for the N+1 select_related("image") fixes: without it,
+    accessing gallery_image.image on each of these 3 rows would cost one
+    extra query per row (3 extra), on top of the 1 query for the rows
+    themselves.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    gallery = GalleryPageFactory(parent=home_page, slug="gallery")
+    for i in range(3):
+        image = Image.objects.create(title=f"Photo {i}", file=get_test_image_file())
+        GalleryImageFactory(page=gallery, image=image, consent_confirmed=True)
+
+    with django_assert_num_queries(1):
+        images = list(
+            gallery.images.select_related("image").filter(
+                image__isnull=False, consent_confirmed=True
+            )
+        )
+        for gallery_image in images:
+            gallery_image.image.title  # noqa: B018 (accessed for its side effect: no query)
+
+
+def test_gallery_image_requires_consent_to_publish(home_page):
+    """A GalleryImage with an image set but consent unticked fails validation.
+
+    Mirrors ``ConsentedImageBlock``'s own guard, now enforced on the plain
+    orderable child model the Gallery page uses instead of a StreamField block
+    (brand-guidelines.md §5).
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    gallery = GalleryPageFactory(parent=home_page, slug="gallery")
+    image = Image.objects.create(title="A person", file=get_test_image_file())
+
+    unconfirmed = GalleryImageFactory.build(
+        page=gallery, image=image, consent_confirmed=False
+    )
+    with pytest.raises(ValidationError):
+        unconfirmed.full_clean()
+
+    # With consent ticked it validates cleanly.
+    confirmed = GalleryImageFactory.build(
+        page=gallery, image=image, consent_confirmed=True
+    )
+    confirmed.full_clean()
+
+
+def test_gallery_image_without_an_image_does_not_require_consent(home_page):
+    """An empty GalleryImage slot (no photo yet) isn't blocked on consent."""
+    gallery = GalleryPageFactory(parent=home_page, slug="gallery")
+    empty = GalleryImageFactory.build(page=gallery, image=None, consent_confirmed=False)
+    empty.full_clean()
+
+
+def test_camp_report_photo_block_requires_consent(db):
+    """CampReportPage.photos' "photo" block type is ConsentedImageBlock.
+
+    Proves the model wiring, not just the block class in isolation — a camp
+    photo cannot be saved without ticked consent (brand-guidelines.md §5).
+    """
+    from wagtail.blocks import StructBlockValidationError
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="A person", file=get_test_image_file())
+    photo_block = CampReportPage().photos.stream_block.child_blocks["photo"]
+    with pytest.raises(StructBlockValidationError):
+        photo_block.clean(
+            photo_block.to_python({"image": image.pk, "consent_confirmed": False})
+        )
+
+
+def test_newsletter_body_photo_block_requires_consent(db):
+    """NewsletterPage.body's "photo" block type is likewise consent-gated."""
+    from wagtail.blocks import StructBlockValidationError
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="A person", file=get_test_image_file())
+    photo_block = NewsletterPage().body.stream_block.child_blocks["photo"]
+    with pytest.raises(StructBlockValidationError):
+        photo_block.clean(
+            photo_block.to_python({"image": image.pk, "consent_confirmed": False})
+        )

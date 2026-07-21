@@ -118,6 +118,9 @@ class DonateCTABlock(blocks.StructBlock):
         template = "blocks/donate_cta_block.html"
 
 
+CONSENT_REQUIRED_MESSAGE = "Confirm consent before publishing this photo."
+
+
 class ConsentedImageBlock(blocks.StructBlock):
     """A photograph that may show an identifiable person, gated on consent.
 
@@ -127,6 +130,12 @@ class ConsentedImageBlock(blocks.StructBlock):
     than inventing a second pattern. Per brand-guidelines.md §5 (dignity &
     consent): an image cannot be saved unless the admin ticks
     ``consent_confirmed``.
+
+    Plan 06 is this block's first real user (Newsletter body photos, Camp
+    Report photos), so it's also where the block first gets a render
+    template — ``blocks/consented_image_block.html`` — shared by every
+    StreamField that reuses this block, rather than each caller inventing its
+    own markup for the same photo+caption shape.
     """
 
     image = ImageChooserBlock()
@@ -148,14 +157,11 @@ class ConsentedImageBlock(blocks.StructBlock):
         result = super().clean(value)
         if result.get("image") and not result.get("consent_confirmed"):
             raise StructBlockValidationError(
-                block_errors={
-                    "consent_confirmed": [
-                        "Confirm consent before publishing this photo."
-                    ]
-                }
+                block_errors={"consent_confirmed": [CONSENT_REQUIRED_MESSAGE]}
             )
         return result
 
     class Meta:
         icon = "image"
         label = "Photo (consent required)"
+        template = "blocks/consented_image_block.html"

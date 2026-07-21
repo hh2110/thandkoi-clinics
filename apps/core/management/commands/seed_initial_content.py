@@ -3,8 +3,9 @@
 A newly migrated database has only Wagtail's default *Welcome* page, so the
 public site 404s on every real URL. This command idempotently creates the
 site's page structure — a :class:`~apps.core.models.HomePage` as the site root
-plus the four core child pages (About, Team, Our Work, Contact) at the slugs the
-primary nav links to — and points the default ``Site`` at the new home page.
+plus the core child pages (About, Team, Our Work, Camp Reports, Newsletters,
+Gallery, Contact, Donate) at the slugs the primary nav links to — and points
+the default ``Site`` at the new home page.
 
 It seeds **structure, not copy**: every page is created with its title/slug and
 an otherwise empty body, published so its URL resolves. A human then fills in the
@@ -30,19 +31,29 @@ from wagtail.models import Page, Site
 
 from apps.core.models import (
     AboutPage,
+    CampReportIndexPage,
     ContactPage,
     DonatePage,
+    GalleryPage,
     HomePage,
+    NewsletterIndexPage,
     OurWorkPage,
     TeamPage,
 )
 
-# (model, title, slug) for the five core children, in nav order. Slugs MUST match
-# templates/partials/nav.html (/about/, /team/, /our-work/, /contact/, /donate/).
+# (model, title, slug) for the core children, in nav order. Slugs MUST match
+# templates/partials/nav.html (/about/, /team/, /our-work/, /camp-reports/,
+# /newsletters/, /gallery/, /contact/, /donate/). The Newsletter/Camp Report
+# archives and the Gallery (Plan 06) are seeded empty — each shows its own
+# "coming soon" state until content is entered — so their nav links resolve
+# immediately after deploy rather than 404ing until the first admin visit.
 CORE_CHILDREN = [
     (AboutPage, "About", "about"),
     (TeamPage, "Our Team", "team"),
     (OurWorkPage, "Our Work", "our-work"),
+    (CampReportIndexPage, "Camp Reports", "camp-reports"),
+    (NewsletterIndexPage, "Newsletters", "newsletters"),
+    (GalleryPage, "Gallery", "gallery"),
     (ContactPage, "Contact", "contact"),
     (DonatePage, "Donate", "donate"),
 ]

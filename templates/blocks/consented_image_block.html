@@ -1,0 +1,32 @@
+{% load wagtailimages_tags %}
+{% comment %}
+Render for ``ConsentedImageBlock`` (apps/core/blocks.py) — a simple photo +
+caption. Shared by every StreamField that reuses the block (Plan 06's
+Newsletter body and Camp Report photos), so the same markup and consent
+handling serve both rather than each caller inventing its own.
+
+``clean()``'s block-level validation only runs through Wagtail's admin-form
+StreamField widget — Django's ``Model.full_clean()``/``.save()`` never call
+it, so a write path outside the admin form (a migration, a management
+command, Plan 09's planned AI-drafting flow) could in principle persist an
+unconsented photo. The ``value.consent_confirmed`` check below is the actual
+guarantee: this template never *renders* a photo without it, regardless of
+how the data got saved.
+
+Mirrors media_grid.html's cell/item split: `.media-grid__item` is the
+fixed-aspect, `overflow: hidden` image box (static/css/layout.css) — a
+caption placed *inside* it would be clipped, so the caption sits outside as
+a sibling within the outer `.media-grid__cell`, matching the grid's own
+figure/figcaption arrangement.
+
+Context: ``value`` — the block's StructValue (image, alt_text, caption).
+{% endcomment %}
+{% if value.image and value.consent_confirmed %}
+  <figure class="media-grid__cell">
+    <div class="media-grid__item">
+      {% image value.image fill-640x640 as photo %}
+      <img src="{{ photo.url }}" alt="{{ value.alt_text|default:value.image.title }}" />
+    </div>
+    {% if value.caption %}<figcaption class="media-grid__caption">{{ value.caption }}</figcaption>{% endif %}
+  </figure>
+{% endif %}

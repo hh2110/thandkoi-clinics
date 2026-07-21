@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+One camp report — Plan 06. Patients served renders as the Plan 03.5 stat band
+(per-category counts plus the derived total, page.get_context's
+`patient_stats`); services offered as a plain list; partner credits and
+narrative as prose; photos through the media grid. Consent is already
+enforced at save time by CampReportPage.photos' ConsentedImageBlock, so
+`camp_photos` (also built in get_context) only ever contains images that
+passed that gate.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>{{ page.title }}</h1>
+      <p class="text-faint">
+        {{ page.camp_date }}{% if page.location %} · {{ page.location }}{% endif %}
+      </p>
+    </div>
+  </section>
+
+  {% include "partials/sections/stat_band.html" with stats=patient_stats %}
+
+  {% if page.services_offered %}
+    <section class="section">
+      <div class="wrapper">
+        <div class="section-header">
+          {% include "partials/sections/section_header.html" with heading=_("Services offered") %}
+        </div>
+        <ul class="prose">
+          {% for service in page.services_offered %}
+            <li>{{ service.value }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if page.narrative %}
+    <section class="section section--tinted">
+      <div class="wrapper prose">
+        {{ page.narrative|richtext }}
+      </div>
+    </section>
+  {% endif %}
+
+  {% if page.partner_credits %}
+    <section class="section">
+      <div class="wrapper prose">
+        <div class="section-header">
+          {% include "partials/sections/section_header.html" with heading=_("With thanks to") %}
+        </div>
+        <p>{{ page.partner_credits|linebreaksbr }}</p>
+      </div>
+    </section>
+  {% endif %}
+
+  {% include "partials/sections/media_grid.html" with items=camp_photos columns=3 %}
+{% endblock %}

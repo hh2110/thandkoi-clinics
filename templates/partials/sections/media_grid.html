@@ -9,7 +9,10 @@ Context:
   link_label / link_url   — optional trailing "View gallery →" link.
   columns    — 3 or 4 (wide-viewport column count); defaults to 4.
   items      — a list of {image, alt, caption} dicts. Any item without `image`
-               renders the placeholder (caption shown inside it).
+               renders the placeholder (caption shown inside it); an item
+               *with* an image shows its caption underneath (Plan 06 — the
+               Gallery and Camp Report photo captions this grid first serves
+               for real).
 
 Empty state: with no items it shows a "coming soon" line, not an empty grid.
 {% endcomment %}
@@ -25,13 +28,18 @@ Empty state: with no items it shows a "coming soon" line, not an empty grid.
     {% endif %}
     <div class="media-grid media-grid--{{ columns|default:4 }}">
       {% for item in items %}
-        <div class="media-grid__item">
-          {% if item.image %}
-            <img src="{{ item.image }}" alt="{{ item.alt|default:'' }}" />
-          {% else %}
-            {% include "partials/sections/_media_placeholder.html" with caption=item.caption %}
+        <figure class="media-grid__cell">
+          <div class="media-grid__item">
+            {% if item.image %}
+              <img src="{{ item.image }}" alt="{{ item.alt|default:'' }}" />
+            {% else %}
+              {% include "partials/sections/_media_placeholder.html" with caption=item.caption %}
+            {% endif %}
+          </div>
+          {% if item.image and item.caption %}
+            <figcaption class="media-grid__caption">{{ item.caption }}</figcaption>
           {% endif %}
-        </div>
+        </figure>
       {% empty %}
         <p class="media-grid__empty text-faint">{% translate "Photos coming soon." %}</p>
       {% endfor %}

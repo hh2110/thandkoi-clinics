@@ -3,8 +3,11 @@
 {% comment %}
 Home page — composed entirely from the Plan 03.5 layout kit. The StreamField
 body renders through the block templates (each of which includes a 03.5 section
-partial); the latest-daily-report teaser renders beneath it only when a report
-exists (Plan 06), degrading to nothing until then.
+partial); the latest-report and latest-newsletter teasers each render beneath
+it only when that content type has a published item — the "report/newsletter"
+teaser degrades gracefully per content type, not all-or-nothing (Plan 06
+decision). Plan 06 wires the newsletter half; the report half stays hidden
+until Plan 08 supplies a report content type to query.
 {% endcomment %}
 
 {% block content %}
@@ -14,5 +17,9 @@ exists (Plan 06), degrading to nothing until then.
 
   {% if latest_report %}
     {% include "partials/sections/feature_split.html" with eyebrow=_("Latest daily report") heading=latest_report.title body=latest_report.summary stats=latest_report.headline_stats cta_label=_("Read the full report →") cta_url=latest_report.url %}
+  {% endif %}
+
+  {% if latest_newsletter %}
+    {% include "partials/sections/feature_split.html" with eyebrow=_("Latest newsletter") heading=latest_newsletter.title body=latest_newsletter.summary cta_label=_("Read the newsletter →") cta_url=latest_newsletter.url %}
   {% endif %}
 {% endblock %}

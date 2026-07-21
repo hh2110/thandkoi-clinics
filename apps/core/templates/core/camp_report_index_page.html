@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Camp Report archive — Plan 06. Same index + child-page pattern as the
+Newsletter archive; lists only published reports, newest first.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>{{ page.title }}</h1>
+      {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrapper">
+      <div class="card-grid card-grid--3">
+        {% for camp_report in camp_reports %}
+          <article class="card card--interactive">
+            <p class="eyebrow">
+              {{ camp_report.camp_date }}{% if camp_report.location %} · {{ camp_report.location }}{% endif %}
+            </p>
+            <h3 class="card__title"><a href="{{ camp_report.url }}">{{ camp_report.title }}</a></h3>
+            <p class="card__body">
+              {% blocktranslate count total=camp_report.total_patients_served %}{{ total }} patient served{% plural %}{{ total }} patients served{% endblocktranslate %}
+            </p>
+          </article>
+        {% empty %}
+          <p class="card-grid__empty text-faint">{% translate "Camp reports coming soon." %}</p>
+        {% endfor %}
+      </div>
+      {% include "partials/pagination.html" with page_obj=camp_reports %}
+    </div>
+  </section>
+{% endblock %}

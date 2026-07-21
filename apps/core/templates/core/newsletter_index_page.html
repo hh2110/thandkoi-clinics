@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Newsletter archive — Plan 06. Wagtail's standard index + child-page pattern
+(new to this repo; grounded against Wagtail's own idiom, no in-repo precedent
+existed before this plan). Lists only published issues, newest first — drafts
+stay invisible (NewsletterIndexPage.get_newsletters queries `.live()`).
+Paginated so a growing archive doesn't turn into one long list.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>{{ page.title }}</h1>
+      {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrapper">
+      <div class="card-grid card-grid--3">
+        {% for newsletter in newsletters %}
+          <article class="card card--interactive">
+            <p class="eyebrow">{{ newsletter.issue_date }}</p>
+            <h3 class="card__title"><a href="{{ newsletter.url }}">{{ newsletter.title }}</a></h3>
+            {% if newsletter.summary %}<p class="card__body">{{ newsletter.summary }}</p>{% endif %}
+          </article>
+        {% empty %}
+          <p class="card-grid__empty text-faint">{% translate "Newsletters coming soon." %}</p>
+        {% endfor %}
+      </div>
+      {% include "partials/pagination.html" with page_obj=newsletters %}
+    </div>
+  </section>
+{% endblock %}

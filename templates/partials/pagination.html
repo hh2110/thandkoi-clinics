@@ -1,0 +1,22 @@
+{% load i18n %}
+{% comment %}
+Minimal prev/next pager for a paginated archive listing (Newsletter and Camp
+Report indexes, Plan 06). Grounded on Django's own Paginator idiom — no
+in-repo precedent existed before these archives.
+
+Context:
+  page_obj — a Django ``Page`` object, from ``Paginator.get_page()``.
+{% endcomment %}
+{% if page_obj.paginator.num_pages > 1 %}
+  <nav class="pagination" aria-label="{% translate 'Pagination' %}">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}">{% translate "Previous" %}</a>
+    {% endif %}
+    <span>
+      {% blocktranslate with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktranslate %}
+    </span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}">{% translate "Next" %}</a>
+    {% endif %}
+  </nav>
+{% endif %}
