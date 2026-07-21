@@ -24,10 +24,12 @@
         }
       })();
     </script>
-    <title>
-      {% block title %}{% if page.seo_title %}{{ page.seo_title }}{% else %}{{ page.title }}{% endif %}{% endblock %}
-      {% block title_suffix %} — The Thandkoi Clinics{% endblock %}
-    </title>
+    {% comment %}
+    Title = page title, then " — The Thandkoi Clinics" — but skip the suffix when
+    the page title already IS the site name (the home page), so social/browser
+    titles don't read "The Thandkoi Clinics — The Thandkoi Clinics".
+    {% endcomment %}
+    <title>{% block title %}{% firstof page.seo_title page.title %}{% endblock %}{% block title_suffix %}{% firstof page.seo_title page.title as page_title %}{% if page_title != "The Thandkoi Clinics" %} — The Thandkoi Clinics{% endif %}{% endblock %}</title>
     <link rel="icon" href="{% static 'favicons/favicon.svg' %}" type="image/svg+xml" />
     <link rel="icon" href="{% static 'favicons/favicon-32.png' %}" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="{% static 'favicons/favicon-180.png' %}" />
@@ -54,6 +56,7 @@
       {% include "partials/footer.html" %}
     </div>
     <script src="{% static 'js/theme-toggle.js' %}" defer></script>
+    <script src="{% static 'js/nav.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
   </body>
 </html>

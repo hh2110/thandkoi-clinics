@@ -113,6 +113,15 @@
     display: none;
   }
 
+  /* On desktop the disclosure is always shown inline, so the list must
+     participate in layout even though the <details> is closed. Modern browsers
+     collapse a closed <details>'s ::details-content wrapper to zero height, so
+     display:flex on the list alone isn't enough — without this the inline nav
+     overflows a 0-height box and disappears behind the hero below. */
+  .primary-nav::details-content {
+    content-visibility: visible;
+  }
+
   .primary-nav__list {
     display: flex;
     flex-direction: row;

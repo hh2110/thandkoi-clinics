@@ -101,6 +101,26 @@ def test_root_redirects_to_a_language_prefix(client, home_page):
     assert response.url.startswith("/en/") or response.url.startswith("/ur/")
 
 
+def test_home_title_is_not_doubled(client, home_page):
+    """The home <title> shows the site name once, not "X — X".
+
+    The home page's own title *is* the site name, so the shared
+    " — The Thandkoi Clinics" suffix must be suppressed — otherwise the
+    browser tab and social/WhatsApp preview read it twice.
+    """
+    content = client.get("/en/", follow=True).content.decode()
+    title = re.search(r"<title>(.*?)</title>", content, re.S).group(1).strip()
+    assert title == "The Thandkoi Clinics"
+
+
+def test_inner_page_title_has_site_suffix(client, home_page):
+    """A non-home page keeps the " — The Thandkoi Clinics" suffix."""
+    AboutPageFactory(parent=home_page, title="About", slug="about")
+    content = client.get("/en/about/").content.decode()
+    title = re.search(r"<title>(.*?)</title>", content, re.S).group(1).strip()
+    assert title == "About — The Thandkoi Clinics"
+
+
 # --- Plan 03: error pages ----------------------------------------------------
 
 
