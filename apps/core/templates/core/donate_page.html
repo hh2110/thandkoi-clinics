@@ -48,20 +48,18 @@ link, mirroring the hero/donate-band guard.
       {% if page.how_to_give %}
         <div class="prose">{{ page.how_to_give|richtext }}</div>
       {% endif %}
-      <div class="card-grid card-grid--3">
-        <article class="card">
-          <h2 class="card__title">{% translate "Zakat & Sadaqa bank details" %}</h2>
-          {% if contact.bank_account_title or contact.bank_iban %}
-            {% if contact.bank_account_title %}<p>{{ contact.bank_account_title }}</p>{% endif %}
-            {% if contact.bank_name %}<p>{{ contact.bank_name }}</p>{% endif %}
-            {% if contact.bank_iban %}<p>{% translate "IBAN" %}: {{ contact.bank_iban }}</p>{% endif %}
-            {% if contact.bank_account_number %}<p>{% translate "Account" %}: {{ contact.bank_account_number }}</p>{% endif %}
-            {% if contact.bank_branch %}<p>{{ contact.bank_branch }}</p>{% endif %}
-          {% else %}
-            <p class="text-faint">{% translate "Bank details coming soon." %}</p>
-          {% endif %}
-        </article>
-      </div>
+      <article class="card">
+        <h2 class="card__title">{% translate "Zakat & Sadaqa bank details" %}</h2>
+        {% if contact.bank_account_title or contact.bank_iban %}
+          {% if contact.bank_account_title %}<p>{{ contact.bank_account_title }}</p>{% endif %}
+          {% if contact.bank_name %}<p>{{ contact.bank_name }}</p>{% endif %}
+          {% if contact.bank_iban %}<p>{% translate "IBAN" %}: {{ contact.bank_iban }}</p>{% endif %}
+          {% if contact.bank_account_number %}<p>{% translate "Account" %}: {{ contact.bank_account_number }}</p>{% endif %}
+          {% if contact.bank_branch %}<p>{{ contact.bank_branch }}</p>{% endif %}
+        {% else %}
+          <p class="text-faint">{% translate "Bank details coming soon." %}</p>
+        {% endif %}
+      </article>
     </div>
   </section>
 
@@ -74,7 +72,7 @@ link, mirroring the hero/donate-band guard.
         {{ page.in_kind_giving|richtext }}
         {% if contact.phone or contact.email %}
           <p>
-            {% if contact.phone %}<a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>{% endif %}
+            {% if contact.phone %}<a href="tel:{{ contact.phone|cut:' ' }}">{{ contact.phone }}</a>{% endif %}
             {% if contact.phone and contact.email %} · {% endif %}
             {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% endif %}
           </p>

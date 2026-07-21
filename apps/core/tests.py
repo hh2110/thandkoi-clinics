@@ -541,7 +541,9 @@ def test_donate_page_in_kind_giving_links_to_contact_channels(client, home_page)
 
     content = client.get("/en/donate/").content.decode()
     assert "Medicine, equipment, and volunteering." in content
-    assert 'href="tel:+92 344 4111235"' in content
+    # tel: strips spaces (a well-formed URI); the visible text keeps them.
+    assert 'href="tel:+923444111235"' in content
+    assert "+92 344 4111235" in content
     assert 'href="mailto:info.thandkoiclinics@example.org"' in content
 
 
