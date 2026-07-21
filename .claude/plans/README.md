@@ -41,7 +41,7 @@ plan from 03.5 onward carries three lifecycle sections:
 | 06 | [Newsletters, Camp Reports & Gallery](06-newsletters-camps-gallery.md) — archive content types, consent-gated photo gallery | 🚧 In progress |
 | 07 | [Accounts & roles](07-accounts-roles.md) — uploaders/approvers | 🚧 In progress |
 | 08 | [Data pipeline](08-data-pipeline.md) — intake, parser registry, aggregate-and-discard, daily report page | 🚧 In progress |
-| 09 | [AI monthly newsletter](09-ai-monthly-newsletter.md) — Anthropic SDK, deterministic-numbers guardrail, draft → review | 📝 Drafted |
+| 09 | [AI monthly newsletter](09-ai-monthly-newsletter.md) — Anthropic SDK, deterministic-numbers guardrail, draft → review | 🚧 In progress |
 
 **Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ✅ Done
 

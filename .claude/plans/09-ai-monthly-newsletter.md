@@ -1,6 +1,6 @@
 # Plan 09 — AI Monthly Newsletter
 
-_Status: Drafted · Depends on: 06 Newsletters, Camp Reports & Gallery; 07 Accounts & roles; 08 Data pipeline · Next: (none — roadmap ends at 09; see README's "Out of scope")_
+_Status: In progress (code merged — PR #41; release phases pending, see "Release plan") · Depends on: 06 Newsletters, Camp Reports & Gallery; 07 Accounts & roles; 08 Data pipeline · Next: (none — roadmap ends at 09; see README's "Out of scope")_
 
 ## Goal
 
