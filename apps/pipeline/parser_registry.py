@@ -263,8 +263,3 @@ class ParserRegistry:
     def sniff_all(cls, workbook) -> list[str]:
         """``format_key``s whose parser's ``sniff()`` matches — a hint, not a choice."""
         return [key for key, parser in cls._parsers.items() if parser.sniff(workbook)]
-
-    @classmethod
-    def _reset_for_tests(cls) -> None:
-        """Test-only: clear registrations so a test can register a fake parser."""
-        cls._parsers.clear()

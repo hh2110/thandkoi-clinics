@@ -15,6 +15,7 @@ date's rows and aggregate atomically. Detected via ``IngestRun.content_hash``
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import date
 from typing import BinaryIO
 
@@ -92,6 +93,7 @@ def recompute_daily_aggregate(
     return aggregate
 
 
+@dataclass(frozen=True)
 class DateIngestResult:
     """Outcome for one clinic-date within a (possibly multi-date) upload.
 
@@ -99,37 +101,17 @@ class DateIngestResult:
     is built from this, never from the parsed rows themselves.
     """
 
-    __slots__ = ("clinic_date", "status", "row_count")
-
-    def __init__(self, clinic_date: date, status: str, row_count: int):
-        self.clinic_date = clinic_date
-        self.status = status
-        self.row_count = row_count
-
-    def __eq__(self, other):
-        if not isinstance(other, DateIngestResult):
-            return NotImplemented
-        return (self.clinic_date, self.status, self.row_count) == (
-            other.clinic_date,
-            other.status,
-            other.row_count,
-        )
-
-    def __repr__(self):
-        return (
-            f"DateIngestResult(clinic_date={self.clinic_date!r}, "
-            f"status={self.status!r}, row_count={self.row_count!r})"
-        )
+    clinic_date: date
+    status: str
+    row_count: int
 
 
+@dataclass(frozen=True)
 class IngestSummary:
     """The only thing the upload view renders — per-date counts, never rows."""
 
-    __slots__ = ("parser_key", "results")
-
-    def __init__(self, parser_key: str, results: list[DateIngestResult]):
-        self.parser_key = parser_key
-        self.results = results
+    parser_key: str
+    results: list[DateIngestResult] = field(default_factory=list)
 
     @property
     def total_rows(self) -> int:

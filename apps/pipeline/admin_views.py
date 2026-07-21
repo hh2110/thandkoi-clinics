@@ -13,8 +13,12 @@ spool it to disk (see ``django.core.files.uploadhandler`` — the memory
 handler's ``receive_data_chunk`` returns the raw chunk unconsumed and
 ``file_complete`` returns ``None`` when it never activated). That is a
 *stronger* guarantee than the usual "delete the temp file afterwards"
-pattern: an oversized export cannot touch disk even transiently. This view
-treats a missing file in a validated form as "too large", not a 500.
+pattern: an oversized export cannot touch disk even transiently. An
+oversized upload surfaces to the admin as the form's ordinary "this field
+is required" validation error (Django never populated ``request.FILES`` for
+it) rather than a 500 — still a friendly failure, just not a distinct
+message, since the view has no way to distinguish "too large" from "nothing
+selected" once the memory handler has already declined the file.
 
 The response is built entirely from ``apps.pipeline.ingest.IngestSummary`` —
 per-date counts only. No parsed row ever reaches this view, so there is
@@ -22,6 +26,8 @@ nothing here that *could* leak into the rendered response.
 """
 
 from __future__ import annotations
+
+from zipfile import BadZipFile
 
 from django.contrib.auth.decorators import permission_required
 from django.core.files.uploadhandler import MemoryFileUploadHandler
@@ -78,7 +84,10 @@ def upload_export(request):
                 summary = ingest_export(
                     uploaded, parser_key=format_key, uploaded_by=request.user
                 )
-            except InvalidFileException:
+            except (InvalidFileException, BadZipFile):
+                # BadZipFile: a non-.xlsx file (e.g. a PDF renamed or a plain
+                # .xls) isn't a zip archive at all, so openpyxl never gets far
+                # enough to raise its own InvalidFileException.
                 error = (
                     "That file doesn't look like a valid .xlsx export. "
                     "Nothing was saved."

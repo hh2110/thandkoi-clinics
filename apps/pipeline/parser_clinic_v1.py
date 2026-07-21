@@ -21,10 +21,14 @@ require a new parser.
 
 Expected columns (case-insensitive, any order):
 
-* ``patient_name``, ``father_name``, ``mrn``, ``phone``, ``address``,
-  ``dob`` — direct identifiers. Read only to compute ``age_band`` (from
-  ``dob``) and are otherwise dropped. Never attached to a
-  :class:`~apps.pipeline.parser_registry.ParsedVisitRow`.
+* ``patient_name``, ``father_name``, ``mrn``, ``phone``, ``address`` — direct
+  identifiers. Never looked up, read, or attached to a
+  :class:`~apps.pipeline.parser_registry.ParsedVisitRow` — this parser has no
+  code path that even locates their column position.
+* ``dob`` — a direct identifier, but read (as a local inside ``parse()``) to
+  compute ``age_band`` via
+  :func:`~apps.pipeline.parser_registry.age_band_for`; the date of birth
+  itself is discarded once that computation is done.
 * ``visit_date`` — the clinic-date this row belongs to (required).
 * ``department`` — free text, kept as-is (not a direct identifier).
 * ``gender`` — mapped via
