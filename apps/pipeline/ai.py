@@ -21,6 +21,7 @@ raise).
 
 from __future__ import annotations
 
+import datetime
 import json
 from typing import Any, Protocol
 
@@ -185,6 +186,220 @@ def draft_daily_summary_sentence(
         return None
 
     if not text or len(text) > MAX_DAILY_SUMMARY_LENGTH:
+        return None
+    return text
+
+
+# --- Plan 09: the monthly newsletter — one-shot prompt with tooling --------
+#
+# The "one-shot prompt with tooling" shape from architecture-and-ai-brief.md
+# §6.2: rather than one pre-flattened context blob, the model is given a
+# short brief and calls small, read-only tools (apps.pipeline.newsletter_tools)
+# to pull the specific figures and comparisons it needs. Unlike the daily
+# summary sentence above, this is full free-form narrative drafting, so it
+# gets CLAUDE.md invariant #4's *general* rule, not Plan 08's exception: this
+# call never auto-publishes anything (see apps.pipeline.newsletter_drafting),
+# and on failure the correct behaviour is "no draft created", never a
+# fallback. See ".claude/plans/09-ai-monthly-newsletter.md" for the full
+# decision record.
+
+MONTHLY_NEWSLETTER_MODEL = "claude-opus-4-8"
+
+# A one-shot-with-tooling call can loop through several tool round-trips
+# before the model is ready to answer; this bounds it so a model that never
+# stops calling tools can't spin the request forever. Generous enough for the
+# three tools this call ever offers (get_month_stats, get_trend_vs_last_month,
+# get_previous_newsletter) to all be called at least once with room to spare.
+MAX_NEWSLETTER_TOOL_TURNS = 6
+
+# A sane upper bound on the drafted issue's length — anything longer (or
+# empty) fails the sanity check and the run produces no draft at all (Plan
+# 09's failure handling — the opposite of Plan 08's daily page, which must
+# ship regardless).
+MAX_MONTHLY_NEWSLETTER_LENGTH = 6000
+
+_MONTHLY_NEWSLETTER_SYSTEM_PROMPT = (
+    "You are drafting one issue of a not-for-profit clinic's monthly "
+    "newsletter for its public website. You do not have this month's figures "
+    "memorised — call get_month_stats and get_trend_vs_last_month to retrieve "
+    "them, and call get_previous_newsletter to match the previous issue's "
+    "voice. Every number in your final newsletter text must come from a tool "
+    "result you were just given; never invent, estimate, or recall a "
+    "statistic. Write warm, factual prose suitable for donors and the local "
+    "community, weaving in the admin's notes and any photo captions you are "
+    "given. You are working from de-identified aggregate counts and "
+    "admin-supplied notes only — never ask about or refer to an individual "
+    "patient. When you are ready, respond with the final newsletter body text "
+    "in plain prose and stop calling tools."
+)
+
+MONTHLY_NEWSLETTER_TOOLS: list[dict[str, object]] = [
+    {
+        "name": "get_month_stats",
+        "description": (
+            "Get this calendar month's aggregate clinic statistics — total "
+            "visits, patient breakdowns, and category counts, computed from "
+            "de-identified daily aggregates."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "month": {
+                    "type": "string",
+                    "description": "Calendar month as YYYY-MM.",
+                }
+            },
+            "required": ["month"],
+        },
+    },
+    {
+        "name": "get_trend_vs_last_month",
+        "description": (
+            "Compare this calendar month's aggregate statistics against the "
+            "month before it, including the change in total visits, new "
+            "patients, and Zakat-beneficiary patients."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "month": {
+                    "type": "string",
+                    "description": "Calendar month as YYYY-MM.",
+                }
+            },
+            "required": ["month"],
+        },
+    },
+    {
+        "name": "get_previous_newsletter",
+        "description": (
+            "Get the most recently published newsletter issue's title and "
+            "summary, for voice and style consistency. Returns null if there "
+            "is no previously published issue."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+]
+
+
+def _parse_tool_month(tool_input: dict[str, Any]) -> datetime.date:
+    return datetime.datetime.strptime(tool_input["month"], "%Y-%m").date()
+
+
+def _execute_newsletter_tool(name: str, tool_input: dict[str, Any]) -> Any:
+    """Dispatch one model-requested tool call to its read-only implementation.
+
+    Every branch here reads only ``DailyAggregate`` or published
+    ``NewsletterPage`` rows (via ``apps.pipeline.newsletter_tools``) — never
+    ``DeidentifiedVisit``, per the de-identification boundary this plan is
+    built to respect.
+    """
+    from apps.pipeline import newsletter_tools
+
+    if name == "get_month_stats":
+        return newsletter_tools.get_month_stats(_parse_tool_month(tool_input))
+    if name == "get_trend_vs_last_month":
+        return newsletter_tools.get_trend_vs_last_month(_parse_tool_month(tool_input))
+    if name == "get_previous_newsletter":
+        return newsletter_tools.get_previous_newsletter()
+    raise ValueError(f"Unknown tool requested by the model: {name!r}")
+
+
+def build_monthly_newsletter_user_message(
+    month: datetime.date, notes_text: str, photo_captions: list[str]
+) -> str:
+    """The one user message this call ever sends — the brief, not the figures.
+
+    Figures are deliberately absent here: the model must call
+    ``get_month_stats``/``get_trend_vs_last_month`` to get them, rather than
+    receiving a pre-flattened blob (the "one-shot prompt with tooling" shape,
+    brief §6.2).
+    """
+    lines = [
+        f"Draft the newsletter issue for {month:%B %Y}.",
+        "Call get_month_stats and get_trend_vs_last_month for this month's "
+        "figures, and get_previous_newsletter to match the previous issue's "
+        "voice, before you write the final text.",
+    ]
+    if notes_text.strip():
+        lines.append("The admin's notes for this month:\n" + notes_text.strip())
+    captions = [caption for caption in photo_captions if caption.strip()]
+    if captions:
+        lines.append(
+            "Photos already selected for this issue (weave them naturally "
+            "into the narrative where relevant; you do not need to describe "
+            "them in detail):\n" + "\n".join(f"- {caption}" for caption in captions)
+        )
+    return "\n\n".join(lines)
+
+
+def draft_monthly_newsletter_body(
+    month: datetime.date,
+    *,
+    notes_text: str = "",
+    photo_captions: list[str] | None = None,
+    client: _AnthropicLike | None = None,
+) -> str | None:
+    """Run the one-shot-prompt-with-tooling call; return prose, or ``None``.
+
+    Returns ``None`` — never raises — on any failure: client construction,
+    the API call itself, exceeding :data:`MAX_NEWSLETTER_TOOL_TURNS` without a
+    final answer, or a response that fails the basic sanity check (empty, or
+    over :data:`MAX_MONTHLY_NEWSLETTER_LENGTH`). Unlike
+    :func:`draft_daily_summary_sentence`, the caller
+    (``apps.pipeline.newsletter_drafting.draft_monthly_newsletter``) does NOT
+    fall back to publishing anything on ``None`` — it records a failed audit
+    run and creates no draft at all (Plan 09's failure handling is the
+    opposite of Plan 08's daily page). The broad ``except Exception`` here is
+    deliberate for the same reason as the daily summary sentence: any failure
+    mode of an external API call must degrade to "no draft", never raise.
+    """
+    try:
+        active_client = client or get_anthropic_client()
+        messages: list[dict[str, Any]] = [
+            {
+                "role": "user",
+                "content": build_monthly_newsletter_user_message(
+                    month, notes_text, photo_captions or []
+                ),
+            }
+        ]
+
+        text = ""
+        for _ in range(MAX_NEWSLETTER_TOOL_TURNS):
+            response = active_client.messages.create(
+                model=MONTHLY_NEWSLETTER_MODEL,
+                max_tokens=4096,
+                system=_MONTHLY_NEWSLETTER_SYSTEM_PROMPT,
+                tools=MONTHLY_NEWSLETTER_TOOLS,
+                messages=messages,
+            )
+            if response.stop_reason != "tool_use":
+                text = "".join(
+                    block.text for block in response.content if block.type == "text"
+                ).strip()
+                break
+
+            messages.append({"role": "assistant", "content": response.content})
+            tool_results = [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": json.dumps(
+                        _execute_newsletter_tool(block.name, block.input),
+                        sort_keys=True,
+                    ),
+                }
+                for block in response.content
+                if block.type == "tool_use"
+            ]
+            messages.append({"role": "user", "content": tool_results})
+        else:
+            return None  # exceeded MAX_NEWSLETTER_TOOL_TURNS without an answer
+    except Exception:  # noqa: BLE001 - any failure means "no draft", never raise
+        return None
+
+    if not text or len(text) > MAX_MONTHLY_NEWSLETTER_LENGTH:
         return None
     return text
 

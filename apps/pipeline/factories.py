@@ -17,6 +17,7 @@ from apps.pipeline.models import (
     DailyReportPage,
     DeidentifiedVisit,
     IngestRun,
+    NewsletterDraftRun,
     ReportIndexPage,
 )
 
@@ -105,3 +106,11 @@ class DailyReportPageFactory(_TreePageFactory):
         DailyAggregateFactory,
         clinic_date=factory.SelfAttribute("..report_date"),
     )
+
+
+class NewsletterDraftRunFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = NewsletterDraftRun
+
+    month = factory.LazyFunction(lambda: datetime.date.today().replace(day=1))
+    status = NewsletterDraftRun.STATUS_SUCCEEDED
