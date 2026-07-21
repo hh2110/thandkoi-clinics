@@ -1,0 +1,42 @@
+{% extends "wagtailadmin/base.html" %}
+{% load wagtailadmin_tags i18n %}
+{% comment %}
+The export-upload admin screen (Plan 08) — gated on can_upload_export
+(apps.pipeline.admin_views.upload_export).
+
+HTMX scope note: the view already speaks HTMX (it checks the `HX-Request`
+header and returns just the result fragment — see
+apps.pipeline.admin_views._template_for), but vendoring htmx.js itself is
+left as a follow-up rather than done here — this project has no htmx asset
+in `static/` yet, and it's not worth introducing sight-unseen in this
+PHI-handling PR. The form below is a plain multipart POST, fully functional
+without JS (full page reload per submit); adding `hx-post`/`hx-target`
+attributes + the htmx.js include is a small, isolated follow-up once the
+asset is vendored.
+{% endcomment %}
+
+{% block titletag %}{% translate "Upload clinic export" %}{% endblock %}
+
+{% block content %}
+  {% include "wagtailadmin/shared/header.html" with title=_("Upload clinic export") icon="upload" %}
+
+  <div class="nice-padding">
+    <p>
+      {% translate "Upload the clinic's daily Excel export. It is aggregated and de-identified in memory and the raw file is never saved — only de-identified counts are stored." %}
+    </p>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <ul class="fields">
+        {% for field in form %}
+          <li>{% formattedfield field %}</li>
+        {% endfor %}
+      </ul>
+      <button type="submit" class="button">{% translate "Upload" %}</button>
+    </form>
+
+    <div id="upload-result">
+      {% include "pipeline/admin/upload_result.html" %}
+    </div>
+  </div>
+{% endblock %}

@@ -87,19 +87,25 @@ class HomePage(Page):
         "core.NewsletterIndexPage",
         "core.CampReportIndexPage",
         "core.GalleryPage",
+        "pipeline.ReportIndexPage",
     ]
 
     def get_latest_report(self):
-        """The most recent published daily report, or ``None``.
+        """The most recently published daily report under this Home page.
 
-        Plan 08 introduces the pipeline-fed report content type; until then
-        there is nothing to query, so this returns ``None`` and the Home
-        template hides the teaser (degrades gracefully rather than showing an
-        empty box). When Plan 08 lands it wires the real "latest published"
-        query here — no change to the Home template is needed for the teaser
-        to start rendering.
+        Mirrors ``get_latest_newsletter``'s same descendant-scoped, degrade-
+        to-``None`` pattern. Plan 08 wires the real content type here — no
+        change to the Home template was needed for the teaser to start
+        rendering once this returns a real page.
         """
-        return None
+        from apps.pipeline.models import DailyReportPage
+
+        return (
+            DailyReportPage.objects.live()
+            .descendant_of(self)
+            .order_by("-report_date", "-pk")
+            .first()
+        )
 
     def get_latest_newsletter(self):
         """The most recently published newsletter issue under this Home page.
@@ -483,12 +489,13 @@ class SocialLink(Orderable):
 # --- Plan 06: shared helpers -------------------------------------------------
 
 
-def _paginate(request, queryset, per_page=12):
+def paginate_archive(request, queryset, per_page=12):
     """Paginate an archive queryset for an index page's ``get_context``.
 
     Shared by ``NewsletterIndexPage``/``CampReportIndexPage``/``GalleryPage``
-    so the page size and query-param name live in one place, not copy-pasted
-    per archive.
+    (and Plan 08's ``ReportIndexPage``) so the page size and query-param name
+    live in one place, not copy-pasted per archive. Public (not ``_``-prefixed)
+    so other apps' index pages can reuse it rather than reinventing it.
     """
     paginator = Paginator(queryset, per_page)
     return paginator.get_page(request.GET.get("page"))
@@ -544,7 +551,7 @@ class NewsletterIndexPage(Page):
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
-        context["newsletters"] = _paginate(request, self.get_newsletters())
+        context["newsletters"] = paginate_archive(request, self.get_newsletters())
         return context
 
     class Meta:
@@ -630,7 +637,7 @@ class CampReportIndexPage(Page):
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
-        context["camp_reports"] = _paginate(request, self.get_camp_reports())
+        context["camp_reports"] = paginate_archive(request, self.get_camp_reports())
         return context
 
     class Meta:
@@ -759,7 +766,7 @@ class GalleryPage(Page):
         images = self.images.select_related("image").filter(
             image__isnull=False, consent_confirmed=True
         )
-        page_obj = _paginate(request, images, per_page=24)
+        page_obj = paginate_archive(request, images, per_page=24)
         context["gallery_page_obj"] = page_obj
         context["gallery_items"] = [
             _photo_item(

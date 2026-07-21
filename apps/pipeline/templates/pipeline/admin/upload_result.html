@@ -1,0 +1,34 @@
+{% load i18n %}
+{% comment %}
+The upload result fragment — rendered both inline (full-page GET) and as the
+whole HTMX response body (POST). Built entirely from IngestSummary: per-date
+status + row **counts** only. There is no code path that could put a parsed
+row here — see apps.pipeline.admin_views' docstring.
+{% endcomment %}
+{% if error %}
+  <div class="help-block help-critical">{{ error }}</div>
+{% endif %}
+
+{% if warning %}
+  <div class="help-block help-warning">{{ warning }}</div>
+{% endif %}
+
+{% if summary %}
+  <div class="help-block help-info">
+    <p>{% translate "Upload processed." %}</p>
+    <ul>
+      {% for result in summary.results %}
+        <li>
+          {{ result.clinic_date }} —
+          {% if result.status == "created" %}
+            {% blocktranslate count total=result.row_count %}{{ total }} visit recorded{% plural %}{{ total }} visits recorded{% endblocktranslate %}
+          {% elif result.status == "replaced" %}
+            {% blocktranslate count total=result.row_count %}replaced with {{ total }} visit{% plural %}replaced with {{ total }} visits{% endblocktranslate %}
+          {% else %}
+            {% translate "duplicate upload — no changes made" %}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
