@@ -136,6 +136,30 @@ def test_inner_page_title_has_site_suffix(client, home_page):
     assert title == "About — The Thandkoi Clinics"
 
 
+def test_home_social_meta_names_the_clinic_once(client, home_page):
+    """OpenGraph/Twitter tags exist and og:title is the site name once.
+
+    Social scrapers (WhatsApp etc.) use these explicit tags, so the doubled
+    "The Thandkoi Clinics — The Thandkoi Clinics" must not appear: the brand
+    lives in og:site_name, and og:title is the page title alone.
+    """
+    content = client.get("/en/", follow=True).content.decode()
+    assert '<meta property="og:title" content="The Thandkoi Clinics" />' in content
+    assert '<meta property="og:site_name" content="The Thandkoi Clinics" />' in content
+    assert "— The Thandkoi Clinics" not in re.search(
+        r'og:title" content="([^"]*)"', content
+    ).group(1)
+    assert 'property="og:description"' in content
+    assert 'property="og:image"' in content
+
+
+def test_inner_page_og_title_is_page_name(client, home_page):
+    """A non-home page's og:title is just its own name (brand via site_name)."""
+    AboutPageFactory(parent=home_page, title="About", slug="about")
+    content = client.get("/en/about/").content.decode()
+    assert '<meta property="og:title" content="About" />' in content
+
+
 # --- Plan 03: error pages ----------------------------------------------------
 
 

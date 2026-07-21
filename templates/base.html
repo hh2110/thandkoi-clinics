@@ -30,6 +30,27 @@
     titles don't read "The Thandkoi Clinics — The Thandkoi Clinics".
     {% endcomment %}
     <title>{% block title %}{% firstof page.seo_title page.title %}{% endblock %}{% block title_suffix %}{% firstof page.seo_title page.title as page_title %}{% if page_title != "The Thandkoi Clinics" %} — The Thandkoi Clinics{% endif %}{% endblock %}</title>
+    {% comment %}
+    Social preview (OpenGraph + Twitter). Explicit tags so platforms use these
+    instead of scraping the page — og:title is the page title alone, with the
+    brand carried by og:site_name, so the home page preview reads "The Thandkoi
+    Clinics" once rather than twice.
+    {% endcomment %}
+    {% firstof page.seo_title page.title "The Thandkoi Clinics" as meta_title %}
+    {% firstof page.search_description "A not-for-profit, family-run primary care clinic in Thandkoi, Swabi — accessible healthcare funded on a Zakat & Sadaqa model." as meta_description %}
+    <meta name="description" content="{{ meta_description }}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="The Thandkoi Clinics" />
+    <meta property="og:title" content="{{ meta_title }}" />
+    <meta property="og:description" content="{{ meta_description }}" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="{{ meta_title }}" />
+    <meta name="twitter:description" content="{{ meta_description }}" />
+    {% if request %}
+    <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}" />
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'favicons/favicon-512.png' %}" />
+    <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'favicons/favicon-512.png' %}" />
+    {% endif %}
     <link rel="icon" href="{% static 'favicons/favicon.svg' %}" type="image/svg+xml" />
     <link rel="icon" href="{% static 'favicons/favicon-32.png' %}" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="{% static 'favicons/favicon-180.png' %}" />
