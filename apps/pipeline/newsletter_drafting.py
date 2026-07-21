@@ -21,6 +21,7 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass
 
+from django.db import transaction
 from django.utils.html import escape
 
 from apps.core.models import HomePage, NewsletterIndexPage, NewsletterPage
@@ -155,21 +156,24 @@ def draft_monthly_newsletter(
             triggered_by=triggered_by,
         )
 
-    index = _get_or_create_newsletter_index()
-    page = NewsletterPage(
-        title=f"Newsletter — {month:%B %Y}",
-        slug=f"newsletter-{month:%Y-%m}",
-        issue_date=month,
-        summary="",
-        body=_build_newsletter_body(body_text, photos),
-        live=False,
-    )
-    index.add_child(instance=page)
-    page.save_revision()
+    # Atomic so a failure between creating the page and recording the audit
+    # row can never leave an orphaned, un-audited NewsletterPage draft behind.
+    with transaction.atomic():
+        index = _get_or_create_newsletter_index()
+        page = NewsletterPage(
+            title=f"Newsletter — {month:%B %Y}",
+            slug=f"newsletter-{month:%Y-%m}",
+            issue_date=month,
+            summary="",
+            body=_build_newsletter_body(body_text, photos),
+            live=False,
+        )
+        index.add_child(instance=page)
+        page.save_revision()
 
-    return NewsletterDraftRun.objects.create(
-        month=month,
-        status=NewsletterDraftRun.STATUS_SUCCEEDED,
-        newsletter_page=page,
-        triggered_by=triggered_by,
-    )
+        return NewsletterDraftRun.objects.create(
+            month=month,
+            status=NewsletterDraftRun.STATUS_SUCCEEDED,
+            newsletter_page=page,
+            triggered_by=triggered_by,
+        )

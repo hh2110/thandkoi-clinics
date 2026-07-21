@@ -374,11 +374,17 @@ def draft_monthly_newsletter_body(
                 tools=MONTHLY_NEWSLETTER_TOOLS,
                 messages=messages,
             )
-            if response.stop_reason != "tool_use":
+            if response.stop_reason == "end_turn":
                 text = "".join(
                     block.text for block in response.content if block.type == "text"
                 ).strip()
                 break
+            if response.stop_reason != "tool_use":
+                # max_tokens (truncated mid-sentence), refusal, stop_sequence,
+                # pause_turn, etc. — none of these is a clean completion, so
+                # none may become the drafted text; degrade to "no draft"
+                # rather than risk publishing a truncated or refused response.
+                return None
 
             messages.append({"role": "assistant", "content": response.content})
             tool_results = [

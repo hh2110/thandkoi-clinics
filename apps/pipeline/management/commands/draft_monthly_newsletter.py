@@ -162,9 +162,17 @@ class Command(BaseCommand):
         return inputs
 
     def _uploaded_photo_inputs(self, photo_specs) -> list[NewsletterPhotoInput]:
+        specs = [spec.partition(":") for spec in photo_specs]
+
+        # Check every path is readable *before* creating any Image rows — a
+        # later spec failing after an earlier one already succeeded would
+        # otherwise leave an orphaned, unused Image behind.
+        for path, _, _caption in specs:
+            if not os.path.isfile(path):
+                raise CommandError(f"--photo file not found: {path!r}")
+
         inputs = []
-        for spec in photo_specs:
-            path, _, caption = spec.partition(":")
+        for path, _, caption in specs:
             title = os.path.basename(path)
             try:
                 with open(path, "rb") as fh:

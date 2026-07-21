@@ -317,6 +317,21 @@ def test_draft_monthly_newsletter_body_returns_none_when_tool_loop_never_ends(db
     assert len(client.messages.calls) == ai.MAX_NEWSLETTER_TOOL_TURNS
 
 
+def test_draft_monthly_newsletter_body_returns_none_on_a_non_end_turn_stop_reason(db):
+    """A truncated (``max_tokens``) or refused response must never become the
+    drafted text — only a clean ``end_turn`` completion is trusted."""
+
+    class _TruncatedMessages:
+        def create(self, **kwargs):
+            return SimpleNamespace(
+                stop_reason="max_tokens",
+                content=[SimpleNamespace(type="text", text="This month, the clinic")],
+            )
+
+    client = SimpleNamespace(messages=_TruncatedMessages())
+    assert ai.draft_monthly_newsletter_body(JULY, client=client) is None
+
+
 # --- draft_monthly_newsletter: the write path + failure handling -----------
 
 
@@ -540,6 +555,31 @@ def test_management_command_requires_confirm_consent_for_direct_photo_upload(
     assert not NewsletterDraftRun.objects.exists()
 
 
+def test_management_command_uploads_no_photos_if_any_path_is_missing(db, tmp_path):
+    """All --photo paths are validated up front — a later bad path must not
+    leave an orphaned Image row behind from an earlier, valid one."""
+    from wagtail.images.models import Image
+
+    HomePageFactory()
+    good_photo = tmp_path / "good.jpg"
+    good_photo.write_bytes(b"pretend image bytes")
+
+    with pytest.raises(CommandError, match="not found"):
+        call_command(
+            "draft_monthly_newsletter",
+            "--month",
+            "2026-07",
+            "--photo",
+            f"{good_photo}:Good photo",
+            "--photo",
+            f"{tmp_path / 'missing.jpg'}:Missing photo",
+            "--confirm-consent",
+        )
+
+    assert not Image.objects.exists()
+    assert not NewsletterDraftRun.objects.exists()
+
+
 def test_management_command_safely_reports_failure_under_the_real_client_guard(db):
     """With no client override, the command hits the same autouse conftest
     guard as every other AI call in this codebase — it must degrade to "no
@@ -556,3 +596,48 @@ def test_management_command_safely_reports_failure_under_the_real_client_guard(d
 def test_management_command_rejects_an_invalid_month(db):
     with pytest.raises(CommandError, match="YYYY-MM"):
         call_command("draft_monthly_newsletter", "--month", "not-a-month")
+
+
+# --- The audit trail's admin visibility (Plan 09's "failure visibility") ---
+
+
+def test_administrator_can_view_the_newsletter_draft_run_snippet_listing(
+    client, db, django_user_model
+):
+    """The acceptance criterion itself, exercised as a real request: a failed
+    run must be visible to an Administrator somewhere in the admin console —
+    not just grantable in principle via the migration."""
+    from apps.pipeline.factories import NewsletterDraftRunFactory
+
+    run = NewsletterDraftRunFactory(status=NewsletterDraftRun.STATUS_FAILED)
+    administrator = django_user_model.objects.create_user(
+        username="administrator-audit",
+        password="x",  # noqa: S106
+    )
+    administrator.groups.add(Group.objects.get(name="Administrator"))
+    client.force_login(administrator)
+
+    response = client.get("/admin/snippets/pipeline/newsletterdraftrun/")
+
+    assert response.status_code == 200
+    assert run.get_status_display().encode() in response.content
+
+
+def test_non_administrator_cannot_view_the_newsletter_draft_run_snippet_listing(
+    client, db, django_user_model
+):
+    from django.contrib.auth.models import Permission
+
+    other = django_user_model.objects.create_user(
+        username="no-perm-audit", password="x"
+    )  # noqa: S106
+    other.user_permissions.add(
+        Permission.objects.get(
+            content_type__app_label="wagtailadmin", codename="access_admin"
+        )
+    )
+    client.force_login(other)
+
+    response = client.get("/admin/snippets/pipeline/newsletterdraftrun/")
+
+    assert response.status_code == 302
