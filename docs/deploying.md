@@ -14,6 +14,9 @@ There are three, and only three:
 | **CI** | GitHub Actions, per PR | ephemeral Postgres service container | mocked — never real |
 | **production** | Render (Starter compute) | Neon Postgres, single database | real, from live traffic |
 
+**Production URL:** https://thandkoiclinics.com — health check at
+[`/healthz`](https://thandkoiclinics.com/healthz).
+
 There is **no staging environment** — deliberately. See the plan's
 [rationale](../.claude/plans/02-development-lifecycle.md#no-staging-environment--and-why-thats-fine):
 the two jobs a staging deploy would do are handled elsewhere — "is this code

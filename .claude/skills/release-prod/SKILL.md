@@ -112,12 +112,11 @@ dashboard**; the GitHub run only confirms the trigger fired.
 After Render reports the deploy live, confirm the app is up:
 
 ```bash
-curl -sS -o /dev/null -w "%{http_code}\n" https://<production-host>/healthz
+curl -sS -o /dev/null -w "%{http_code}\n" https://thandkoiclinics.com/healthz
 ```
 
-`200` means the new version is serving. If the host/custom domain isn't known,
-ask the user (or read it from the Render service). Migrations run automatically
-as the `preDeployCommand` before traffic swaps — you do not run them manually.
+`200` means the new version is serving. Migrations run automatically as the
+`preDeployCommand` before traffic swaps — you do not run them manually.
 
 ## Rollback
 
