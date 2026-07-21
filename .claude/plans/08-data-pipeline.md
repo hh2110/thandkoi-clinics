@@ -1,6 +1,6 @@
 # Plan 08 — Data Pipeline: Intake, Parser Registry, Aggregate-and-Discard, Daily Report
 
-_Status: Drafted · Depends on: 01 Project foundation, 07 Accounts & roles · Next: 09 AI monthly newsletter_
+_Status: In progress (code merged — PR #39; release Phases 1–3 pending, see "Release plan") · Depends on: 01 Project foundation, 07 Accounts & roles · Next: 09 AI monthly newsletter_
 
 ## Goal
 
