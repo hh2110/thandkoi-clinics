@@ -1,7 +1,7 @@
 """
-Core content models (Plan 04).
+Core content models (Plan 04, extended by Plan 05).
 
-The site's five core pages — Home, About, Team, Our Work, Contact — plus the
+The site's core pages — Home, About, Team, Our Work, Contact, Donate — plus the
 site-wide Contact & Bank Details setting, modelled as editable Wagtail content a
 non-technical admin can maintain in ``/admin/`` without touching code.
 
@@ -72,6 +72,7 @@ class HomePage(Page):
         "core.TeamPage",
         "core.OurWorkPage",
         "core.ContactPage",
+        "core.DonatePage",
     ]
 
     def get_latest_report(self):
@@ -309,6 +310,69 @@ class ContactPage(Page):
 
     class Meta:
         verbose_name = "Contact page"
+
+
+class DonatePage(Page):
+    """Zakat/Sadaqa "Giving with Purpose" message + ways to actually give.
+
+    A placeholder, not a checkout (architecture brief §5 + this assistant's own
+    safety rules never build a live money-movement flow): plain
+    ``RichTextField``s, same reasoning as About/Contact — the copy is
+    predictable, not flexible. Bank details are deliberately **not** fields
+    here; they're pulled live from the shared ``ContactBankSettings`` singleton
+    (Plan 04) so a correction only ever needs one edit, never two. Zakat and
+    Sadaqa get their own section each (maintainer decision, Plan 05) rather than
+    one blended message.
+    """
+
+    intro = RichTextField(
+        blank=True, help_text='"Giving with Purpose" message (PDF p.18).'
+    )
+    zakat_description = RichTextField(
+        blank=True,
+        help_text="Zakat section: specific eligibility/calculation rules (PDF p.18).",
+    )
+    sadaqa_description = RichTextField(
+        blank=True,
+        help_text="Sadaqa section: general voluntary giving (PDF p.18).",
+    )
+    how_to_give = RichTextField(
+        blank=True,
+        help_text="How-to-give steps for the bank transfer below.",
+    )
+    in_kind_giving = RichTextField(
+        blank=True,
+        help_text="In-kind options (medicine, equipment, volunteering) — "
+        "arranged via Contact, not a form.",
+    )
+
+    content_panels = [
+        *Page.content_panels,
+        FieldPanel("intro"),
+        FieldPanel("zakat_description"),
+        FieldPanel("sadaqa_description"),
+        FieldPanel("how_to_give"),
+        FieldPanel("in_kind_giving"),
+    ]
+
+    max_count = 1
+    parent_page_types = ["core.HomePage"]
+    subpage_types: list[str] = []
+
+    def get_context(self, request, *args, **kwargs):
+        """Add the live Contact page URL for the "another way to give" CTA.
+
+        Guarded the same way ``HomePage.get_latest_report`` guards its teaser:
+        if no Contact page exists yet, this is ``None`` and the template omits
+        the CTA entirely rather than linking to a dead "#".
+        """
+        context = super().get_context(request, *args, **kwargs)
+        contact_page = ContactPage.objects.live().first()
+        context["contact_page_url"] = contact_page.url if contact_page else None
+        return context
+
+    class Meta:
+        verbose_name = "Donate page"
 
 
 @register_setting(icon="mail")

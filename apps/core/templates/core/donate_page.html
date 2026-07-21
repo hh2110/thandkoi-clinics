@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Donate page — the Zakat/Sadaqa "Giving with Purpose" message (PDF p.18), plus
+Wagtail's own bank-transfer and in-kind ways to actually give. Distinct Zakat
+and Sadaqa sections (maintainer decision, Plan 05); bank details are never
+re-entered here — they're pulled live from the shared Contact & Bank Details
+setting (Plan 04), so a correction in /admin/ updates this page with no code
+change. No form, no payment widget, no third-party script — this is a
+placeholder page (Plan 05 scope), not a checkout. The closing CTA only renders
+once a real Contact page exists (see DonatePage.get_context) — no dead "#"
+link, mirroring the hero/donate-band guard.
+{% endcomment %}
+
+{% block content %}
+  {% with contact=settings.core.ContactBankSettings %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>{{ page.title }}</h1>
+      {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+    </div>
+  </section>
+
+  {% if page.zakat_description or page.sadaqa_description %}
+    <section class="section section--tinted">
+      <div class="wrapper prose">
+        {% if page.zakat_description %}
+          <div class="section-header">
+            {% include "partials/sections/section_header.html" with heading=_("Zakat") %}
+          </div>
+          {{ page.zakat_description|richtext }}
+        {% endif %}
+        {% if page.sadaqa_description %}
+          <div class="section-header">
+            {% include "partials/sections/section_header.html" with heading=_("Sadaqa") %}
+          </div>
+          {{ page.sadaqa_description|richtext }}
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="section">
+    <div class="wrapper">
+      <div class="section-header">
+        {% include "partials/sections/section_header.html" with eyebrow=_("How to give") heading=_("Bank transfer") %}
+      </div>
+      {% if page.how_to_give %}
+        <div class="prose">{{ page.how_to_give|richtext }}</div>
+      {% endif %}
+      <div class="card-grid card-grid--3">
+        <article class="card">
+          <h2 class="card__title">{% translate "Zakat & Sadaqa bank details" %}</h2>
+          {% if contact.bank_account_title or contact.bank_iban %}
+            {% if contact.bank_account_title %}<p>{{ contact.bank_account_title }}</p>{% endif %}
+            {% if contact.bank_name %}<p>{{ contact.bank_name }}</p>{% endif %}
+            {% if contact.bank_iban %}<p>{% translate "IBAN" %}: {{ contact.bank_iban }}</p>{% endif %}
+            {% if contact.bank_account_number %}<p>{% translate "Account" %}: {{ contact.bank_account_number }}</p>{% endif %}
+            {% if contact.bank_branch %}<p>{{ contact.bank_branch }}</p>{% endif %}
+          {% else %}
+            <p class="text-faint">{% translate "Bank details coming soon." %}</p>
+          {% endif %}
+        </article>
+      </div>
+    </div>
+  </section>
+
+  {% if page.in_kind_giving %}
+    <section class="section section--tinted">
+      <div class="wrapper prose">
+        <div class="section-header">
+          {% include "partials/sections/section_header.html" with eyebrow=_("Not everyone gives in cash") heading=_("In-kind giving") %}
+        </div>
+        {{ page.in_kind_giving|richtext }}
+        {% if contact.phone or contact.email %}
+          <p>
+            {% if contact.phone %}<a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>{% endif %}
+            {% if contact.phone and contact.email %} · {% endif %}
+            {% if contact.email %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% endif %}
+          </p>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+
+  {% if contact_page_url %}
+    {% include "partials/sections/cta_band.html" with heading=_("Prefer another way to give?") body=_("Contact us to arrange an in-kind gift, a receipt, or any question about giving.") cta_label=_("Contact us") cta_url=contact_page_url %}
+  {% endif %}
+  {% endwith %}
+{% endblock %}
