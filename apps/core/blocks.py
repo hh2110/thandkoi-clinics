@@ -118,6 +118,9 @@ class DonateCTABlock(blocks.StructBlock):
         template = "blocks/donate_cta_block.html"
 
 
+CONSENT_REQUIRED_MESSAGE = "Confirm consent before publishing this photo."
+
+
 class ConsentedImageBlock(blocks.StructBlock):
     """A photograph that may show an identifiable person, gated on consent.
 
@@ -154,11 +157,7 @@ class ConsentedImageBlock(blocks.StructBlock):
         result = super().clean(value)
         if result.get("image") and not result.get("consent_confirmed"):
             raise StructBlockValidationError(
-                block_errors={
-                    "consent_confirmed": [
-                        "Confirm consent before publishing this photo."
-                    ]
-                }
+                block_errors={"consent_confirmed": [CONSENT_REQUIRED_MESSAGE]}
             )
         return result
 

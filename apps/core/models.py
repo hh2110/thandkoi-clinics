@@ -102,13 +102,21 @@ class HomePage(Page):
         return None
 
     def get_latest_newsletter(self):
-        """The most recently published newsletter issue, or ``None``.
+        """The most recently published newsletter issue under this Home page.
 
         Plan 06's half of the "latest report/newsletter" teaser Plan 04 left
         wired to nothing — mirrors ``get_latest_report``'s same degrade-to-
-        nothing guard, now with a real query on the other side.
+        nothing guard, now with a real query on the other side. Scoped with
+        ``descendant_of(self)`` (matching ``NewsletterIndexPage.get_newsletters``'s
+        own tree scoping) rather than a bare global query, so this always
+        reflects the newsletter published under *this* Home page's tree.
         """
-        return NewsletterPage.objects.live().order_by("-issue_date").first()
+        return (
+            NewsletterPage.objects.live()
+            .descendant_of(self)
+            .order_by("-issue_date", "-pk")
+            .first()
+        )
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
@@ -472,6 +480,35 @@ class SocialLink(Orderable):
         return self.label
 
 
+# --- Plan 06: shared helpers -------------------------------------------------
+
+
+def _paginate(request, queryset, per_page=12):
+    """Paginate an archive queryset for an index page's ``get_context``.
+
+    Shared by ``NewsletterIndexPage``/``CampReportIndexPage``/``GalleryPage``
+    so the page size and query-param name live in one place, not copy-pasted
+    per archive.
+    """
+    paginator = Paginator(queryset, per_page)
+    return paginator.get_page(request.GET.get("page"))
+
+
+def _photo_item(image, alt_text, caption):
+    """Build the ``{image, alt, caption}`` dict ``media_grid.html`` expects.
+
+    Shared by ``CampReportPage.get_context`` (StreamField photo blocks) and
+    ``GalleryPage.get_context`` (``GalleryImage`` children) — both reduce to
+    the same image + alt-fallback + caption shape once resolved to a concrete
+    ``Image`` instance.
+    """
+    return {
+        "image": image.get_rendition("fill-640x640").url,
+        "alt": alt_text or image.title,
+        "caption": caption,
+    }
+
+
 # --- Plan 06: Newsletter archive --------------------------------------------
 
 
@@ -495,13 +532,19 @@ class NewsletterIndexPage(Page):
     subpage_types = ["core.NewsletterPage"]
 
     def get_newsletters(self):
-        """Published issues under this index, newest first."""
-        return NewsletterPage.objects.live().child_of(self).order_by("-issue_date")
+        """Published issues under this index, newest first.
+
+        Orders by ``-pk`` after ``-issue_date`` so two issues sharing a date
+        (editors only pick a date, not a timestamp) still get a deterministic,
+        stable order across the separate paginated queries below.
+        """
+        return (
+            NewsletterPage.objects.live().child_of(self).order_by("-issue_date", "-pk")
+        )
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
-        paginator = Paginator(self.get_newsletters(), 12)
-        context["newsletters"] = paginator.get_page(request.GET.get("page"))
+        context["newsletters"] = _paginate(request, self.get_newsletters())
         return context
 
     class Meta:
@@ -575,13 +618,19 @@ class CampReportIndexPage(Page):
     subpage_types = ["core.CampReportPage"]
 
     def get_camp_reports(self):
-        """Published camp reports under this index, newest first."""
-        return CampReportPage.objects.live().child_of(self).order_by("-camp_date")
+        """Published camp reports under this index, newest first.
+
+        Orders by ``-pk`` after ``-camp_date`` for the same reason as
+        ``NewsletterIndexPage.get_newsletters`` — a stable order when two
+        reports share a date.
+        """
+        return (
+            CampReportPage.objects.live().child_of(self).order_by("-camp_date", "-pk")
+        )
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
-        paginator = Paginator(self.get_camp_reports(), 12)
-        context["camp_reports"] = paginator.get_page(request.GET.get("page"))
+        context["camp_reports"] = _paginate(request, self.get_camp_reports())
         return context
 
     class Meta:
@@ -666,11 +715,9 @@ class CampReportPage(Page):
             },
         ]
         context["camp_photos"] = [
-            {
-                "image": block.value["image"].get_rendition("fill-640x640").url,
-                "alt": block.value["alt_text"] or block.value["image"].title,
-                "caption": block.value["caption"],
-            }
+            _photo_item(
+                block.value["image"], block.value["alt_text"], block.value["caption"]
+            )
             for block in self.photos
             if block.value.get("image") and block.value.get("consent_confirmed")
         ]
@@ -706,14 +753,19 @@ class GalleryPage(Page):
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
+        # select_related("image") avoids one extra query per photo to resolve
+        # its image FK; paginated (like the Newsletter/Camp Report archives)
+        # so a growing gallery doesn't generate every rendition on every view.
+        images = self.images.select_related("image").filter(
+            image__isnull=False, consent_confirmed=True
+        )
+        page_obj = _paginate(request, images, per_page=24)
+        context["gallery_page_obj"] = page_obj
         context["gallery_items"] = [
-            {
-                "image": gallery_image.image.get_rendition("fill-640x640").url,
-                "alt": gallery_image.alt_text or gallery_image.image.title,
-                "caption": gallery_image.caption,
-            }
-            for gallery_image in self.images.all()
-            if gallery_image.image_id and gallery_image.consent_confirmed
+            _photo_item(
+                gallery_image.image, gallery_image.alt_text, gallery_image.caption
+            )
+            for gallery_image in page_obj
         ]
         return context
 
@@ -763,7 +815,7 @@ class GalleryImage(Orderable):
         super().clean()
         if self.image_id and not self.consent_confirmed:
             raise ValidationError(
-                {"consent_confirmed": "Confirm consent before publishing this photo."}
+                {"consent_confirmed": core_blocks.CONSENT_REQUIRED_MESSAGE}
             )
 
     def __str__(self):

@@ -672,6 +672,41 @@ def test_newsletter_body_renders_paragraph_and_consented_photo(client, home_page
     assert 'alt="Camp photo"' in content  # falls back to the image's own title
 
 
+def test_newsletter_never_renders_an_unconsented_photo(client, home_page):
+    """A photo block saved without consent_confirmed never reaches the page.
+
+    ConsentedImageBlock.clean() only fires through Wagtail's admin-form
+    StreamField validation, not through Model.full_clean()/.save() — so a
+    write path outside the admin form (a migration, a management command,
+    Plan 09's planned AI-drafting flow) could in principle persist an
+    unconsented photo. consented_image_block.html's own consent_confirmed
+    check is the real guarantee: this asserts it holds even when the save-time
+    guard was bypassed.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Unconsented photo", file=get_test_image_file())
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="unconsented-issue",
+        body=[
+            (
+                "photo",
+                {
+                    "image": image,
+                    "alt_text": "",
+                    "caption": "should never render",
+                    "consent_confirmed": False,
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/unconsented-issue/").content.decode()
+    assert "should never render" not in content
+    assert "Unconsented photo" not in content
+
+
 def test_camp_report_page_renders_under_its_index(client, home_page):
     """A camp report is independently linkable and shows the derived total."""
     index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
@@ -821,6 +856,33 @@ def test_gallery_image_renders_through_the_media_grid(client, home_page):
     content = client.get("/en/gallery/").content.decode()
     assert "The courtyard" in content
     assert 'alt="Clinic courtyard"' in content
+
+
+def test_gallery_images_query_resolves_image_fk_without_an_extra_query_each(
+    home_page, django_assert_num_queries
+):
+    """GalleryPage's images queryset resolves each image's FK in one query.
+
+    Regression guard for the N+1 select_related("image") fixes: without it,
+    accessing gallery_image.image on each of these 3 rows would cost one
+    extra query per row (3 extra), on top of the 1 query for the rows
+    themselves.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    gallery = GalleryPageFactory(parent=home_page, slug="gallery")
+    for i in range(3):
+        image = Image.objects.create(title=f"Photo {i}", file=get_test_image_file())
+        GalleryImageFactory(page=gallery, image=image, consent_confirmed=True)
+
+    with django_assert_num_queries(1):
+        images = list(
+            gallery.images.select_related("image").filter(
+                image__isnull=False, consent_confirmed=True
+            )
+        )
+        for gallery_image in images:
+            gallery_image.image.title  # noqa: B018 (accessed for its side effect: no query)
 
 
 def test_gallery_image_requires_consent_to_publish(home_page):
