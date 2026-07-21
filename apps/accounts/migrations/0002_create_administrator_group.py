@@ -107,8 +107,12 @@ PAGE_PERMISSIONS = [
 ]
 
 
-def _get_or_create_permission(Permission, ContentType, app_label, model, codename, name):
-    content_type, _ = ContentType.objects.get_or_create(app_label=app_label, model=model)
+def _get_or_create_permission(
+    Permission, ContentType, app_label, model, codename, name
+):
+    content_type, _ = ContentType.objects.get_or_create(
+        app_label=app_label, model=model
+    )
     permission, _ = Permission.objects.get_or_create(
         content_type=content_type, codename=codename, defaults={"name": name}
     )
