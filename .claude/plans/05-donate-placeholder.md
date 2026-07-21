@@ -1,6 +1,6 @@
 # Plan 05 — Donate Placeholder
 
-_Status: Drafted · Depends on: 01 Project foundation, 03 Design system & base templates, 04 Core content pages · Next: 06 Newsletters, Camp Reports & Gallery_
+_Status: In progress · Depends on: 01 Project foundation, 03 Design system & base templates, 04 Core content pages · Next: 06 Newsletters, Camp Reports & Gallery_
 
 ## Goal
 
