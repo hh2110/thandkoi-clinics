@@ -1462,9 +1462,7 @@ def test_recompute_daily_aggregates_command_zeroes_a_date_with_no_remaining_visi
 
     DeidentifiedVisit.objects.filter(visit_date=CLINIC_V1_VISIT_DATE).delete()
 
-    call_command(
-        "recompute_daily_aggregates", date=CLINIC_V1_VISIT_DATE.isoformat()
-    )
+    call_command("recompute_daily_aggregates", date=CLINIC_V1_VISIT_DATE.isoformat())
 
     rebuilt = DailyAggregate.objects.get(clinic_date=CLINIC_V1_VISIT_DATE)
     assert rebuilt.total_visits == 0
