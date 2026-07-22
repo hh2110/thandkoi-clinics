@@ -136,8 +136,9 @@ class CircleOfCareStageBlock(blocks.StructBlock):
         max_length=80, help_text="Full stage name, shown in the hub."
     )
     short = blocks.CharBlock(
-        max_length=40,
-        help_text="On-ring label — keep brief so it fits the wedge.",
+        max_length=28,
+        help_text="On-ring label — keep brief so it fits the wedge (the "
+        "longest example, 'Doctor's Consultation', is 21 characters).",
     )
     desc = blocks.TextBlock(
         help_text="Detail shown in the hub when this stage is selected."
