@@ -18,12 +18,19 @@ from __future__ import annotations
 import datetime
 import io
 import json
+import re
 from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth.models import Group, Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.uploadhandler import (
+    MemoryFileUploadHandler,
+    TemporaryFileUploadHandler,
+)
 from django.core.management import call_command
+from django.http import HttpResponse
+from django.test import Client, RequestFactory
 from django.urls import reverse
 from openpyxl import Workbook
 
@@ -38,6 +45,7 @@ from apps.pipeline.ingest import (
     recompute_daily_aggregate,
 )
 from apps.pipeline.intake import process_upload
+from apps.pipeline.middleware import MemoryOnlyUploadHandlerMiddleware
 from apps.pipeline.models import (
     DailyAggregate,
     DailyReportPage,
@@ -556,6 +564,98 @@ def test_upload_view_never_writes_a_file_to_disk(
     assert response.status_code == 200
     assert list(tmp_path.iterdir()) == []
     assert DailyAggregate.objects.filter(clinic_date=CLINIC_V1_VISIT_DATE).exists()
+
+
+def _extract_csrf_token(html: str) -> str:
+    """Pull the hidden ``csrfmiddlewaretoken`` value out of a rendered form."""
+    match = re.search(r'name="csrfmiddlewaretoken"\s+value="([^"]+)"', html)
+    assert match is not None, "no CSRF token found in the rendered upload form"
+    return match.group(1)
+
+
+def test_upload_view_survives_csrf_enforced_multipart_post(
+    home_page, settings, tmp_path, django_user_model
+):
+    """Regression for the production 500: the real browser path is a
+    CSRF-enforced multipart POST.
+
+    ``CsrfViewMiddleware`` reads ``request.POST`` to validate the token, which
+    parses the multipart body and locks ``request.upload_handlers`` *before*
+    the view runs. When the memory-only handler was set inside the view, that
+    swap raised ``AttributeError: You cannot set the upload handlers after the
+    upload has been processed`` → HTTP 500. Moving the swap into
+    ``MemoryOnlyUploadHandlerMiddleware`` (which runs before CSRF) fixes it.
+
+    The default Django test client sets ``enforce_csrf_checks=False``, so
+    ``CsrfViewMiddleware`` short-circuits without reading ``request.POST`` and
+    the whole failure mode is invisible — which is exactly why CI stayed green.
+    This test opts into CSRF enforcement to exercise the true production path.
+    """
+    settings.MEDIA_ROOT = str(tmp_path)
+    csrf_client = Client(enforce_csrf_checks=True)
+    csrf_client.force_login(_administrator_user(django_user_model))
+
+    # GET the form first — this sets the csrftoken cookie and renders a token
+    # matching it, mirroring a real browser session.
+    form_page = csrf_client.get(reverse("pipeline:upload_export"))
+    assert form_page.status_code == 200
+    token = _extract_csrf_token(form_page.content.decode())
+
+    response = csrf_client.post(
+        reverse("pipeline:upload_export"),
+        data={
+            "csrfmiddlewaretoken": token,
+            "export_file": SimpleUploadedFile(
+                "daily-export.xlsx",
+                _build_clinic_v1_xlsx(),
+                content_type=XLSX_CONTENT_TYPE,
+            ),
+            "format_key": "clinic_daily_export_v1",
+        },
+    )
+
+    # Not a 403 (CSRF genuinely passed) and not a 500 (the handler swap
+    # happened in time) — the upload was ingested.
+    assert response.status_code == 200
+    # And the memory-only handler still held under the real CSRF path: the raw
+    # export never spooled to disk (invariant #1).
+    assert list(tmp_path.iterdir()) == []
+    assert DailyAggregate.objects.filter(clinic_date=CLINIC_V1_VISIT_DATE).exists()
+
+
+def test_middleware_installs_memory_only_handler_for_the_upload_post():
+    """The upload POST is forced onto a single ``MemoryFileUploadHandler`` —
+    no ``TemporaryFileUploadHandler`` that could spool to disk."""
+    captured: dict[str, list] = {}
+
+    def get_response(request):
+        captured["handlers"] = list(request.upload_handlers)
+        return HttpResponse()
+
+    request = RequestFactory().post(reverse("pipeline:upload_export"))
+    MemoryOnlyUploadHandlerMiddleware(get_response)(request)
+
+    assert len(captured["handlers"]) == 1
+    assert isinstance(captured["handlers"][0], MemoryFileUploadHandler)
+
+
+def test_middleware_leaves_other_paths_on_the_default_handler_chain():
+    """A POST elsewhere (e.g. a Wagtail image upload) keeps the default
+    handlers, including the temp handler that spools large files to disk —
+    the memory-only swap is scoped to the export upload alone."""
+    captured: dict[str, list] = {}
+
+    def get_response(request):
+        captured["handlers"] = list(request.upload_handlers)
+        return HttpResponse()
+
+    request = RequestFactory().post("/admin/images/multiple/add/")
+    MemoryOnlyUploadHandlerMiddleware(get_response)(request)
+
+    assert any(
+        isinstance(handler, TemporaryFileUploadHandler)
+        for handler in captured["handlers"]
+    )
 
 
 def test_upload_view_denies_user_without_can_upload_export(

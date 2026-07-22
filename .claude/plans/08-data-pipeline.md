@@ -33,10 +33,23 @@ construction:
 - **The raw bytes never touch disk.** Django's default upload handling spools
   any upload over ~2.5 MB to a **temporary file on disk** (`TemporaryUploadedFile`)
   — which would mean raw PHI transiently written to disk, violating the
-  invariant even if we delete it after. So the upload view runs with an
+  invariant even if we delete it after. So the upload runs with an
   **in-memory-only upload handler** (`MemoryFileUploadHandler` only, no temp-file
-  fallback) — a per-view `request.upload_handlers` override. The file exists only
-  as a byte buffer for the life of the request.
+  fallback). The file exists only as a byte buffer for the life of the request.
+
+  > **Correction (2026-07-22).** This handler override was originally set inside
+  > the upload view (`request.upload_handlers = [...]`), but that is too late:
+  > `CsrfViewMiddleware` reads `request.POST` to validate the CSRF token on a
+  > POST, which parses the multipart body — with the *default* handlers — and
+  > locks `request.upload_handlers` **before the view runs**. In production this
+  > raised `AttributeError: You cannot set the upload handlers after the upload
+  > has been processed` (HTTP 500), and, worse, meant an oversized export was
+  > briefly spooled to disk by the default `TemporaryFileUploadHandler`. The
+  > override now lives in `apps.pipeline.middleware.MemoryOnlyUploadHandlerMiddleware`,
+  > listed **before** `CsrfViewMiddleware`, scoped to the upload path. (The
+  > Django-documented `csrf_exempt`/`csrf_protect` view split can't be used here:
+  > Wagtail's `require_admin_access` wrapper has no `functools.wraps`, so a
+  > `csrf_exempt` marker on the view never reaches the middleware.)
 - **The raw file is never saved to a model / MEDIA / object storage.** There is
   **no** `FileField`/`ImageField` for the export anywhere in the schema. It is
   read straight from the in-memory buffer into pandas; nothing writes it back
@@ -119,7 +132,7 @@ Admin ──.xlsx──▶ upload view (Wagtail admin, can_upload_export)
 |---|---|---|
 | App | A new `apps/pipeline` (Django app) | Keeps ingest/parsers/models/report together, upstream of any `ai` module — mirrors the brief's boundary. |
 | Intake UI | A **custom Wagtail admin view** registered via `register_admin_urls` / a menu item, gated by `can_upload_export` (Plan 07), HTMX for the submit + result | Lives where the admin already logs in; no separate front-end. HTMX per the stack decision (brief §3). |
-| Raw file handling | **In-memory upload handler only** for this view (`request.upload_handlers = [MemoryFileUploadHandler(...)]`); **no** `FileField` for the export anywhere | The structural enforcement of invariant #1 — the raw bytes cannot reach disk or MEDIA because nothing is capable of writing them there. |
+| Raw file handling | **In-memory upload handler only** for this upload, installed by `MemoryOnlyUploadHandlerMiddleware` **before** `CsrfViewMiddleware` (a per-view override is too late — CSRF parses the body first; see the 2026-07-22 correction above); **no** `FileField` for the export anywhere | The structural enforcement of invariant #1 — the raw bytes cannot reach disk or MEDIA because nothing is capable of writing them there. |
 | Parser selection | The uploading admin **picks the format** from a dropdown of registered parsers; each parser also exposes `sniff(workbook) -> bool` used to **confirm/auto-suggest** the choice | Explicit selection avoids silently mis-parsing a look-alike format; `sniff` guards against picking the wrong one. Not AI — a hand-written check of columns/sheet names. |
 | Parser contract | `BaseExportParser` with `sniff()` and `parse(buffer) -> ParsedExport` (de-identified rows + aggregate dict); concrete parsers register into `ParserRegistry` by a format key | One parser per export format; adding a format = adding a subclass + registering it, **no change to pipeline core**. This is goal 3 (extensibility) done with explicit code. |
 | De-identification | Drop **name, father's/husband's name, and full street address** inside the parser before any persistence; derive **age band** from DOB then drop DOB; **keep a coarse `location`** (village / union council), not the exact address; **classify free-text diagnosis into a fixed `diagnosis_category` via a parser-side mapping table**, never store the raw text | **Maintainer decision (PR #15): age bands, and keep location.** Age *band* rather than exact age/DOB, and a *coarse* location rather than a full address, keep the row table de-identified while preserving location for impact reporting. Direct identifiers never written even transiently (brief §4). **Diagnosis confirmed free text in the source clinic software** (maintainer, post-PR-15) — the parser owns a hand-written keyword/lookup mapping (e.g. `{"htn": "hypertension", "high bp": "hypertension", ...}`) into a small fixed category set, with an explicit **`other`/`unclassified`** bucket for anything unmapped. Raw diagnosis text is read only transiently during parsing and is never written to `DeidentifiedVisit` or anywhere else — it's a second application of invariant #1 (not just row-vs-aggregate, but free-text-vs-category within the row itself), and it's what makes `category_counts` aggregation actually work (free text doesn't group cleanly). The mapping table lives in code, reviewed like the rest of the parser — not user-editable at runtime, consistent with "hand-written parser per format, not agentic inference." |
@@ -278,7 +291,8 @@ decision, never invented. Wiring and page patterns reuse merged plans.
    table (with an `other`/`unclassified` fallback), and the deterministic
    aggregate computation.
 5. **Upload view** — Wagtail admin view, `can_upload_export`-gated, **in-memory
-   upload handler override**, HTMX submit; on success writes rows + aggregate +
+   upload handler** (installed by `MemoryOnlyUploadHandlerMiddleware`, before
+   CSRF), HTMX submit; on success writes rows + aggregate +
    `IngestRun` in one transaction and returns a **summary only** (counts), never
    the parsed rows.
 6. **Idempotency / replace** — content-hash check against `IngestRun`; an
