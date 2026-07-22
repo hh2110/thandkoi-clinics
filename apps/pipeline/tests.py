@@ -1038,9 +1038,7 @@ def test_tkc_daily_reupload_via_upload_view_is_a_noop_duplicate(
     assert IngestRun.objects.filter(clinic_date=TKC_VISIT_DATE).first().status == (
         IngestRun.STATUS_DUPLICATE
     )
-    assert (
-        DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE).count() == 3
-    )
+    assert DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE).count() == 3
 
 
 # --- Daily report auto-publish + the AI summary sentence -------------------
