@@ -431,22 +431,32 @@ def _build_clinic_v1_xlsx(rows=None) -> bytes:
     return buffer.getvalue()
 
 
-def _ingest_clinic_v1(rows=None, *, uploaded_by=None):
+def _ingest_clinic_v1(
+    rows=None,
+    *,
+    uploaded_by=None,
+    report_kind=IngestRun.KIND_DAILY,
+    camp_title=None,
+):
     """Parse + persist the clinic_v1 fixture, bypassing ``ParserRegistry``.
 
     ``ClinicDailyExportV1Parser`` is no longer registered (see apps.py), so
     ``ingest_export(..., parser_key="clinic_daily_export_v1", ...)`` would
     raise ``KeyError``. The tests using this helper aren't testing that
     format specifically — they use its rich, already-built fixture as
-    convenient data for generic ingest/aggregate/publish machinery — so this
-    calls the parser directly and hands the parsed rows to
-    ``persist_parsed_export`` (the same thing ``ingest_export`` does
-    internally, minus the registry lookup).
+    convenient data for generic ingest/aggregate/publish machinery (including
+    the camp-upload flow's report_kind separation) — so this calls the parser
+    directly and hands the parsed rows to ``persist_parsed_export`` (the same
+    thing ``ingest_export`` does internally, minus the registry lookup).
     """
     buffer = io.BytesIO(_build_clinic_v1_xlsx(rows=rows))
     parsed = ClinicDailyExportV1Parser().parse(buffer)
     return persist_parsed_export(
-        parsed, parser_key="clinic_daily_export_v1", uploaded_by=uploaded_by
+        parsed,
+        parser_key="clinic_daily_export_v1",
+        uploaded_by=uploaded_by,
+        report_kind=report_kind,
+        camp_title=camp_title,
     )
 
 
@@ -1134,6 +1144,7 @@ def _post_tkc_daily_upload(client, **xls_kwargs):
                 content_type="application/vnd.ms-excel",
             ),
             "format_key": "tkc_daily_activity_v1",
+            "report_kind": "daily",
         },
     )
 
@@ -1227,13 +1238,13 @@ def test_export_upload_form_requires_camp_title_only_for_camp_report_kind():
     """``report_kind`` defaults to daily and needs no title; switching it to
     camp makes ``camp_title`` required (form-level, not just at the view)."""
     daily_form = ExportUploadForm(
-        data={"format_key": "clinic_daily_export_v1", "report_kind": "daily"},
+        data={"format_key": "tkc_daily_activity_v1", "report_kind": "daily"},
     )
     daily_form.fields["export_file"].required = False
     assert daily_form.is_valid()
 
     camp_form_missing_title = ExportUploadForm(
-        data={"format_key": "clinic_daily_export_v1", "report_kind": "camp"},
+        data={"format_key": "tkc_daily_activity_v1", "report_kind": "camp"},
     )
     camp_form_missing_title.fields["export_file"].required = False
     assert not camp_form_missing_title.is_valid()
@@ -1241,7 +1252,7 @@ def test_export_upload_form_requires_camp_title_only_for_camp_report_kind():
 
     camp_form_with_title = ExportUploadForm(
         data={
-            "format_key": "clinic_daily_export_v1",
+            "format_key": "tkc_daily_activity_v1",
             "report_kind": "camp",
             "camp_title": "Free Medical Camp — Union Council X",
         },
@@ -1257,7 +1268,7 @@ def test_export_upload_form_rejects_a_camp_title_over_200_chars():
     a friendly form error."""
     form = ExportUploadForm(
         data={
-            "format_key": "clinic_daily_export_v1",
+            "format_key": "tkc_daily_activity_v1",
             "report_kind": "camp",
             "camp_title": "x" * 201,
         },
@@ -1299,23 +1310,23 @@ def test_upload_view_camp_report_kind_publishes_camp_page_not_daily_page(
         reverse("pipeline:upload_export"),
         data={
             "export_file": SimpleUploadedFile(
-                "daily-export.xlsx",
-                _build_clinic_v1_xlsx(),
-                content_type=XLSX_CONTENT_TYPE,
+                "TKC daily.xls",
+                _build_tkc_daily_xls(),
+                content_type="application/vnd.ms-excel",
             ),
-            "format_key": "clinic_daily_export_v1",
+            "format_key": "tkc_daily_activity_v1",
             "report_kind": "camp",
             "camp_title": "Free Medical Camp — Union Council X",
         },
     )
 
     assert response.status_code == 200
-    assert not DailyReportPage.objects.filter(report_date=CLINIC_V1_VISIT_DATE).exists()
+    assert not DailyReportPage.objects.filter(report_date=TKC_VISIT_DATE).exists()
 
-    camp_page = CampUploadReportPage.objects.get(camp_date=CLINIC_V1_VISIT_DATE)
+    camp_page = CampUploadReportPage.objects.get(camp_date=TKC_VISIT_DATE)
     assert camp_page.live is True
     assert camp_page.title == "Free Medical Camp — Union Council X"
-    assert camp_page.aggregate.total_visits == EXPECTED_TOTAL_VISITS
+    assert camp_page.aggregate.total_visits == 3
     assert camp_page.aggregate.report_kind == IngestRun.KIND_CAMP
     # Lives under the existing Plan 06 Camp Report archive, not a new index.
     assert camp_page.get_parent().specific_class is CampReportIndexPage
@@ -1326,19 +1337,8 @@ def test_camp_and_daily_uploads_on_the_same_date_do_not_merge_aggregates(home_pa
     clinic's own daily activity landing on the *same calendar date* get
     independent ``DailyAggregate``/``DeidentifiedVisit`` rows — neither
     merges into nor supersedes the other."""
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-        report_kind=IngestRun.KIND_DAILY,
-    )
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-        report_kind=IngestRun.KIND_CAMP,
-        camp_title="Free Medical Camp",
-    )
+    _ingest_clinic_v1(report_kind=IngestRun.KIND_DAILY)
+    _ingest_clinic_v1(report_kind=IngestRun.KIND_CAMP, camp_title="Free Medical Camp")
 
     daily_aggregate = DailyAggregate.objects.get(
         clinic_date=CLINIC_V1_VISIT_DATE, report_kind=IngestRun.KIND_DAILY
@@ -1370,12 +1370,7 @@ def test_camp_and_daily_uploads_on_the_same_date_do_not_merge_aggregates(home_pa
 
     # A re-upload of the daily export (a correction) supersedes only the
     # daily rows/aggregate — the camp's are untouched.
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-        report_kind=IngestRun.KIND_DAILY,
-    )
+    _ingest_clinic_v1(report_kind=IngestRun.KIND_DAILY)
     assert (
         DailyAggregate.objects.get(
             clinic_date=CLINIC_V1_VISIT_DATE, report_kind=IngestRun.KIND_CAMP
@@ -1416,19 +1411,8 @@ def test_recompute_daily_aggregates_command_rebuilds_both_kinds_for_a_shared_dat
     """A date carrying both a daily and a camp upload gets *both* aggregates
     rebuilt — recomputing by date alone would silently skip one report_kind
     (see the command's docstring)."""
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-        report_kind=IngestRun.KIND_DAILY,
-    )
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-        report_kind=IngestRun.KIND_CAMP,
-        camp_title="Free Medical Camp",
-    )
+    _ingest_clinic_v1(report_kind=IngestRun.KIND_DAILY)
+    _ingest_clinic_v1(report_kind=IngestRun.KIND_CAMP, camp_title="Free Medical Camp")
 
     DailyAggregate.objects.filter(clinic_date=CLINIC_V1_VISIT_DATE).update(
         total_visits=999
@@ -1453,11 +1437,7 @@ def test_recompute_daily_aggregates_command_zeroes_a_date_with_no_remaining_visi
     DailyAggregate to zero when every DeidentifiedVisit for that date has
     since been deleted (e.g. a data correction) — not silently no-op just
     because the date no longer appears in the visit table."""
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    _ingest_clinic_v1()
     assert DailyAggregate.objects.get(clinic_date=CLINIC_V1_VISIT_DATE).total_visits > 0
 
     DeidentifiedVisit.objects.filter(visit_date=CLINIC_V1_VISIT_DATE).delete()

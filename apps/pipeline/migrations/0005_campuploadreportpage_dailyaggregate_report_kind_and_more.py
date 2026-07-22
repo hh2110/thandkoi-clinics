@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('pipeline', '0003_grant_newsletter_draft_run_view_permission'),
+        ('pipeline', '0004_reportindexpage_intro'),
         ('wagtailcore', '0097_baselogentry_uuid_action_timestamp_indexes'),
     ]
 
