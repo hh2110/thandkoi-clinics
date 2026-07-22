@@ -54,6 +54,16 @@
   --color-donate-text: #ffffff;
   --color-focus-ring: var(--color-teal-bright);
 
+  /* Stat-band figures (`.stat__value`, layout.css) sit on
+     --color-accent-soft-bg, which becomes the deep-teal ground in dark mode
+     (below). --color-brand itself stays the same light-mode teal in dark
+     mode (it's also used against lighter surfaces elsewhere), which drops
+     the figure's contrast against that now-dark background to ~1.9:1 — the
+     "ribbon disappears in dark mode" report. This token gives the figure its
+     own dark-appropriate colour without changing --color-brand everywhere
+     else it's used. */
+  --color-stat-value: var(--color-brand);
+
   /* Footer is always the dark teal ground, in both themes (brand-guidelines
      "Footer / deepest ground"), so it gets its own fixed tokens rather than
      reading the page's light/dark tokens. */
@@ -110,6 +120,7 @@
     --color-donate-bg: var(--color-amber-on-dark);
     --color-donate-text: var(--color-ink);
     --color-accent-soft-bg: var(--color-teal-deep);
+    --color-stat-value: var(--color-pale-aqua);
   }
 }
 
@@ -131,6 +142,7 @@
   --color-donate-bg: var(--color-amber-on-dark);
   --color-donate-text: var(--color-ink);
   --color-accent-soft-bg: var(--color-teal-deep);
+  --color-stat-value: var(--color-pale-aqua);
 }
 
 :root[data-theme="light"] {
@@ -150,4 +162,5 @@
   --color-donate-bg: var(--color-amber-on-light);
   --color-donate-text: #ffffff;
   --color-accent-soft-bg: var(--color-aqua-tint);
+  --color-stat-value: var(--color-brand);
 }

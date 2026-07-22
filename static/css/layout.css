@@ -30,6 +30,15 @@
   background-color: var(--color-accent-soft-bg);
 }
 
+/* Page-scoped rhythm override for a page made up of several short,
+   header-less sections stacked back to back (the daily report page) — cuts
+   the sitewide `--space-8` gap down to `--space-4` (both existing tokens on
+   the `tokens.css` scale, no new value invented) without touching `.section`
+   itself, which longer pages still rely on. */
+.section--snug {
+  padding-block: var(--space-4);
+}
+
 /* The Teal-Deep "dark band" (donate band family) — always the deep teal
    ground in both themes, like the footer, so it reads as one visual family
    rather than "dark mode" logic. Text/links switch to the light-on-dark
@@ -164,12 +173,23 @@
   }
 }
 
-/* --- Impact-stat band ------------------------------------------------------ */
+/* --- Impact-stat band ------------------------------------------------------
+   A flex row rather than a fixed-column grid: `page.headline_stats` (or the
+   CMS-editable ImpactStatsBlock) can hand this any number of stats, and a
+   short row of `1fr` grid tracks left-justifies instead of centering when
+   there are fewer items than columns. `justify-content: center` on a flex row
+   centers the whole row regardless of count, so a 3-stat report and a 4-stat
+   one both land centered without hard-coding either number. */
 .stat-band__grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-4) var(--space-2);
   text-align: center;
+}
+
+.stat-band__grid .stat {
+  flex: 0 1 calc(50% - var(--space-2) / 2);
 }
 
 .stat__value {
@@ -177,7 +197,7 @@
   font-weight: 800;
   font-size: var(--font-size-2xl);
   line-height: 1;
-  color: var(--color-brand);
+  color: var(--color-stat-value);
   font-variant-numeric: tabular-nums;
   margin-block: 0;
 }
@@ -202,8 +222,11 @@
 
 @media (min-width: 56rem) {
   .stat-band__grid {
-    grid-template-columns: repeat(4, 1fr);
     gap: var(--space-4);
+  }
+
+  .stat-band__grid .stat {
+    flex: 0 1 calc(25% - var(--space-4) * 3 / 4);
   }
 }
 

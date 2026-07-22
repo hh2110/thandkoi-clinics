@@ -7,17 +7,23 @@ never copying figures onto the page) — never from `page.summary_sentence`,
 which is rendered separately, below the figures, and is allowed to be blank
 (CLAUDE.md invariant #3: numbers from Python, prose never a source of a
 statistic).
+
+`section--snug` (layout.css) is a page-scoped spacing modifier: every section
+here is a short, header-less block (title, figures, a couple of optional
+detail lists), so the sitewide `.section` rhythm (`--space-8` each side)
+stacks into a lot of dead air between them. Scoped to this page rather than
+shrinking `--space-8` itself, which other, longer pages still rely on.
 {% endcomment %}
 
 {% block content %}
-  <section class="section">
+  <section class="section section--snug">
     <div class="wrapper prose">
       <h1>{{ page.title }}</h1>
       <p class="text-faint">{{ page.report_date }}</p>
     </div>
   </section>
 
-  <section class="section section--tinted stat-band" data-role="figures">
+  <section class="section section--snug section--tinted stat-band" data-role="figures">
     <div class="wrapper">
       <div class="stat-band__grid">
         {% for stat in page.headline_stats %}
@@ -31,30 +37,22 @@ statistic).
   </section>
 
   {% if page.summary_sentence %}
-    <section class="section" data-role="narrative">
+    <section class="section section--snug" data-role="narrative">
       <div class="wrapper prose">
         <p>{{ page.summary_sentence }}</p>
       </div>
     </section>
   {% endif %}
 
-  <section class="section">
+  <section class="section section--snug">
     <div class="wrapper">
-      <div class="card-grid card-grid--3">
+      <div class="card-grid card-grid--2">
         <article class="card">
-          <h3 class="card__title">{% translate "By sex" %}</h3>
+          <h3 class="card__title">{% translate "By gender" %}</h3>
           <ul class="prose">
             <li>{% translate "Male" %}: <strong>{{ aggregate.male_patients }}</strong></li>
             <li>{% translate "Female" %}: <strong>{{ aggregate.female_patients }}</strong></li>
             <li>{% translate "Other / unknown" %}: <strong>{{ aggregate.other_or_unknown_sex_patients }}</strong></li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3 class="card__title">{% translate "New vs. follow-up" %}</h3>
-          <ul class="prose">
-            <li>{% translate "New" %}: <strong>{{ aggregate.new_patients }}</strong></li>
-            <li>{% translate "Follow-up" %}: <strong>{{ aggregate.follow_up_patients }}</strong></li>
-            <li>{% translate "Unrecorded" %}: <strong>{{ aggregate.unknown_patient_type_patients }}</strong></li>
           </ul>
         </article>
         <article class="card">
@@ -69,21 +67,8 @@ statistic).
     </div>
   </section>
 
-  {% if by_department %}
-    <section class="section">
-      <div class="wrapper prose">
-        <h2>{% translate "By department" %}</h2>
-        <ul>
-          {% for label, count in by_department %}
-            <li>{{ label }}: <strong>{{ count }}</strong></li>
-          {% endfor %}
-        </ul>
-      </div>
-    </section>
-  {% endif %}
-
   {% if by_diagnosis_category %}
-    <section class="section">
+    <section class="section section--snug">
       <div class="wrapper prose">
         <h2>{% translate "By diagnosis category" %}</h2>
         <ul>
@@ -96,7 +81,7 @@ statistic).
   {% endif %}
 
   {% if by_age_band %}
-    <section class="section">
+    <section class="section section--snug">
       <div class="wrapper prose">
         <h2>{% translate "By age band" %}</h2>
         <ul>

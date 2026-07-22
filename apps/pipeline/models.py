@@ -21,6 +21,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import models
 from wagtail.admin.panels import FieldPanel
+from wagtail.fields import RichTextField
 from wagtail.models import Page
 
 from apps.core.models import paginate_archive
@@ -257,6 +258,13 @@ class ReportIndexPage(Page):
     precedent over invention).
     """
 
+    intro = RichTextField(blank=True, help_text="Optional intro copy for the archive.")
+
+    content_panels = [
+        *Page.content_panels,
+        FieldPanel("intro"),
+    ]
+
     max_count = 1
     parent_page_types = ["core.HomePage"]
     subpage_types = ["pipeline.DailyReportPage"]
@@ -347,9 +355,12 @@ class DailyReportPage(Page):
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         context["aggregate"] = self.aggregate
-        context["by_department"] = sorted(
-            self.aggregate.category_counts.get("by_department", {}).items()
-        )
+        # "By department" is intentionally not surfaced here: the real TKC
+        # parser never populates `department` (parser_tkc_daily_v1's own
+        # docstring), so this would always render as one dead "Unknown: N"
+        # line in production. `category_counts["by_department"]` is still
+        # computed at the model layer (harmless, and a future parser may
+        # populate it) — this page just stops rendering it.
         context["by_diagnosis_category"] = sorted(
             self.aggregate.category_counts.get("by_diagnosis_category", {}).items()
         )
