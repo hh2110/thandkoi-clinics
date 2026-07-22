@@ -86,13 +86,19 @@ def upload_export(request):
                 summary = ingest_export(
                     uploaded, parser_key=format_key, uploaded_by=request.user
                 )
-            except (InvalidFileException, BadZipFile):
-                # BadZipFile: a non-.xlsx file (e.g. a PDF renamed or a plain
-                # .xls) isn't a zip archive at all, so openpyxl never gets far
-                # enough to raise its own InvalidFileException.
+            except (InvalidFileException, BadZipFile, OSError):
+                # BadZipFile: a non-.xlsx file (e.g. a PDF renamed) isn't a
+                # zip archive at all, so openpyxl never gets far enough to
+                # raise its own InvalidFileException.
+                # OSError: the clinic system's real .xls export is an OLE2
+                # file that happens to embed a zip end-of-central-directory
+                # record, so ``zipfile`` opens it and openpyxl only fails
+                # later with ``OSError("File contains no valid workbook
+                # part")`` — production 500 of 2026-07-22.
                 error = (
                     "That file doesn't look like a valid .xlsx export. "
-                    "Nothing was saved."
+                    "If this is the clinic's .xls export, re-save it as "
+                    ".xlsx first. Nothing was saved."
                 )
             except KeyError:
                 error = "Unknown export format selected. Nothing was saved."

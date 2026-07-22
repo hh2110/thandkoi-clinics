@@ -19,6 +19,7 @@ import datetime
 import io
 import json
 import re
+import zipfile
 from types import SimpleNamespace
 
 import pytest
@@ -564,6 +565,56 @@ def test_upload_view_never_writes_a_file_to_disk(
     assert response.status_code == 200
     assert list(tmp_path.iterdir()) == []
     assert DailyAggregate.objects.filter(clinic_date=CLINIC_V1_VISIT_DATE).exists()
+
+
+def _build_ole2_with_embedded_zip() -> bytes:
+    """Mimic the clinic system's real .xls export, without any PHI.
+
+    The production file (regression of 2026-07-22) is an OLE2 compound
+    document that happens to contain an embedded zip end-of-central-directory
+    record, so ``zipfile`` opens it as an archive and openpyxl fails past the
+    ``BadZipFile`` guard with ``OSError("File contains no valid workbook
+    part")``. Reproduce that shape: OLE2 magic bytes followed by a zip whose
+    only entry is a content-types manifest — no workbook part.
+    """
+    inner = io.BytesIO()
+    with zipfile.ZipFile(inner, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+        )
+    ole2_magic = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+    return ole2_magic + b"\x00" * 64 + inner.getvalue()
+
+
+def test_upload_view_rejects_ole2_xls_with_embedded_zip_gracefully(
+    client, home_page, django_user_model
+):
+    """Regression for the production 500 of 2026-07-22: the clinic's real
+    ``.xls`` export slipped past the ``BadZipFile`` catch (its OLE2 body
+    embeds a zip signature) and openpyxl's ``OSError`` went unhandled. The
+    view must answer with its ordinary "not a valid .xlsx" error — a 200,
+    nothing ingested."""
+    client.force_login(_administrator_user(django_user_model))
+
+    response = client.post(
+        reverse("pipeline:upload_export"),
+        data={
+            "export_file": SimpleUploadedFile(
+                "TKC JULY 8TH STAT.xls",
+                _build_ole2_with_embedded_zip(),
+                content_type="application/vnd.ms-excel",
+            ),
+            "format_key": "clinic_daily_export_v1",
+        },
+    )
+
+    assert response.status_code == 200
+    # The apostrophe in "doesn't" is HTML-escaped in the rendered page, so
+    # assert on the fragment after it.
+    assert "look like a valid .xlsx export" in response.content.decode()
+    assert not IngestRun.objects.exists()
+    assert not DailyAggregate.objects.exists()
 
 
 def _extract_csrf_token(html: str) -> str:
