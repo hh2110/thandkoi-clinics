@@ -61,6 +61,7 @@ from apps.pipeline.parser_registry import (
     diagnosis_category_for,
     normalise_sex,
 )
+from apps.pipeline.parser_tkc_daily_v1 import TkcDailyActivityV1Parser
 from apps.pipeline.rendering import render_daily_report
 from apps.pipeline.report_publishing import publish_daily_report
 from apps.pipeline.xls_compat import convert_xls_to_xlsx, looks_like_xls
@@ -751,6 +752,75 @@ def test_upload_view_rejects_multi_day_xls_with_clear_error(
     assert "Multi-day exports" in response.content.decode()
     assert not IngestRun.objects.exists()
     assert not DailyAggregate.objects.exists()
+
+
+def _build_tkc_daily_workbook_with_wrapped_text_continuation_rows() -> bytes:
+    """Reproduces the exact phantom-row shape found in the clinic system's
+    real 2026-07-20 export (a production bug: 7 real patients were parsed and
+    published as 17).
+
+    The clinic system's report writer spills a free-text column's wrapped
+    content (observed on ``Presenting Complaints``) onto an extra physical
+    row when it has multiple lines. That continuation row has every cell
+    ``None`` except the one free-text column — no ``MR #`` — so the old
+    "is this row entirely blank" check didn't catch it and it was counted as
+    its own visit. A wholly blank leftover row (stray ``.xls`` "used range"
+    padding) is included too, since the old check *did* correctly skip that
+    one — this fixture proves the fix keeps that case working as well as
+    fixing the continuation-row case. No real patient data: names/MRNs here
+    are fabricated placeholders, not the real file's values.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Patient Report"
+    sheet.append(["THE THANDKOI CLINICS — Daily Activity Report"])
+    sheet.append(["Period: 20 Jul 2026 to 20 Jul 2026"])
+    sheet.append([])
+    header = [
+        "S#",
+        "MR #",
+        "Patient Name",
+        "Father's / Husband's Name",
+        "Date of Birth",
+        "Sex",
+        "Address",
+        "Status",
+        "Presenting Complaints",
+        "Provisional Diagnosis",
+    ]
+    sheet.append(header)
+    # A genuine visit, whose "Presenting Complaints" text wraps onto a second
+    # physical row that carries no MR # (or anything else).
+    sheet.append(
+        [1, "MRN-201", "Placeholder One", "Someone", "05-Mar-1988", "Female",
+         "Addr", "Zakat", "first line of complaint", ""]
+    )
+    sheet.append(
+        [None, None, None, None, None, None, None, None,
+         "second line of complaint (wrapped, no MR #)", None]
+    )
+    # Another genuine visit, followed by a wholly blank leftover row.
+    sheet.append(
+        [2, "MRN-202", "Placeholder Two", "Someone Else", "", "Male",
+         "Addr", "Regular", "another complaint", ""]
+    )
+    sheet.append([None] * 10)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def test_tkc_daily_parser_skips_wrapped_text_continuation_rows_without_mr_number():
+    """Regression for the 2026-07-20 production bug: a real 7-patient export
+    was parsed and published as 17. Root cause: a free-text column's wrapped
+    content spills onto an extra physical row carrying no ``MR #``; the old
+    "all cells are None" blank check didn't catch it (one cell held text) so
+    each continuation row was counted as its own phantom visit. The fix
+    requires a non-blank ``MR #`` for a row to count as a visit."""
+    parsed = TkcDailyActivityV1Parser().parse(
+        io.BytesIO(_build_tkc_daily_workbook_with_wrapped_text_continuation_rows())
+    )
+    assert len(parsed.rows) == 2
 
 
 def test_xls_conversion_preserves_date_cells():
