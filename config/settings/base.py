@@ -79,6 +79,12 @@ MIDDLEWARE = [
     # public URLs to the detected language.
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # Must come BEFORE CsrfViewMiddleware: the CSRF check reads request.POST on
+    # a POST, which parses the multipart body and locks request.upload_handlers.
+    # This installs the memory-only handler for the clinic-export upload while
+    # the body is still unparsed (the swap is impossible afterwards). See
+    # apps/pipeline/middleware.py.
+    "apps.pipeline.middleware.MemoryOnlyUploadHandlerMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

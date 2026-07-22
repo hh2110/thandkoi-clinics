@@ -1,24 +1,27 @@
 """The upload view — the structural enforcement of CLAUDE.md invariant #1.
 
 Gated on ``accounts.can_upload_export`` (Plan 07's one custom permission,
-held only by the Administrator group). The load-bearing line is
-``request.upload_handlers = [MemoryFileUploadHandler(request)]``, set before
-``request.POST``/``request.FILES`` is ever touched (Django only honours an
-``upload_handlers`` override made before the multipart body is parsed — see
-Django's file-upload docs). With **no** ``TemporaryFileUploadHandler`` in the
-chain, a file over ``settings.FILE_UPLOAD_MAX_MEMORY_SIZE`` (Django's
-default, 2.5 MB) simply never reaches ``request.FILES`` at all — Django's
-``MemoryFileUploadHandler`` declines it and there is no fallback handler to
-spool it to disk (see ``django.core.files.uploadhandler`` — the memory
-handler's ``receive_data_chunk`` returns the raw chunk unconsumed and
-``file_complete`` returns ``None`` when it never activated). That is a
-*stronger* guarantee than the usual "delete the temp file afterwards"
-pattern: an oversized export cannot touch disk even transiently. An
-oversized upload surfaces to the admin as the form's ordinary "this field
-is required" validation error (Django never populated ``request.FILES`` for
-it) rather than a 500 — still a friendly failure, just not a distinct
-message, since the view has no way to distinguish "too large" from "nothing
-selected" once the memory handler has already declined the file.
+held only by the Administrator group).
+
+The load-bearing guarantee — that the upload runs through **only**
+``MemoryFileUploadHandler``, with no ``TemporaryFileUploadHandler`` to spool
+an oversized export to disk — is installed by
+``apps.pipeline.middleware.MemoryOnlyUploadHandlerMiddleware``, **not** here.
+It has to be: Django only honours an ``upload_handlers`` override made before
+the multipart body is parsed, and ``CsrfViewMiddleware`` parses that body (to
+read the CSRF token from ``request.POST``) *before* this view ever runs — so
+setting the handler here raised ``AttributeError: You cannot set the upload
+handlers after the upload has been processed``. See that middleware's
+docstring for the full ordering argument and why the ``csrf_exempt`` view
+split can't be used for a Wagtail admin view.
+
+With no fallback handler in the chain, a file over
+``settings.FILE_UPLOAD_MAX_MEMORY_SIZE`` (Django's default, 2.5 MB) never
+reaches ``request.FILES`` at all — ``MemoryFileUploadHandler`` declines it and
+nothing spools it to disk. An oversized upload therefore surfaces as the
+form's ordinary "this field is required" validation error rather than a 500 —
+the view can't distinguish "too large" from "nothing selected" once the memory
+handler has declined the file, but neither is a crash and neither touches disk.
 
 The response is built entirely from ``apps.pipeline.ingest.IngestSummary`` —
 per-date counts only. No parsed row ever reaches this view, so there is
@@ -30,7 +33,6 @@ from __future__ import annotations
 from zipfile import BadZipFile
 
 from django.contrib.auth.decorators import permission_required
-from django.core.files.uploadhandler import MemoryFileUploadHandler
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 from openpyxl import load_workbook
@@ -51,10 +53,10 @@ def _template_for(request) -> str:
 @require_http_methods(["GET", "POST"])
 @permission_required("accounts.can_upload_export", raise_exception=True)
 def upload_export(request):
-    # Must be set before request.POST / request.FILES is accessed anywhere —
-    # including inside ExportUploadForm(request.POST, request.FILES) below.
-    request.upload_handlers = [MemoryFileUploadHandler(request)]
-
+    # The memory-only upload handler is installed by
+    # apps.pipeline.middleware.MemoryOnlyUploadHandlerMiddleware, which runs
+    # before CsrfViewMiddleware parses the body — it cannot be set here (the
+    # body is already parsed by the time this view runs).
     summary = None
     warning = None
     error = None
