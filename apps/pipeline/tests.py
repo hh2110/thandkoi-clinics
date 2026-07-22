@@ -35,12 +35,17 @@ from django.http import HttpResponse
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from openpyxl import Workbook, load_workbook
+from wagtail.models import Site
 
 from apps.core.factories import HomePageFactory
 from apps.pipeline import ai
 from apps.pipeline.aggregation import aggregate_export
 from apps.pipeline.ai import PATIENT_IDENTIFYING_COLUMNS, draft_newsletter_prose
-from apps.pipeline.factories import DailyReportPageFactory, ReportIndexPageFactory
+from apps.pipeline.factories import (
+    DailyAggregateFactory,
+    DailyReportPageFactory,
+    ReportIndexPageFactory,
+)
 from apps.pipeline.ingest import (
     persist_parsed_export,
     recompute_daily_aggregate,
@@ -449,9 +454,15 @@ def home_page(db):
     """A HomePage so ``publish_daily_report``'s ``ReportIndexPage`` auto-create
     (``apps.pipeline.report_publishing._get_or_create_report_index``) has
     somewhere to attach to — every test that calls ``ingest_export``/
-    ``publish_daily_report`` needs one to exist first, same as a real site
-    (mirrors ``apps.core.tests.home_page``'s role, scoped to this module)."""
-    return HomePageFactory()
+    ``publish_daily_report`` needs one to exist first, same as a real site.
+    Also repoints the default Site at it (mirrors ``apps.core.tests.home_page``
+    exactly), so tests resolving a real URL via ``client.get(...)`` don't each
+    need their own inline Site-rooting snippet."""
+    home = HomePageFactory()
+    site = Site.objects.get(is_default_site=True)
+    site.root_page = home
+    site.save()
+    return home
 
 
 # --- Parser registry unit tests ---------------------------------------------
@@ -1229,6 +1240,87 @@ def test_home_page_get_latest_report_returns_latest_published_daily_report(db):
     )
 
     assert home.get_latest_report().pk == latest.pk
+
+
+# --- Daily report page UX pass (Plan 08 follow-up) --------------------------
+
+
+def test_daily_report_page_context_omits_by_department_keeps_other_breakdowns(
+    home_page,
+):
+    """`by_department` is never in the template context — the real TKC parser
+    never populates `department` (parser_tkc_daily_v1's own docstring), so
+    rendering it would always show one dead "Unknown: N" line. The other two
+    breakdowns are untouched."""
+    report_date = datetime.date(2026, 7, 10)
+    aggregate = DailyAggregateFactory(
+        clinic_date=report_date,
+        category_counts={
+            "by_department": {"General Medicine": 3},
+            "by_diagnosis_category": {"hypertension": 2},
+            "by_age_band": {"18-40": 3},
+        },
+    )
+    page = DailyReportPageFactory(
+        parent=ReportIndexPageFactory(parent=home_page),
+        report_date=report_date,
+        aggregate=aggregate,
+    )
+
+    request = RequestFactory().get("/en/reports/2026-07-10/")
+    context = page.get_context(request)
+
+    assert "by_department" not in context
+    assert context["by_diagnosis_category"] == [("hypertension", 2)]
+    assert context["by_age_band"] == [("18-40", 3)]
+
+
+def test_daily_report_page_rendering_reflects_ux_pass_copy_and_card_changes(
+    client, home_page
+):
+    """UX-pass copy/structure fixes: "By sex" -> "By gender"; the always-empty
+    "New vs. follow-up" card and the "By department" section no longer render,
+    while the still-wanted breakdown sections are unaffected."""
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    report_date = datetime.date(2026, 7, 10)
+    aggregate = DailyAggregateFactory(
+        clinic_date=report_date,
+        category_counts={
+            "by_department": {"General Medicine": 3},
+            "by_diagnosis_category": {"hypertension": 2},
+            "by_age_band": {"18-40": 3},
+        },
+    )
+    DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=aggregate,
+    )
+
+    content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
+
+    assert "By gender" in content
+    assert "By sex" not in content
+    assert "New vs. follow-up" not in content
+    assert "By department" not in content
+    assert "By diagnosis category" in content
+    assert "By age band" in content
+
+
+def test_report_index_page_renders_intro_when_set(client, home_page):
+    """Mirrors ``OurWorkPage``/``NewsletterIndexPage``'s optional-intro pattern
+    (same ``{% if page.intro %}`` guard, same ``RichTextField``) — the archive
+    index is the "thin content page" the maintainer wants it on."""
+    ReportIndexPageFactory(
+        parent=home_page,
+        slug="reports",
+        intro="<p>Every report we publish, in one place.</p>",
+    )
+
+    content = client.get("/en/reports/").content.decode()
+
+    assert "Every report we publish, in one place." in content
 
 
 def test_persist_parsed_export_groups_rows_by_visit_date(home_page):
