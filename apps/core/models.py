@@ -502,15 +502,22 @@ def paginate_archive(request, queryset, per_page=12):
 
 
 def _photo_item(image, alt_text, caption):
-    """Build the ``{image, alt, caption}`` dict ``media_grid.html`` expects.
+    """Build the ``{image, alt, caption, full}`` dict ``media_grid.html`` expects.
 
     Shared by ``CampReportPage.get_context`` (StreamField photo blocks) and
     ``GalleryPage.get_context`` (``GalleryImage`` children) — both reduce to
     the same image + alt-fallback + caption shape once resolved to a concrete
     ``Image`` instance.
+
+    ``full`` is a second rendition alongside the cropped grid thumbnail:
+    ``max-1600x1600`` fits the image within a 1600px box *without* cropping
+    (unlike the grid's ``fill-640x640``), so the lightbox modal
+    (``static/js/lightbox.js``) can show it close to its original aspect
+    ratio instead of the square crop.
     """
     return {
         "image": image.get_rendition("fill-640x640").url,
+        "full": image.get_rendition("max-1600x1600").url,
         "alt": alt_text or image.title,
         "caption": caption,
     }

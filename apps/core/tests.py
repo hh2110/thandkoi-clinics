@@ -279,6 +279,63 @@ def test_media_grid_uses_real_image_when_present():
     assert "media-placeholder" not in html
 
 
+def test_media_grid_wraps_real_photo_in_a_lightbox_trigger():
+    """A real photo is click-to-expand: its full-size URL is on the trigger.
+
+    Maintainer feedback: clicking a (necessarily cropped) grid photo should
+    open the uncropped/larger version in a modal (static/js/lightbox.js).
+    """
+    html = render_to_string(
+        "partials/sections/media_grid.html",
+        {
+            "items": [
+                {
+                    "image": "/media/x.fill-640x640.jpg",
+                    "full": "/media/x.max-1600x1600.jpg",
+                    "alt": "A clinic day",
+                }
+            ]
+        },
+    )
+    assert "data-lightbox-trigger" in html
+    assert 'data-lightbox-src="/media/x.max-1600x1600.jpg"' in html
+    assert 'data-lightbox-alt="A clinic day"' in html
+
+
+def test_media_grid_lightbox_trigger_falls_back_to_grid_image_without_full():
+    """A caller that hasn't supplied `full` still gets a (smaller) modal.
+
+    Rather than erroring or silently dropping the click-to-expand behaviour.
+    """
+    html = render_to_string(
+        "partials/sections/media_grid.html",
+        {"items": [{"image": "/media/x.jpg", "alt": "A clinic day"}]},
+    )
+    assert 'data-lightbox-src="/media/x.jpg"' in html
+
+
+def test_media_placeholder_has_no_lightbox_trigger():
+    """An imageless placeholder slot isn't wrapped in a click-to-expand trigger."""
+    html = render_to_string(
+        "partials/sections/media_grid.html",
+        {"items": [{"caption": "clinic photo"}]},
+    )
+    assert "data-lightbox-trigger" not in html
+
+
+def test_lightbox_dialog_and_script_present_on_every_page(client, home_page):
+    """base.html renders the shared lightbox <dialog> and wires its script.
+
+    One dialog/script pair serves every media_grid.html instance on the page
+    (templates/partials/lightbox.html, static/js/lightbox.js), so it should
+    be present regardless of which page renders it.
+    """
+    content = client.get("/en/").content.decode()
+    assert 'id="lightbox"' in content
+    assert 'class="lightbox"' in content
+    assert "js/lightbox.js" in content
+
+
 def test_layout_css_linked_after_components_in_base(client, home_page):
     """base.html loads layout.css, and it comes after components.css."""
     content = client.get("/en/").content.decode()
@@ -781,6 +838,8 @@ def test_camp_report_photos_render_through_the_media_grid(client, home_page):
     content = client.get("/en/camp-reports/verify-camp/").content.decode()
     assert "Crowd at the camp" in content
     assert 'alt="Camp crowd"' in content
+    assert "data-lightbox-trigger" in content
+    assert "max-1600x1600" in content  # the modal's larger, uncropped rendition
 
 
 def test_newsletter_archive_lists_only_published_newest_first(client, home_page):
@@ -883,6 +942,31 @@ def test_gallery_image_renders_through_the_media_grid(client, home_page):
     content = client.get("/en/gallery/").content.decode()
     assert "The courtyard" in content
     assert 'alt="Clinic courtyard"' in content
+
+
+def test_gallery_image_click_to_expand_uses_an_uncropped_full_size_rendition(
+    client, home_page
+):
+    """The Gallery page's photos open a larger, uncropped image on click.
+
+    `gallery_items` (GalleryPage.get_context, via the shared `_photo_item`)
+    must carry a `full` rendition distinct from the square `fill-640x640`
+    grid crop, and media_grid.html must put it on the click-to-expand
+    trigger — otherwise the modal would just show the same crop, which is
+    the exact maintainer complaint this feature answers.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    gallery = GalleryPageFactory(parent=home_page, slug="gallery")
+    image = Image.objects.create(title="Clinic courtyard", file=get_test_image_file())
+    GalleryImageFactory(
+        page=gallery, image=image, caption="The courtyard", consent_confirmed=True
+    )
+
+    content = client.get("/en/gallery/").content.decode()
+    assert "data-lightbox-trigger" in content
+    assert "fill-640x640" in content  # the grid's own cropped thumbnail
+    assert "max-1600x1600" in content  # the modal's larger, uncropped rendition
 
 
 def test_gallery_images_query_resolves_image_fk_without_an_extra_query_each(

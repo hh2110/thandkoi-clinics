@@ -76,8 +76,10 @@
       </main>
       {% include "partials/footer.html" %}
     </div>
+    {% include "partials/lightbox.html" %}
     <script src="{% static 'js/theme-toggle.js' %}" defer></script>
     <script src="{% static 'js/nav.js' %}" defer></script>
+    <script src="{% static 'js/lightbox.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
   </body>
 </html>

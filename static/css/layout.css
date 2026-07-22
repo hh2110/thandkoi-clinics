@@ -411,6 +411,20 @@
   object-fit: cover;
 }
 
+/* The click-to-expand trigger wrapping each real photo — reset to a plain,
+   borderless block the same size as its `.media-grid__item` box so the
+   button is invisible until interacted with; opens templates/partials/
+   lightbox.html's <dialog> via static/js/lightbox.js. */
+.media-grid__trigger {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
 /* The cell wrapping each grid slot (Plan 06) — a plain block, so the grid
    still sizes columns off `.media-grid`; `.media-grid__item` keeps its own
    fixed-aspect image treatment, unaffected by whether a caption follows. */
@@ -422,6 +436,54 @@
   font-size: var(--font-size-xs);
   color: var(--color-text-faint);
   margin-block: var(--space-1) 0;
+}
+
+/* --- Lightbox --------------------------------------------------------------
+   The shared <dialog> from templates/partials/lightbox.html. Sizing/position
+   comes from the native `<dialog>` centring plus these overrides; `::backdrop`
+   is the native dim-the-page-behind-it layer, styled to match the site's ink
+   tone rather than the browser default. */
+.lightbox {
+  padding: 0;
+  border: 0;
+  border-radius: var(--card-radius);
+  background: var(--color-surface);
+  box-shadow: var(--card-shadow);
+  max-width: min(92vw, 1200px);
+  max-height: 92vh;
+}
+
+.lightbox::backdrop {
+  background: var(--color-ink);
+  opacity: 0.8;
+}
+
+.lightbox__img {
+  display: block;
+  max-width: min(92vw, 1200px);
+  max-height: 92vh;
+}
+
+.lightbox__close {
+  position: absolute;
+  top: var(--space-1);
+  inset-inline-end: var(--space-1);
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.lightbox__close svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 /* --- Image placeholder ----------------------------------------------------
