@@ -53,7 +53,7 @@ PATIENT_IDENTIFYING_COLUMNS = frozenset(
 )
 
 # Model used for newsletter drafting (see CLAUDE.md → Stack).
-DRAFTING_MODEL = "claude-opus-4-8"
+DRAFTING_MODEL = "claude-sonnet-5"
 
 _SYSTEM_PROMPT = (
     "You are drafting prose for a not-for-profit clinic's public report. "
@@ -203,7 +203,7 @@ def draft_daily_summary_sentence(
 # fallback. See ".claude/plans/09-ai-monthly-newsletter.md" for the full
 # decision record.
 
-MONTHLY_NEWSLETTER_MODEL = "claude-opus-4-8"
+MONTHLY_NEWSLETTER_MODEL = "claude-sonnet-5"
 
 # A one-shot-with-tooling call can loop through several tool round-trips
 # before the model is ready to answer; this bounds it so a model that never
