@@ -30,11 +30,16 @@
 }
 
 .site-header__logo {
-  /* Icon-only mark (logo-mark.svg), sized well above the old 2.5rem wordmark
-     lockup per maintainer feedback ("tiny ... maybe without the text logo").
-     .site-header__bar's padding-block (--space-2, 1rem) grows the bar to
-     accommodate rather than the logo overflowing the bar's edges. */
-  height: 4rem;
+  /* Sized up from the old 2.5rem per maintainer feedback ("tiny"). Stays on
+     logo.svg (the full mark + wordmark lockup) rather than the icon-only
+     logo-mark.svg: docs/brand-guidelines.md explicitly reserves the
+     icon-only mark for contexts too narrow for the full lockup (avatar/app
+     icon) and specifies the full lockup for header/footer/print — dropping
+     the wordmark here would also remove the only visible on-page text
+     naming the clinic for sighted visitors. .site-header__bar's
+     padding-block (--space-2, 1rem) grows the bar to accommodate rather
+     than the logo overflowing the bar's edges. */
+  height: 3.5rem;
   width: auto;
 }
 
