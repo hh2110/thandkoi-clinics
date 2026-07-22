@@ -67,6 +67,12 @@ This bucket holds **published website media only** (Wagtail images/documents an
 editor uploads). It is **not** the PHI pipeline — that data is aggregated in
 memory and discarded per CLAUDE.md invariant #1 and never touches this store.
 
+Because the bucket is public and served with unsigned URLs
+(`querystring_auth = False`), **Wagtail's private/restricted collections are not
+enforceable here** — any object is world-readable by URL. That is acceptable
+under the "clinic media is public content" assumption above; do not upload
+anything access-restricted to this store expecting the collection gate to hold.
+
 ## Precedent map (Stage 7)
 
 - **`STORAGES["default"]` override in `prod.py`** — mirrors the existing
@@ -109,7 +115,10 @@ slice to guard.
    - `MEDIA_BUCKET_NAME` = the bucket name
    - `MEDIA_S3_ENDPOINT_URL` = `https://<accountid>.r2.cloudflarestorage.com`
    - `MEDIA_S3_ACCESS_KEY_ID` / `MEDIA_S3_SECRET_ACCESS_KEY` = the token pair
-   - `MEDIA_CUSTOM_DOMAIN` = the public host serving objects
+   - `MEDIA_CUSTOM_DOMAIN` = the public host serving objects — **bare hostname
+     only, no `https://` and no trailing slash** (e.g. `media.thandkoiclinics.com`
+     or the `pub-xxxx.r2.dev` public URL). django-storages adds the scheme; a
+     value with `https://` breaks every media URL.
 4. Deploy a fresh tag and run the gating check.
 
 ## Tasks

@@ -72,14 +72,19 @@ STORAGES["default"] = {
         "endpoint_url": env("MEDIA_S3_ENDPOINT_URL"),
         "access_key": env("MEDIA_S3_ACCESS_KEY_ID"),
         "secret_key": env("MEDIA_S3_SECRET_ACCESS_KEY"),
-        # Public host that serves the objects (the R2 public bucket URL or a
-        # custom domain such as media.thandkoiclinics.com). URLs render as
-        # https://<custom_domain>/<key>.
+        # Public host that serves the objects — a bare hostname, NO scheme and
+        # no trailing slash (e.g. media.thandkoiclinics.com or pub-xxxx.r2.dev).
+        # django-storages prepends https:// itself; a value like
+        # "https://media.thandkoiclinics.com" would produce a broken
+        # "https://https://…" URL for every file.
         "custom_domain": env("MEDIA_CUSTOM_DOMAIN"),
         # R2 ignores regions but the S3 client requires a value; "auto" is R2's.
         "region_name": "auto",
         # Public bucket: serve plain, cacheable URLs (no signed querystrings).
         "querystring_auth": False,
+        # CDN cache hint for the public objects (renditions/documents are
+        # effectively immutable once uploaded).
+        "object_parameters": {"CacheControl": "public, max-age=86400"},
         # Wagtail renditions are content-addressed; never clobber an upload that
         # happens to share a name.
         "file_overwrite": False,
