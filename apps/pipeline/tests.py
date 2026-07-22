@@ -792,17 +792,47 @@ def _build_tkc_daily_workbook_with_wrapped_text_continuation_rows() -> bytes:
     # A genuine visit, whose "Presenting Complaints" text wraps onto a second
     # physical row that carries no MR # (or anything else).
     sheet.append(
-        [1, "MRN-201", "Placeholder One", "Someone", "05-Mar-1988", "Female",
-         "Addr", "Zakat", "first line of complaint", ""]
+        [
+            1,
+            "MRN-201",
+            "Placeholder One",
+            "Someone",
+            "05-Mar-1988",
+            "Female",
+            "Addr",
+            "Zakat",
+            "first line of complaint",
+            "",
+        ]
     )
     sheet.append(
-        [None, None, None, None, None, None, None, None,
-         "second line of complaint (wrapped, no MR #)", None]
+        [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "second line of complaint (wrapped, no MR #)",
+            None,
+        ]
     )
     # Another genuine visit, followed by a wholly blank leftover row.
     sheet.append(
-        [2, "MRN-202", "Placeholder Two", "Someone Else", "", "Male",
-         "Addr", "Regular", "another complaint", ""]
+        [
+            2,
+            "MRN-202",
+            "Placeholder Two",
+            "Someone Else",
+            "",
+            "Male",
+            "Addr",
+            "Regular",
+            "another complaint",
+            "",
+        ]
     )
     sheet.append([None] * 10)
     buffer = io.BytesIO()
