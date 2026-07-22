@@ -53,7 +53,7 @@ PATIENT_IDENTIFYING_COLUMNS = frozenset(
 )
 
 # Model used for newsletter drafting (see CLAUDE.md → Stack).
-DRAFTING_MODEL = "claude-opus-4-8"
+DRAFTING_MODEL = "claude-sonnet-5"
 
 _SYSTEM_PROMPT = (
     "You are drafting prose for a not-for-profit clinic's public report. "
@@ -79,6 +79,13 @@ def build_prompt_payload(aggregate: ClinicAggregate) -> dict[str, Any]:
     return {
         "model": DRAFTING_MODEL,
         "max_tokens": 1024,
+        # Sonnet 5 runs adaptive thinking by default when `thinking` is
+        # omitted (Opus did not) -- thinking output counts against this same
+        # fixed max_tokens, so an unconfigured default risks truncating this
+        # already-tight budget (stop_reason="max_tokens") purely from the
+        # model swap. Disabled explicitly to keep the budget for prose, same
+        # as the pre-existing Opus behavior.
+        "thinking": {"type": "disabled"},
         "system": _SYSTEM_PROMPT,
         "messages": [
             {
@@ -203,7 +210,7 @@ def draft_daily_summary_sentence(
 # fallback. See ".claude/plans/09-ai-monthly-newsletter.md" for the full
 # decision record.
 
-MONTHLY_NEWSLETTER_MODEL = "claude-opus-4-8"
+MONTHLY_NEWSLETTER_MODEL = "claude-sonnet-5"
 
 # A one-shot-with-tooling call can loop through several tool round-trips
 # before the model is ready to answer; this bounds it so a model that never
@@ -370,6 +377,15 @@ def draft_monthly_newsletter_body(
             response = active_client.messages.create(
                 model=MONTHLY_NEWSLETTER_MODEL,
                 max_tokens=4096,
+                # Sonnet 5 runs adaptive thinking by default when `thinking`
+                # is omitted (Opus, the previous model here, did not), and
+                # thinking output counts against this same fixed max_tokens
+                # across every tool-turn -- an unconfigured default risks
+                # truncating a turn (stop_reason="max_tokens", read as a
+                # failure below) purely from the model swap. Disabled
+                # explicitly to preserve the prior no-thinking behavior and
+                # budget.
+                thinking={"type": "disabled"},
                 system=_MONTHLY_NEWSLETTER_SYSTEM_PROMPT,
                 tools=MONTHLY_NEWSLETTER_TOOLS,
                 messages=messages,

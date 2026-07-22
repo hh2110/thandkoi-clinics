@@ -52,8 +52,10 @@ rules are architectural constraints, not preferences — never weaken them:
 
 - **Django + Wagtail** (CMS) + **HTMX** — one Python codebase, minimal JS.
 - **pandas / openpyxl / xlrd** — Excel parsing and aggregation.
-- **Anthropic Python SDK** — generation. Models: `claude-opus-4-8` for drafting
-  and schema inference, `claude-haiku-4-5` for translation / short tasks.
+- **Anthropic Python SDK** — generation. Models (maintainer decision,
+  2026-07-22): `claude-sonnet-5` for newsletter drafting, `claude-haiku-4-5`
+  for the daily summary sentence / translation / short tasks, `claude-opus-4-8`
+  reserved for schema inference (deferred — see plans README "Out of scope").
 - **PostgreSQL** — aggregates and de-identified data only.
 - **Hosting:** Render (or Railway), ~US$20–30/month all-in.
 

@@ -130,7 +130,7 @@ This plan is a **reader**, not a re-implementer, of Plan 08's data model:
 | Choice | Proposed | Notes |
 |---|---|---|
 | Prompt shape | "One-shot prompt with tooling" per brief §6.2 — a single system/user prompt describing the drafting task, with the model calling read-only tools (`get_month_stats`, `get_trend_vs_last_month`, `get_previous_newsletter`) to pull specifics rather than one pre-flattened context blob | Matches the brief's own description verbatim; lets the model ask for exactly the comparisons it needs rather than the app guessing what to include up front. |
-| Model | `claude-opus-4-8` | Per brief §6, model-selection table: "Newsletter/report drafting, schema inference → Claude Opus 4.8." Same model Plan 08 would use if it ever needed drafting-grade quality (it doesn't — its one sentence is template-fixed). |
+| Model | `claude-sonnet-5` (updated 2026-07-22 — see below) | Originally proposed as `claude-opus-4-8` per brief §6's model-selection table. Maintainer decision (2026-07-22, Plan 11 C4): switch newsletter/report drafting to Sonnet 5, keep Haiku for the Plan 08 daily summary sentence. `docs/architecture-and-ai-brief.md`'s model table was updated to match. |
 | Numbers guardrail | Every figure available to the model comes from a Python-computed tool result (`get_month_stats` / `get_trend_vs_last_month`), never typed into the prompt as prose by a human and never left for the model to compute or recall | Same discipline as invariant #3 and Plan 08's guardrail — "the AI writes prose only; it must never invent or restate statistics from memory." Testable the same way: a guardrail test asserts every numeric tool-call result traces back to a `DailyAggregate` query, and a fixture-based test asserts the model is never the source of a number that ends up in a published page. |
 | Landing point | A new `NewsletterPage` instance under the existing `NewsletterIndexPage` (Plan 06), created via `save_revision()` — unpublished | Plan 06's doc states this exact mechanism as the intended integration point; no new model, no new page type. |
 | Publish permission | The drafting code path holds **no** publish permission (Plan 07's "AI/automation code holds no publish permission") | Structural enforcement of invariant #4's general rule, same mechanism Plan 07 already built for any AI-authored page. |
@@ -209,8 +209,9 @@ prompt/tooling shape grounds against an external reference.
    that supports both picking existing Plan 06 `GalleryImage`s and uploading
    new images directly (consent-gated, per Plan 06's convention).
 5. **Drafting call** — the one-shot prompt-with-tooling Anthropic call
-   (`claude-opus-4-8`), assembling the month's data, notes, and photos, and
-   producing newsletter body content.
+   (`claude-sonnet-5`, updated 2026-07-22 from the originally proposed
+   `claude-opus-4-8` — see the decision table above), assembling the month's
+   data, notes, and photos, and producing newsletter body content.
 6. **Draft-landing** — write the model's output into a new `NewsletterPage`
    under `NewsletterIndexPage` via `save_revision()`; no publish call
    anywhere in this code path (Plan 07 permission boundary).
