@@ -38,6 +38,7 @@ from openpyxl import Workbook, load_workbook
 from wagtail.models import Site
 
 from apps.core.factories import HomePageFactory
+from apps.core.models import CampReportIndexPage
 from apps.pipeline import ai
 from apps.pipeline.aggregation import aggregate_export
 from apps.pipeline.ai import PATIENT_IDENTIFYING_COLUMNS, draft_newsletter_prose
@@ -46,6 +47,7 @@ from apps.pipeline.factories import (
     DailyReportPageFactory,
     ReportIndexPageFactory,
 )
+from apps.pipeline.forms import ExportUploadForm
 from apps.pipeline.ingest import (
     persist_parsed_export,
     recompute_daily_aggregate,
@@ -53,6 +55,7 @@ from apps.pipeline.ingest import (
 from apps.pipeline.intake import process_upload
 from apps.pipeline.middleware import MemoryOnlyUploadHandlerMiddleware
 from apps.pipeline.models import (
+    CampUploadReportPage,
     DailyAggregate,
     DailyReportPage,
     DeidentifiedVisit,
@@ -637,6 +640,7 @@ def test_upload_view_never_writes_a_file_to_disk(
                 content_type="application/vnd.ms-excel",
             ),
             "format_key": "tkc_daily_activity_v1",
+            "report_kind": "daily",
         },
     )
     assert response.status_code == 200
@@ -685,6 +689,7 @@ def test_upload_view_rejects_ole2_xls_with_embedded_zip_gracefully(
                     content_type="application/vnd.ms-excel",
                 ),
                 "format_key": "tkc_daily_activity_v1",
+                "report_kind": "daily",
             },
         )
 
@@ -776,6 +781,7 @@ def test_upload_view_ingests_real_format_xls(
                 content_type="application/vnd.ms-excel",
             ),
             "format_key": "tkc_daily_activity_v1",
+            "report_kind": "daily",
         },
     )
 
@@ -819,6 +825,7 @@ def test_upload_view_rejects_multi_day_xls_with_clear_error(
                 content_type="application/vnd.ms-excel",
             ),
             "format_key": "tkc_daily_activity_v1",
+            "report_kind": "daily",
         },
     )
 
@@ -996,6 +1003,7 @@ def test_upload_view_survives_csrf_enforced_multipart_post(
                 content_type="application/vnd.ms-excel",
             ),
             "format_key": "tkc_daily_activity_v1",
+            "report_kind": "daily",
         },
     )
 
@@ -1208,6 +1216,139 @@ def test_ingest_export_auto_publishes_the_daily_report_page(home_page):
     assert page.aggregate.total_visits == EXPECTED_TOTAL_VISITS
 
 
+# --- Camp-upload flow (2026-07-22) ------------------------------------------
+
+
+def test_export_upload_form_requires_camp_title_only_for_camp_report_kind():
+    """``report_kind`` defaults to daily and needs no title; switching it to
+    camp makes ``camp_title`` required (form-level, not just at the view)."""
+    daily_form = ExportUploadForm(
+        data={"format_key": "clinic_daily_export_v1", "report_kind": "daily"},
+    )
+    daily_form.fields["export_file"].required = False
+    assert daily_form.is_valid()
+
+    camp_form_missing_title = ExportUploadForm(
+        data={"format_key": "clinic_daily_export_v1", "report_kind": "camp"},
+    )
+    camp_form_missing_title.fields["export_file"].required = False
+    assert not camp_form_missing_title.is_valid()
+    assert "camp_title" in camp_form_missing_title.errors
+
+    camp_form_with_title = ExportUploadForm(
+        data={
+            "format_key": "clinic_daily_export_v1",
+            "report_kind": "camp",
+            "camp_title": "Free Medical Camp — Union Council X",
+        },
+    )
+    camp_form_with_title.fields["export_file"].required = False
+    assert camp_form_with_title.is_valid()
+
+
+def test_upload_view_camp_report_kind_publishes_camp_page_not_daily_page(
+    client, home_page, django_user_model
+):
+    """A camp upload (same parser/schema as the daily export) publishes a
+    ``CampUploadReportPage`` titled from the admin's ``camp_title`` — not a
+    ``DailyReportPage`` — and leaves no daily report behind for that date."""
+    client.force_login(_administrator_user(django_user_model))
+
+    response = client.post(
+        reverse("pipeline:upload_export"),
+        data={
+            "export_file": SimpleUploadedFile(
+                "daily-export.xlsx",
+                _build_clinic_v1_xlsx(),
+                content_type=XLSX_CONTENT_TYPE,
+            ),
+            "format_key": "clinic_daily_export_v1",
+            "report_kind": "camp",
+            "camp_title": "Free Medical Camp — Union Council X",
+        },
+    )
+
+    assert response.status_code == 200
+    assert not DailyReportPage.objects.filter(report_date=CLINIC_V1_VISIT_DATE).exists()
+
+    camp_page = CampUploadReportPage.objects.get(camp_date=CLINIC_V1_VISIT_DATE)
+    assert camp_page.live is True
+    assert camp_page.title == "Free Medical Camp — Union Council X"
+    assert camp_page.aggregate.total_visits == EXPECTED_TOTAL_VISITS
+    assert camp_page.aggregate.report_kind == IngestRun.KIND_CAMP
+    # Lives under the existing Plan 06 Camp Report archive, not a new index.
+    assert camp_page.get_parent().specific_class is CampReportIndexPage
+
+
+def test_camp_and_daily_uploads_on_the_same_date_do_not_merge_aggregates(home_page):
+    """The load-bearing guarantee behind ``report_kind``: a camp and the
+    clinic's own daily activity landing on the *same calendar date* get
+    independent ``DailyAggregate``/``DeidentifiedVisit`` rows — neither
+    merges into nor supersedes the other."""
+    ingest_export(
+        io.BytesIO(_build_clinic_v1_xlsx()),
+        parser_key="clinic_daily_export_v1",
+        uploaded_by=None,
+        report_kind=IngestRun.KIND_DAILY,
+    )
+    ingest_export(
+        io.BytesIO(_build_clinic_v1_xlsx()),
+        parser_key="clinic_daily_export_v1",
+        uploaded_by=None,
+        report_kind=IngestRun.KIND_CAMP,
+        camp_title="Free Medical Camp",
+    )
+
+    daily_aggregate = DailyAggregate.objects.get(
+        clinic_date=CLINIC_V1_VISIT_DATE, report_kind=IngestRun.KIND_DAILY
+    )
+    camp_aggregate = DailyAggregate.objects.get(
+        clinic_date=CLINIC_V1_VISIT_DATE, report_kind=IngestRun.KIND_CAMP
+    )
+    assert daily_aggregate.pk != camp_aggregate.pk
+    assert daily_aggregate.total_visits == EXPECTED_TOTAL_VISITS
+    assert camp_aggregate.total_visits == EXPECTED_TOTAL_VISITS
+
+    assert (
+        DeidentifiedVisit.objects.filter(
+            visit_date=CLINIC_V1_VISIT_DATE,
+            ingest_run__report_kind=IngestRun.KIND_DAILY,
+        ).count()
+        == EXPECTED_TOTAL_VISITS
+    )
+    assert (
+        DeidentifiedVisit.objects.filter(
+            visit_date=CLINIC_V1_VISIT_DATE, ingest_run__report_kind=IngestRun.KIND_CAMP
+        ).count()
+        == EXPECTED_TOTAL_VISITS
+    )
+
+    # Both pages exist, independently.
+    assert DailyReportPage.objects.filter(report_date=CLINIC_V1_VISIT_DATE).exists()
+    assert CampUploadReportPage.objects.filter(camp_date=CLINIC_V1_VISIT_DATE).exists()
+
+    # A re-upload of the daily export (a correction) supersedes only the
+    # daily rows/aggregate — the camp's are untouched.
+    ingest_export(
+        io.BytesIO(_build_clinic_v1_xlsx()),
+        parser_key="clinic_daily_export_v1",
+        uploaded_by=None,
+        report_kind=IngestRun.KIND_DAILY,
+    )
+    assert (
+        DailyAggregate.objects.get(
+            clinic_date=CLINIC_V1_VISIT_DATE, report_kind=IngestRun.KIND_CAMP
+        ).pk
+        == camp_aggregate.pk
+    )
+    assert (
+        DeidentifiedVisit.objects.filter(
+            visit_date=CLINIC_V1_VISIT_DATE, ingest_run__report_kind=IngestRun.KIND_CAMP
+        ).count()
+        == EXPECTED_TOTAL_VISITS
+    )
+
+
 # --- Recompute command: DailyAggregate is a derived cache -------------------
 
 
@@ -1226,6 +1367,42 @@ def test_recompute_daily_aggregates_command_rebuilds_from_deidentified_visit(hom
 
     rebuilt = DailyAggregate.objects.get(clinic_date=CLINIC_V1_VISIT_DATE)
     assert rebuilt.as_dict() == original_dict
+
+
+def test_recompute_daily_aggregates_command_rebuilds_both_kinds_for_a_shared_date(
+    home_page,
+):
+    """A date carrying both a daily and a camp upload gets *both* aggregates
+    rebuilt — recomputing by date alone would silently skip one report_kind
+    (see the command's docstring)."""
+    ingest_export(
+        io.BytesIO(_build_clinic_v1_xlsx()),
+        parser_key="clinic_daily_export_v1",
+        uploaded_by=None,
+        report_kind=IngestRun.KIND_DAILY,
+    )
+    ingest_export(
+        io.BytesIO(_build_clinic_v1_xlsx()),
+        parser_key="clinic_daily_export_v1",
+        uploaded_by=None,
+        report_kind=IngestRun.KIND_CAMP,
+        camp_title="Free Medical Camp",
+    )
+
+    DailyAggregate.objects.filter(clinic_date=CLINIC_V1_VISIT_DATE).update(
+        total_visits=999
+    )
+
+    call_command("recompute_daily_aggregates")
+
+    daily = DailyAggregate.objects.get(
+        clinic_date=CLINIC_V1_VISIT_DATE, report_kind=IngestRun.KIND_DAILY
+    )
+    camp = DailyAggregate.objects.get(
+        clinic_date=CLINIC_V1_VISIT_DATE, report_kind=IngestRun.KIND_CAMP
+    )
+    assert daily.total_visits == EXPECTED_TOTAL_VISITS
+    assert camp.total_visits == EXPECTED_TOTAL_VISITS
 
 
 # --- Home page teaser wiring -------------------------------------------------

@@ -72,6 +72,8 @@ def upload_export(request):
         if form.is_valid():
             uploaded = form.cleaned_data["export_file"]
             format_key = form.cleaned_data["format_key"]
+            report_kind = form.cleaned_data["report_kind"]
+            camp_title = form.cleaned_data["camp_title"]
             # The not-really-an-Excel-file catch is scoped to the
             # convert/open/sniff step only. ``ingest_export`` commits one
             # transaction per clinic-date and publishes a page per date, so
@@ -130,7 +132,11 @@ def upload_export(request):
                 uploaded.seek(0)
                 try:
                     summary = ingest_export(
-                        uploaded, parser_key=format_key, uploaded_by=request.user
+                        uploaded,
+                        parser_key=format_key,
+                        uploaded_by=request.user,
+                        report_kind=report_kind,
+                        camp_title=camp_title,
                     )
                 except ExportParseError as exc:
                     # Raised by a parser before anything is persisted, with a

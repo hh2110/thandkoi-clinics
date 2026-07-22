@@ -5,6 +5,13 @@ decision, PR #15 — see ``.claude/plans/08-data-pipeline.md`` "Recompute
 path"). When a metric definition changes, this command rebuilds every
 affected date's aggregate from the row-level table — no re-upload needed.
 
+Iterates ``(clinic_date, report_kind)`` pairs, not dates alone (camp-upload
+flow, 2026-07-22): a camp upload and the clinic's own daily activity can
+share a calendar date but must never be aggregated together (see
+``IngestRun.report_kind``'s docstring) — rebuilding by date alone would
+recompute only one of the two kinds and silently leave the other's aggregate
+stale.
+
     uv run python manage.py recompute_daily_aggregates            # every date
     uv run python manage.py recompute_daily_aggregates --date 2026-07-20
 """
@@ -31,24 +38,28 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        visits = DeidentifiedVisit.objects.order_by()
         if options["clinic_date"]:
             try:
-                dates = [datetime.date.fromisoformat(options["clinic_date"])]
+                clinic_date = datetime.date.fromisoformat(options["clinic_date"])
             except ValueError as exc:
                 raise CommandError(f"Invalid --date: {exc}") from exc
-        else:
-            dates = list(
-                DeidentifiedVisit.objects.order_by()
-                .values_list("visit_date", flat=True)
-                .distinct()
-            )
+            visits = visits.filter(visit_date=clinic_date)
 
-        if not dates:
+        date_kind_pairs = list(
+            visits.values_list("visit_date", "ingest_run__report_kind").distinct()
+        )
+
+        if not date_kind_pairs:
             self.stdout.write("No dates to recompute.")
             return
 
-        for clinic_date in sorted(dates):
-            recompute_daily_aggregate(clinic_date)
-            self.stdout.write(self.style.SUCCESS(f"  recomputed  {clinic_date}"))
+        for clinic_date, report_kind in sorted(date_kind_pairs):
+            recompute_daily_aggregate(clinic_date, report_kind=report_kind)
+            self.stdout.write(
+                self.style.SUCCESS(f"  recomputed  {clinic_date} ({report_kind})")
+            )
 
-        self.stdout.write(self.style.SUCCESS(f"Recomputed {len(dates)} date(s)."))
+        self.stdout.write(
+            self.style.SUCCESS(f"Recomputed {len(date_kind_pairs)} date/kind pair(s).")
+        )

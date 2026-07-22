@@ -15,7 +15,7 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass, field
 
-from apps.pipeline.models import DailyAggregate
+from apps.pipeline.models import DailyAggregate, IngestRun
 
 
 def first_of_month(month: datetime.date) -> datetime.date:
@@ -104,15 +104,24 @@ _SUMMED_FIELDS = (
 
 
 def compute_monthly_rollup(month: datetime.date) -> MonthlyRollup:
-    """Sum every ``DailyAggregate`` row for ``month``'s calendar month.
+    """Sum every daily ``DailyAggregate`` row for ``month``'s calendar month.
 
     Queries only ``DailyAggregate`` (Plan 08's derived cache) — never
     ``DeidentifiedVisit`` — so this can never surface a row-level value.
+
+    Scoped to ``report_kind=IngestRun.KIND_DAILY`` (camp-upload flow,
+    2026-07-22): this newsletter rollup is the clinic's own monthly activity,
+    not camp attendance, and ``DailyAggregate`` now also holds
+    ``report_kind="camp"`` rows for the same dates — summing without this
+    filter would silently fold camp patients into the clinic's monthly
+    figures whenever a camp upload falls in the target month.
     """
     target = first_of_month(month)
     rows = list(
         DailyAggregate.objects.filter(
-            clinic_date__year=target.year, clinic_date__month=target.month
+            clinic_date__year=target.year,
+            clinic_date__month=target.month,
+            report_kind=IngestRun.KIND_DAILY,
         )
     )
     totals = {name: sum(getattr(row, name) for row in rows) for name in _SUMMED_FIELDS}
