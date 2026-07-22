@@ -79,6 +79,13 @@ def build_prompt_payload(aggregate: ClinicAggregate) -> dict[str, Any]:
     return {
         "model": DRAFTING_MODEL,
         "max_tokens": 1024,
+        # Sonnet 5 runs adaptive thinking by default when `thinking` is
+        # omitted (Opus did not) -- thinking output counts against this same
+        # fixed max_tokens, so an unconfigured default risks truncating this
+        # already-tight budget (stop_reason="max_tokens") purely from the
+        # model swap. Disabled explicitly to keep the budget for prose, same
+        # as the pre-existing Opus behavior.
+        "thinking": {"type": "disabled"},
         "system": _SYSTEM_PROMPT,
         "messages": [
             {
@@ -370,6 +377,15 @@ def draft_monthly_newsletter_body(
             response = active_client.messages.create(
                 model=MONTHLY_NEWSLETTER_MODEL,
                 max_tokens=4096,
+                # Sonnet 5 runs adaptive thinking by default when `thinking`
+                # is omitted (Opus, the previous model here, did not), and
+                # thinking output counts against this same fixed max_tokens
+                # across every tool-turn -- an unconfigured default risks
+                # truncating a turn (stop_reason="max_tokens", read as a
+                # failure below) purely from the model swap. Disabled
+                # explicitly to preserve the prior no-thinking behavior and
+                # budget.
+                thinking={"type": "disabled"},
                 system=_MONTHLY_NEWSLETTER_SYSTEM_PROMPT,
                 tools=MONTHLY_NEWSLETTER_TOOLS,
                 messages=messages,
