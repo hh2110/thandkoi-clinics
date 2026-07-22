@@ -157,7 +157,8 @@ without a code release. The model sees column shapes, never real patient rows.
 
 | Task | Model | Model ID |
 |---|---|---|
-| Newsletter/report drafting, schema inference | Claude Opus 4.8 | `claude-opus-4-8` |
+| Newsletter/report drafting | Claude Sonnet 5 | `claude-sonnet-5` |
+| Schema inference (deferred — see Plans README "Out of scope") | Claude Opus 4.8 | `claude-opus-4-8` |
 | Translation, image alt-text, summaries, site assistant | Claude Haiku 4.5 | `claude-haiku-4-5` |
 
 These are small text calls over aggregate payloads, so real spend is a few
