@@ -10,11 +10,24 @@ diagnosis + billing), using the same column-name vocabulary already fixed by
 ``apps.pipeline.ai.PATIENT_IDENTIFYING_COLUMNS`` (Plan 02) for the
 identifying columns.
 
-This is a deliberate stand-in, not a guess dressed up as the real thing: the
+This was a deliberate stand-in, not a guess dressed up as the real thing: the
 parser registry's whole design point (one hand-written subclass per format,
-no change to the core) means swapping in the *real* parser once the sample
-lands is a new subclass + registering it — this file and its tests stay as a
-worked example / fallback format, not something that has to be torn up.
+no change to the core) meant swapping in the *real* parser once the sample
+landed was a new subclass + registering it — see ``parser_tkc_daily_v1``,
+grounded in the real production sample (2026-07-22).
+
+**No longer registered as a selectable upload format** (decision,
+2026-07-22): now that the real parser exists and is what real uploads use,
+this class is no longer imported/registered from
+``apps.pipeline.apps.PipelineConfig.ready()``, so it does not appear in the
+upload form's dropdown and ``ParserRegistry.get("clinic_daily_export_v1")``
+no longer resolves. The class itself stays in the tree — it remains a
+worked example of the parser contract, and ``apps/pipeline/tests.py`` still
+uses it directly (constructed and called without going through
+``ParserRegistry``) both for its own privacy-guardrail tests and as
+convenient fixture data for generic ingest/aggregate/publish tests unrelated
+to this specific format.
+
 Column names below are matched case-insensitively and independent of column
 order, so minor real-world header variations (spacing, capitalisation) don't
 require a new parser.
@@ -183,5 +196,11 @@ class ClinicDailyExportV1Parser(BaseExportParser):
 
 
 def register() -> None:
-    """Called from ``PipelineConfig.ready()`` so this parser self-registers."""
+    """Add this parser to ``ParserRegistry``.
+
+    No longer called from ``PipelineConfig.ready()`` (decision, 2026-07-22 —
+    see the module docstring), so this format is not registered/selectable in
+    production. Kept so a test (or a future need) can still register it
+    explicitly if it ever wants ``ParserRegistry.get()`` to resolve it.
+    """
     ParserRegistry.register(ClinicDailyExportV1Parser())
