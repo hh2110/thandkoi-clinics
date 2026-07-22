@@ -142,7 +142,16 @@ def publish_camp_report(clinic_date: date, *, camp_title: str) -> CampUploadRepo
     if page is None:
         page = CampUploadReportPage(
             title=camp_title,
-            slug=clinic_date.isoformat(),
+            # "camp-" prefix, not the bare ISO date: CampReportIndexPage now
+            # hosts this auto-published type alongside the manually-authored
+            # core.CampReportPage as siblings, and Wagtail enforces slug
+            # uniqueness across ALL sibling types under one parent, not just
+            # same-type -- an editor naming their manual page's slug after
+            # its date (a very natural choice) would otherwise collide with
+            # this auto-generated slug and raise an unhandled ValidationError
+            # from add_child(), after this date's ingest data has already
+            # committed.
+            slug=f"camp-{clinic_date.isoformat()}",
             camp_date=clinic_date,
             camp_title=camp_title,
             aggregate=aggregate,

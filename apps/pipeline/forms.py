@@ -39,6 +39,7 @@ class ExportUploadForm(forms.Form):
     camp_title = forms.CharField(
         label="Camp title",
         required=False,
+        max_length=200,  # matches CampUploadReportPage.camp_title's max_length
         help_text="Required when 'This export is for' is set to Medical "
         "camp — e.g. 'Free Medical Camp — Union Council X'.",
     )

@@ -37,7 +37,11 @@ from django.urls import reverse
 from openpyxl import Workbook, load_workbook
 from wagtail.models import Site
 
-from apps.core.factories import HomePageFactory
+from apps.core.factories import (
+    CampReportIndexPageFactory,
+    CampReportPageFactory,
+    HomePageFactory,
+)
 from apps.core.models import CampReportIndexPage
 from apps.pipeline import ai
 from apps.pipeline.aggregation import aggregate_export
@@ -71,7 +75,7 @@ from apps.pipeline.parser_registry import (
 )
 from apps.pipeline.parser_tkc_daily_v1 import TkcDailyActivityV1Parser
 from apps.pipeline.rendering import render_daily_report
-from apps.pipeline.report_publishing import publish_daily_report
+from apps.pipeline.report_publishing import publish_camp_report, publish_daily_report
 from apps.pipeline.xls_compat import convert_xls_to_xlsx, looks_like_xls
 
 XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1246,6 +1250,43 @@ def test_export_upload_form_requires_camp_title_only_for_camp_report_kind():
     assert camp_form_with_title.is_valid()
 
 
+def test_export_upload_form_rejects_a_camp_title_over_200_chars():
+    """Regression: camp_title has no matching model field limit historically,
+    so a form-valid-but-too-long title would reach CampUploadReportPage's
+    max_length=200 field unguarded and raise a DB-level DataError instead of
+    a friendly form error."""
+    form = ExportUploadForm(
+        data={
+            "format_key": "clinic_daily_export_v1",
+            "report_kind": "camp",
+            "camp_title": "x" * 201,
+        },
+    )
+    form.fields["export_file"].required = False
+    assert not form.is_valid()
+    assert "camp_title" in form.errors
+
+
+def test_publish_camp_report_slug_does_not_collide_with_a_manual_camp_report_page(
+    home_page,
+):
+    """Regression: CampReportIndexPage now hosts both the manually-authored
+    core.CampReportPage and the auto-published CampUploadReportPage as
+    siblings, and Wagtail enforces slug uniqueness across all sibling types
+    under one parent. An editor naming their manual page's slug after its
+    date (a natural choice) must not collide with the auto-generated slug."""
+    camp_date = datetime.date(2026, 8, 1)
+    index = CampReportIndexPageFactory(parent=home_page)
+    CampReportPageFactory(parent=index, slug=camp_date.isoformat())
+    DailyAggregateFactory(clinic_date=camp_date, report_kind=IngestRun.KIND_CAMP)
+
+    publish_camp_report(camp_date, camp_title="Free Medical Camp")
+
+    page = CampUploadReportPage.objects.get(camp_date=camp_date)
+    assert page.live is True
+    assert page.slug != camp_date.isoformat()
+
+
 def test_upload_view_camp_report_kind_publishes_camp_page_not_daily_page(
     client, home_page, django_user_model
 ):
@@ -1403,6 +1444,30 @@ def test_recompute_daily_aggregates_command_rebuilds_both_kinds_for_a_shared_dat
     )
     assert daily.total_visits == EXPECTED_TOTAL_VISITS
     assert camp.total_visits == EXPECTED_TOTAL_VISITS
+
+
+def test_recompute_daily_aggregates_command_zeroes_a_date_with_no_remaining_visits(
+    home_page,
+):
+    """Regression: an explicit ``--date`` recompute must still reset a stale
+    DailyAggregate to zero when every DeidentifiedVisit for that date has
+    since been deleted (e.g. a data correction) — not silently no-op just
+    because the date no longer appears in the visit table."""
+    ingest_export(
+        io.BytesIO(_build_clinic_v1_xlsx()),
+        parser_key="clinic_daily_export_v1",
+        uploaded_by=None,
+    )
+    assert DailyAggregate.objects.get(clinic_date=CLINIC_V1_VISIT_DATE).total_visits > 0
+
+    DeidentifiedVisit.objects.filter(visit_date=CLINIC_V1_VISIT_DATE).delete()
+
+    call_command(
+        "recompute_daily_aggregates", date=CLINIC_V1_VISIT_DATE.isoformat()
+    )
+
+    rebuilt = DailyAggregate.objects.get(clinic_date=CLINIC_V1_VISIT_DATE)
+    assert rebuilt.total_visits == 0
 
 
 # --- Home page teaser wiring -------------------------------------------------
