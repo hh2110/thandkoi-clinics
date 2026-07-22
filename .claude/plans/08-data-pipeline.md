@@ -449,5 +449,19 @@ assumptions recorded above:
    full `Address` column is never read (the coarse-location decision above
    still stands, but this format simply has no coarse location to keep).
 
-`clinic_daily_export_v1` stays registered as the worked example it was
-written to be.
+`clinic_daily_export_v1` stayed registered as the worked example it was
+written to be, until the maintainer's follow-up decision below.
+
+## Update — 2026-07-22: provisional parser unregistered from the dropdown
+
+With `tkc_daily_activity_v1` grounded in the real sample and in production
+use, the maintainer asked to drop `clinic_daily_export_v1` from the upload
+form's format dropdown — it was never validated against a real export and
+no longer needs to be offered as a choice. `apps/pipeline/apps.py` no
+longer calls `parser_clinic_v1.register()`, so it does not appear in
+`ParserRegistry.choices()` and `ParserRegistry.get("clinic_daily_export_v1")`
+no longer resolves. The module and class stay in the tree: its own
+privacy-guardrail tests remain valuable regression coverage, and several
+generic ingest/aggregate/publish tests in `apps/pipeline/tests.py` use it
+directly (bypassing `ParserRegistry`) purely as convenient fixture data,
+unrelated to testing this specific format.

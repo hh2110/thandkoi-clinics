@@ -6,8 +6,9 @@ banner rows (``THE THANDKOI CLINICS — Daily Activity Report`` and
 ``Period: 08 Jul 2026 to 08 Jul 2026``), a blank row, then a 27-column
 header row followed by one row per patient visit. This replaces the
 provisional-schema assumption documented in ``parser_clinic_v1`` for real
-uploads; that parser stays registered as the worked example it was written
-to be.
+uploads; that parser is no longer registered as a selectable format
+(decision, 2026-07-22 — see its module docstring), though it stays in the
+tree as a worked example and as test fixture data.
 
 Layout facts observed on the sample (matched case-insensitively; the header
 row is *found*, not assumed at a fixed index, so extra banner lines don't

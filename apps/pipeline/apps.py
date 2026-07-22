@@ -23,8 +23,17 @@ class PipelineConfig(AppConfig):
         ``ParserRegistry`` on import; this is the one place that import needs
         to happen so every registered parser is available regardless of
         which view or management command runs first.
-        """
-        from apps.pipeline import parser_clinic_v1, parser_tkc_daily_v1
 
-        parser_clinic_v1.register()
+        ``apps.pipeline.parser_clinic_v1`` (the pre-sample, provisional
+        schema) is deliberately **not** imported/registered here (decision,
+        2026-07-22): now that the real export sample has landed and
+        ``tkc_daily_activity_v1`` is grounded in it, the provisional parser
+        no longer needs to appear as a selectable upload format. The module
+        itself stays in the tree — its privacy-guardrail tests and its use
+        as generic fixture data elsewhere in ``apps/pipeline/tests.py`` are
+        still-useful regression coverage — it's just no longer wired up as a
+        real format choice.
+        """
+        from apps.pipeline import parser_tkc_daily_v1
+
         parser_tkc_daily_v1.register()

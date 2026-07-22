@@ -42,7 +42,6 @@ from apps.pipeline.aggregation import aggregate_export
 from apps.pipeline.ai import PATIENT_IDENTIFYING_COLUMNS, draft_newsletter_prose
 from apps.pipeline.factories import DailyReportPageFactory, ReportIndexPageFactory
 from apps.pipeline.ingest import (
-    ingest_export,
     persist_parsed_export,
     recompute_daily_aggregate,
 )
@@ -232,6 +231,18 @@ def test_real_anthropic_client_is_forbidden_in_tests():
 # actually maps into a DeidentifiedVisit row. Every guardrail test below
 # proves those identifier columns — and the raw free-text diagnoses — never
 # survive past the parser boundary.
+#
+# ClinicDailyExportV1Parser is no longer registered/selectable (decision,
+# 2026-07-22 — see apps.py and the parser's own module docstring): the real
+# ``tkc_daily_activity_v1`` parser is what production uploads use now. This
+# fixture and parser class are still used directly below (constructed and
+# called without going through ParserRegistry) for two purposes: the
+# parser's own privacy-guardrail tests, and — via the ``_ingest_clinic_v1``
+# helper — as convenient, already-built test data for the generic
+# ingest/aggregate/publish machinery tests that follow, which aren't about
+# this specific format. Tests that exercise the real upload *view* (which
+# only accepts a registered ``format_key``) use the real
+# ``tkc_daily_activity_v1`` fixture instead — see ``_build_tkc_daily_xls``.
 # =============================================================================
 
 CLINIC_V1_HEADER = [
@@ -375,6 +386,25 @@ def _build_clinic_v1_xlsx(rows=None) -> bytes:
     return buffer.getvalue()
 
 
+def _ingest_clinic_v1(rows=None, *, uploaded_by=None):
+    """Parse + persist the clinic_v1 fixture, bypassing ``ParserRegistry``.
+
+    ``ClinicDailyExportV1Parser`` is no longer registered (see apps.py), so
+    ``ingest_export(..., parser_key="clinic_daily_export_v1", ...)`` would
+    raise ``KeyError``. The tests using this helper aren't testing that
+    format specifically — they use its rich, already-built fixture as
+    convenient data for generic ingest/aggregate/publish machinery — so this
+    calls the parser directly and hands the parsed rows to
+    ``persist_parsed_export`` (the same thing ``ingest_export`` does
+    internally, minus the registry lookup).
+    """
+    buffer = io.BytesIO(_build_clinic_v1_xlsx(rows=rows))
+    parsed = ClinicDailyExportV1Parser().parse(buffer)
+    return persist_parsed_export(
+        parsed, parser_key="clinic_daily_export_v1", uploaded_by=uploaded_by
+    )
+
+
 def _administrator_user(django_user_model, username="administrator"):
     user = django_user_model.objects.create_user(username=username, password="x")  # noqa: S106
     user.groups.add(Group.objects.get(name="Administrator"))
@@ -486,11 +516,7 @@ def test_ingest_never_persists_raw_phi_and_computes_correct_aggregate(home_page)
     """Invariant #1 end-to-end: parse → persist → the DB holds only
     de-identified rows and aggregates; invariant #3: the aggregate is exactly
     the deterministic recomputation from the fixture."""
-    summary = ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    summary = _ingest_clinic_v1()
     assert summary.total_rows == EXPECTED_TOTAL_VISITS
     assert summary.results[0].status == IngestRun.STATUS_CREATED
 
@@ -549,7 +575,12 @@ def test_upload_view_never_writes_a_file_to_disk(
 ):
     """Invariant #1 through the real admin view: MemoryFileUploadHandler means
     the upload never touches MEDIA_ROOT, mirroring the Plan 02 placeholder
-    test but exercised through the real permission-gated view."""
+    test but exercised through the real permission-gated view.
+
+    Uses the real, selectable ``tkc_daily_activity_v1`` format —
+    ``clinic_daily_export_v1`` (used above as fixture data only) is no
+    longer a valid ``format_key`` choice, see apps.py.
+    """
     settings.MEDIA_ROOT = str(tmp_path)
     client.force_login(_administrator_user(django_user_model))
 
@@ -557,16 +588,16 @@ def test_upload_view_never_writes_a_file_to_disk(
         reverse("pipeline:upload_export"),
         data={
             "export_file": SimpleUploadedFile(
-                "daily-export.xlsx",
-                _build_clinic_v1_xlsx(),
-                content_type=XLSX_CONTENT_TYPE,
+                "TKC JULY 8TH STAT.xls",
+                _build_tkc_daily_xls(),
+                content_type="application/vnd.ms-excel",
             ),
-            "format_key": "clinic_daily_export_v1",
+            "format_key": "tkc_daily_activity_v1",
         },
     )
     assert response.status_code == 200
     assert list(tmp_path.iterdir()) == []
-    assert DailyAggregate.objects.filter(clinic_date=CLINIC_V1_VISIT_DATE).exists()
+    assert DailyAggregate.objects.filter(clinic_date=TKC_VISIT_DATE).exists()
 
 
 def _build_ole2_with_embedded_zip() -> bytes:
@@ -609,7 +640,7 @@ def test_upload_view_rejects_ole2_xls_with_embedded_zip_gracefully(
                     _build_ole2_with_embedded_zip(),
                     content_type="application/vnd.ms-excel",
                 ),
-                "format_key": "clinic_daily_export_v1",
+                "format_key": "tkc_daily_activity_v1",
             },
         )
 
@@ -817,11 +848,11 @@ def test_upload_view_survives_csrf_enforced_multipart_post(
         data={
             "csrfmiddlewaretoken": token,
             "export_file": SimpleUploadedFile(
-                "daily-export.xlsx",
-                _build_clinic_v1_xlsx(),
-                content_type=XLSX_CONTENT_TYPE,
+                "TKC JULY 8TH STAT.xls",
+                _build_tkc_daily_xls(),
+                content_type="application/vnd.ms-excel",
             ),
-            "format_key": "clinic_daily_export_v1",
+            "format_key": "tkc_daily_activity_v1",
         },
     )
 
@@ -831,7 +862,7 @@ def test_upload_view_survives_csrf_enforced_multipart_post(
     # And the memory-only handler still held under the real CSRF path: the raw
     # export never spooled to disk (invariant #1).
     assert list(tmp_path.iterdir()) == []
-    assert DailyAggregate.objects.filter(clinic_date=CLINIC_V1_VISIT_DATE).exists()
+    assert DailyAggregate.objects.filter(clinic_date=TKC_VISIT_DATE).exists()
 
 
 def test_middleware_installs_memory_only_handler_for_the_upload_post():
@@ -911,18 +942,10 @@ def test_upload_view_denies_user_without_can_upload_export(
 
 
 def test_reuploading_the_same_fixture_is_a_noop_duplicate(home_page):
-    first = ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    first = _ingest_clinic_v1()
     assert first.results[0].status == IngestRun.STATUS_CREATED
 
-    second = ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    second = _ingest_clinic_v1()
     assert second.results[0].status == IngestRun.STATUS_DUPLICATE
     assert DeidentifiedVisit.objects.filter(
         visit_date=CLINIC_V1_VISIT_DATE
@@ -930,19 +953,11 @@ def test_reuploading_the_same_fixture_is_a_noop_duplicate(home_page):
 
 
 def test_corrected_reupload_replaces_rather_than_double_counts(home_page):
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    _ingest_clinic_v1()
 
     corrected_rows = [list(row) for row in CLINIC_V1_ROWS]
     corrected_rows[0][8] = "Male"  # a correction: row 1's gender was mis-entered
-    result = ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx(rows=corrected_rows)),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    result = _ingest_clinic_v1(rows=corrected_rows)
     assert result.results[0].status == IngestRun.STATUS_REPLACED
 
     # Still exactly 4 rows for the date — replaced, not appended.
@@ -963,11 +978,7 @@ def test_daily_summary_payload_contains_only_this_dates_aggregate(
     """Invariant #2, for the daily-summary call specifically: the payload is
     built only from this date's DailyAggregate — never a row, never another
     date's figures."""
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    _ingest_clinic_v1()
     aggregate = DailyAggregate.objects.get(clinic_date=CLINIC_V1_VISIT_DATE)
 
     sentence = ai.draft_daily_summary_sentence(aggregate, mock_anthropic_client)
@@ -987,20 +998,17 @@ def test_daily_report_page_publishes_numbers_even_when_ai_client_fails(home_page
     """The AI summary sentence never blocks the deterministic numbers: a
     client whose call raises still results in a published page with the
     correct figures and an empty summary_sentence."""
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    _ingest_clinic_v1()
 
     def _raise(**kwargs):
         raise TimeoutError("simulated AI timeout")
 
     raising_client = SimpleNamespace(messages=SimpleNamespace(create=_raise))
 
-    # publish_daily_report already ran once during ingest_export (client=None,
-    # which hits the forbidden-real-client guard and falls back) — republish
-    # explicitly with a client that raises, to prove the *same* fallback path.
+    # publish_daily_report already ran once during _ingest_clinic_v1 (client=
+    # None, which hits the forbidden-real-client guard and falls back) —
+    # republish explicitly with a client that raises, to prove the *same*
+    # fallback path.
     page = publish_daily_report(CLINIC_V1_VISIT_DATE, client=raising_client)
 
     assert page.live is True
@@ -1011,11 +1019,7 @@ def test_daily_report_page_publishes_numbers_even_when_ai_client_fails(home_page
 def test_ingest_export_auto_publishes_the_daily_report_page(home_page):
     """The full flow: an ingest creates + live-publishes the DailyReportPage,
     with no draft step (maintainer decision, PR #15)."""
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    _ingest_clinic_v1()
     page = DailyReportPage.objects.get(report_date=CLINIC_V1_VISIT_DATE)
     assert page.live is True
     assert page.aggregate.total_visits == EXPECTED_TOTAL_VISITS
@@ -1025,11 +1029,7 @@ def test_ingest_export_auto_publishes_the_daily_report_page(home_page):
 
 
 def test_recompute_daily_aggregates_command_rebuilds_from_deidentified_visit(home_page):
-    ingest_export(
-        io.BytesIO(_build_clinic_v1_xlsx()),
-        parser_key="clinic_daily_export_v1",
-        uploaded_by=None,
-    )
+    _ingest_clinic_v1()
     original = DailyAggregate.objects.get(clinic_date=CLINIC_V1_VISIT_DATE)
     original_dict = original.as_dict()
 
