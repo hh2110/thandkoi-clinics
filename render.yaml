@@ -48,6 +48,22 @@ services:
       # Render dashboard. The test suite never uses this (AI is always mocked).
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Object storage for user-uploaded media (Wagtail images/documents).
+      # Cloudflare R2 (S3-compatible) — WhiteNoise serves static only and
+      # Render's disk is ephemeral, so media must live in a bucket. All set as
+      # secrets in the Render dashboard; the endpoint embeds the R2 account id
+      # and the keys are credentials, so none are committed. See
+      # docs/deploying.md → Secrets and .claude/plans/10-media-object-storage.md.
+      - key: MEDIA_BUCKET_NAME
+        sync: false
+      - key: MEDIA_S3_ENDPOINT_URL
+        sync: false
+      - key: MEDIA_S3_ACCESS_KEY_ID
+        sync: false
+      - key: MEDIA_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: MEDIA_CUSTOM_DOMAIN
+        sync: false
       # Generated once by Render and kept secret.
       - key: SECRET_KEY
         generateValue: true

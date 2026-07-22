@@ -6,7 +6,7 @@ if a required secret is missing, rather than fall back to an insecure default.
 """
 
 from .base import *  # noqa: F403
-from .base import env
+from .base import STORAGES, env
 
 # Fail fast if these are not provided by the environment.
 DEBUG = False
@@ -53,6 +53,46 @@ CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS",
     default=[f"https://{host}" for host in ALLOWED_HOSTS if host != "*"],
 )
+
+# --- Media storage (user uploads) ------------------------------------------
+
+# WhiteNoise serves STATIC files only — it deliberately does not serve MEDIA —
+# and Render's container filesystem is ephemeral (no persistent disk), so
+# user-uploaded media (Wagtail images/renditions and documents) must live in
+# external object storage. We use an S3-compatible bucket (Cloudflare R2) via
+# django-storages. Media is served directly from the bucket's public domain, so
+# no Django ``/media/`` route is involved (that dev-only route stays behind
+# DEBUG in config/urls.py). All five values are required in prod: the process
+# fails loudly at startup if the bucket isn't configured, rather than silently
+# writing uploads to a disk that vanishes on the next deploy.
+STORAGES["default"] = {
+    "BACKEND": "storages.backends.s3.S3Storage",
+    "OPTIONS": {
+        "bucket_name": env("MEDIA_BUCKET_NAME"),
+        "endpoint_url": env("MEDIA_S3_ENDPOINT_URL"),
+        "access_key": env("MEDIA_S3_ACCESS_KEY_ID"),
+        "secret_key": env("MEDIA_S3_SECRET_ACCESS_KEY"),
+        # Public host that serves the objects — a bare hostname, NO scheme and
+        # no trailing slash (e.g. media.thandkoiclinics.com or pub-xxxx.r2.dev).
+        # django-storages prepends https:// itself; a value like
+        # "https://media.thandkoiclinics.com" would produce a broken
+        # "https://https://…" URL for every file.
+        "custom_domain": env("MEDIA_CUSTOM_DOMAIN"),
+        # R2 ignores regions but the S3 client requires a value; "auto" is R2's.
+        "region_name": "auto",
+        # Public bucket: serve plain, cacheable URLs (no signed querystrings).
+        "querystring_auth": False,
+        # CDN cache hint for the public objects (renditions/documents are
+        # effectively immutable once uploaded).
+        "object_parameters": {"CacheControl": "public, max-age=86400"},
+        # Wagtail renditions are content-addressed; never clobber an upload that
+        # happens to share a name.
+        "file_overwrite": False,
+        # R2 does not support ACLs — sending one is rejected.
+        "default_acl": None,
+        "signature_version": "s3v4",
+    },
+}
 
 # --- Logging ---------------------------------------------------------------
 

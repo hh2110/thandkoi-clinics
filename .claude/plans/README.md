@@ -42,6 +42,7 @@ plan from 03.5 onward carries three lifecycle sections:
 | 07 | [Accounts & roles](07-accounts-roles.md) — uploaders/approvers | 🚧 In progress |
 | 08 | [Data pipeline](08-data-pipeline.md) — intake, parser registry, aggregate-and-discard, daily report page | 🚧 In progress |
 | 09 | [AI monthly newsletter](09-ai-monthly-newsletter.md) — Anthropic SDK, deterministic-numbers guardrail, draft → review | 🚧 In progress |
+| 10 | [Media object storage](10-media-object-storage.md) — serve/persist Wagtail uploads from S3-compatible object storage (Cloudflare R2); prod media was 404ing on ephemeral disk | 🚧 In progress |
 
 **Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ✅ Done
 
