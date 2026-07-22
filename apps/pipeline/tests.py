@@ -588,28 +588,35 @@ def _build_ole2_with_embedded_zip() -> bytes:
 
 
 def test_upload_view_rejects_ole2_xls_with_embedded_zip_gracefully(
-    client, home_page, django_user_model
+    client, home_page, django_user_model, caplog
 ):
     """Regression for the production 500 of 2026-07-22: the clinic's real
     ``.xls`` export slipped past the ``BadZipFile`` catch (its OLE2 body
     embeds a zip signature) and openpyxl's ``OSError`` went unhandled. The
     view must answer with its ordinary "not a valid .xlsx" error — a 200,
-    nothing ingested."""
+    nothing ingested — while logging the underlying exception so a recurring
+    failure stays visible to the operator."""
     client.force_login(_administrator_user(django_user_model))
 
-    response = client.post(
-        reverse("pipeline:upload_export"),
-        data={
-            "export_file": SimpleUploadedFile(
-                "TKC JULY 8TH STAT.xls",
-                _build_ole2_with_embedded_zip(),
-                content_type="application/vnd.ms-excel",
-            ),
-            "format_key": "clinic_daily_export_v1",
-        },
-    )
+    with caplog.at_level("WARNING", logger="apps.pipeline.admin_views"):
+        response = client.post(
+            reverse("pipeline:upload_export"),
+            data={
+                "export_file": SimpleUploadedFile(
+                    "TKC JULY 8TH STAT.xls",
+                    _build_ole2_with_embedded_zip(),
+                    content_type="application/vnd.ms-excel",
+                ),
+                "format_key": "clinic_daily_export_v1",
+            },
+        )
 
     assert response.status_code == 200
+    # The swallowed exception is still diagnosable from the logs.
+    assert any(
+        "OSError" in record.getMessage() and "workbook part" in record.getMessage()
+        for record in caplog.records
+    )
     # The apostrophe in "doesn't" is HTML-escaped in the rendered page, so
     # assert on the fragment after it.
     assert "look like a valid .xlsx export" in response.content.decode()

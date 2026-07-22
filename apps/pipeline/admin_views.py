@@ -30,6 +30,7 @@ nothing here that *could* leak into the rendered response.
 
 from __future__ import annotations
 
+import logging
 from zipfile import BadZipFile
 
 from django.contrib.auth.decorators import permission_required
@@ -41,6 +42,8 @@ from openpyxl.utils.exceptions import InvalidFileException
 from apps.pipeline.forms import ExportUploadForm
 from apps.pipeline.ingest import ingest_export
 from apps.pipeline.parser_registry import ParserRegistry
+
+logger = logging.getLogger(__name__)
 
 
 def _template_for(request) -> str:
@@ -66,12 +69,38 @@ def upload_export(request):
         if form.is_valid():
             uploaded = form.cleaned_data["export_file"]
             format_key = form.cleaned_data["format_key"]
+            # The not-really-an-.xlsx catch is scoped to opening/sniffing the
+            # workbook only. ``ingest_export`` commits one transaction per
+            # clinic-date and publishes a page per date, so an OSError-family
+            # exception escaping *it* (TimeoutError, ConnectionError, ...)
+            # must surface as a logged 500 — after a partial ingest, "Nothing
+            # was saved" would be a lie.
             try:
                 workbook = load_workbook(uploaded, read_only=True, data_only=True)
                 try:
                     suggested = ParserRegistry.sniff_all(workbook)
                 finally:
                     workbook.close()
+            except (InvalidFileException, BadZipFile, OSError) as exc:
+                # BadZipFile: a non-.xlsx file (e.g. a PDF renamed) isn't a
+                # zip archive at all, so openpyxl never gets far enough to
+                # raise its own InvalidFileException.
+                # OSError: the clinic system's real .xls export is an OLE2
+                # file that happens to embed a zip end-of-central-directory
+                # record, so ``zipfile`` opens it and openpyxl only fails
+                # later with ``OSError("File contains no valid workbook
+                # part")`` — production 500 of 2026-07-22.
+                logger.warning(
+                    "Rejected export upload as not a readable .xlsx: %s: %s",
+                    type(exc).__name__,
+                    exc,
+                )
+                error = (
+                    "That file doesn't look like a valid .xlsx export. "
+                    "If this is the clinic's .xls export, re-save it as "
+                    ".xlsx first. Nothing was saved."
+                )
+            else:
                 if suggested and format_key not in suggested:
                     suggested_labels = ", ".join(
                         label
@@ -86,22 +115,6 @@ def upload_export(request):
                 summary = ingest_export(
                     uploaded, parser_key=format_key, uploaded_by=request.user
                 )
-            except (InvalidFileException, BadZipFile, OSError):
-                # BadZipFile: a non-.xlsx file (e.g. a PDF renamed) isn't a
-                # zip archive at all, so openpyxl never gets far enough to
-                # raise its own InvalidFileException.
-                # OSError: the clinic system's real .xls export is an OLE2
-                # file that happens to embed a zip end-of-central-directory
-                # record, so ``zipfile`` opens it and openpyxl only fails
-                # later with ``OSError("File contains no valid workbook
-                # part")`` — production 500 of 2026-07-22.
-                error = (
-                    "That file doesn't look like a valid .xlsx export. "
-                    "If this is the clinic's .xls export, re-save it as "
-                    ".xlsx first. Nothing was saved."
-                )
-            except KeyError:
-                error = "Unknown export format selected. Nothing was saved."
         else:
             error = "; ".join(
                 f"{field}: {', '.join(errs)}" for field, errs in form.errors.items()
