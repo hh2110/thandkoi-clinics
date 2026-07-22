@@ -1,0 +1,37 @@
+{% load i18n %}
+{% comment %}
+CSS-only scroll-snap carousel — a horizontally-scrolling row of partner logos
+and named-donor entries. No carousel/slider JS precedent exists anywhere in
+this repo (confirmed via grep); Plan 03's "minimal JS" bias (see
+theme_toggle.html's the-one-deliberate-script comment) means this reaches for
+scroll-snap-type/scroll-snap-align on a plain flex row instead of a JS
+library or hand-rolled slider. It degrades gracefully to an ordinary
+horizontally scrollable row with no JS, and carries no autoplay/animation so
+there is nothing extra to gate under prefers-reduced-motion.
+
+Context:
+  eyebrow / heading — optional section header.
+  items — list of {kind: "partner"|"donor", ...} dicts — see
+          `_carousel_item.html` for each kind's shape.
+
+Empty state: with no items it shows a "coming soon" line, not an empty strip
+(same convention as card_grid.html/media_grid.html).
+{% endcomment %}
+<section class="section">
+  <div class="wrapper">
+    {% if eyebrow or heading %}
+      <div class="section-header">
+        {% include "partials/sections/section_header.html" %}
+      </div>
+    {% endif %}
+    {% if items %}
+      <div class="carousel" role="region" aria-label="{{ heading|default:_('Partners and donors') }}" tabindex="0">
+        {% for item in items %}
+          {% include "partials/sections/_carousel_item.html" %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="carousel__empty text-faint">{% translate "Content coming soon." %}</p>
+    {% endif %}
+  </div>
+</section>

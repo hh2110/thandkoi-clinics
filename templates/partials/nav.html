@@ -9,6 +9,9 @@ Newsletters and Gallery now resolve to real pages (Plan 06); "Camp Reports"
 is a new link Plan 06 adds for its Camp Report archive. "Reports" is left as
 a placeholder/404 — that slot is reserved for Plan 08's pipeline-fed
 ReportIndexPage, a distinct content type Plan 06 does not build.
+
+"Donors & Partners" is a plain link, not a dropdown — this nav has no
+dropdown support yet (a separate, not-yet-built backlog item).
 {% endcomment %}
 {% with lang=LANGUAGE_CODE|default:"en" %}
 <nav aria-label="{% translate 'Primary' %}">
@@ -21,6 +24,7 @@ ReportIndexPage, a distinct content type Plan 06 does not build.
       <li><a href="/{{ lang }}/about/">{% translate "About" %}</a></li>
       <li><a href="/{{ lang }}/team/">{% translate "Team" %}</a></li>
       <li><a href="/{{ lang }}/our-work/">{% translate "Our Work" %}</a></li>
+      <li><a href="/{{ lang }}/donors-partners/">{% translate "Donors & Partners" %}</a></li>
       <li><a href="/{{ lang }}/camp-reports/">{% translate "Camp Reports" %}</a></li>
       <li><a href="/{{ lang }}/reports/">{% translate "Reports" %}</a></li>
       <li><a href="/{{ lang }}/newsletters/">{% translate "Newsletters" %}</a></li>

@@ -20,12 +20,15 @@ from apps.core.models import (
     CampReportPage,
     ContactPage,
     DonatePage,
+    Donor,
+    DonorsPartnersPage,
     GalleryImage,
     GalleryPage,
     HomePage,
     NewsletterIndexPage,
     NewsletterPage,
     OurWorkPage,
+    Partner,
     Service,
     TeamMember,
     TeamPage,
@@ -213,3 +216,28 @@ class GalleryImageFactory(factory.django.DjangoModelFactory):
 
     caption = "A clinic photo."
     consent_confirmed = True
+
+
+class DonorsPartnersPageFactory(_TreePageFactory):
+    class Meta:
+        model = DonorsPartnersPage
+
+    title = "Donors & Partners"
+    slug = "donors-partners"
+    intro = "<p>With thanks to those who make our work possible.</p>"
+
+
+class PartnerFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Partner
+
+    name = factory.Sequence(lambda n: f"Partner {n}")
+    description = "An organisational partner."
+
+
+class DonorFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Donor
+
+    name = factory.Sequence(lambda n: f"Donor {n}")
+    description = "Donated in-kind support."

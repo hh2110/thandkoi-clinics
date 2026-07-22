@@ -10,6 +10,11 @@ change. No form, no payment widget, no third-party script — this is a
 placeholder page (Plan 05 scope), not a checkout. The closing CTA only renders
 once a real Contact page exists (see DonatePage.get_context) — no dead "#"
 link, mirroring the hero/donate-band guard.
+
+The partner-logo/donor carousel below reads the live Donors & Partners page's
+own partners/donors (DonatePage.get_context → carousel_items) rather than
+duplicating that content here by hand; with no such page published yet it
+shows the carousel's own "coming soon" empty state.
 {% endcomment %}
 
 {% block content %}
@@ -80,6 +85,8 @@ link, mirroring the hero/donate-band guard.
       </div>
     </section>
   {% endif %}
+
+  {% include "partials/sections/carousel.html" with eyebrow=_("With thanks") heading=_("Partners & donors") items=carousel_items %}
 
   {% if contact_page_url %}
     {% include "partials/sections/cta_band.html" with heading=_("Prefer another way to give?") body=_("Contact us to arrange an in-kind gift, a receipt, or any question about giving.") cta_label=_("Contact us") cta_url=contact_page_url %}
