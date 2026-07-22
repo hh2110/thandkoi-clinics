@@ -112,16 +112,23 @@
   margin-block: var(--space-4) 0;
 }
 
+/* --media-ratio must match the caller's Wagtail rendition (hero_block.html's
+   fill-760x950) so object-fit never has to crop in practice. */
 .hero__media {
   position: relative;
+  --media-ratio: 4 / 5;
 }
 
-/* 4:5 matches the fill-760x950 rendition, so the box is reserved before the
-   image loads (no layout shift) and object-fit never has to crop in practice. */
-.hero__image {
+/* One framed-image treatment for every media slot. The slot wrapper sets
+   --media-ratio once; the loaded image and the unset-state placeholder
+   (same fallback chain, below) reserve the identical box, so neither the
+   image arriving nor the placeholder swap ever shifts layout. */
+.hero__image,
+.feature-split__image,
+.card__photo img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: var(--media-ratio, 1 / 1);
   object-fit: cover;
   border-radius: var(--card-radius);
 }
@@ -265,18 +272,12 @@
   margin-block: 0;
 }
 
-/* Person / service card photo slot. The image (or, when unset, the shared
-   `.media-placeholder`) fills the slot; the card padding frames it. */
+/* Person / service card photo slot. The image (styled by the shared media-slot
+   rule under the hero section; 1/1 via the --media-ratio default) or, when
+   unset, the shared `.media-placeholder` fills the slot; the card padding
+   frames it. */
 .card__photo {
   margin-block-end: var(--space-2);
-}
-
-.card__photo img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: var(--card-radius);
 }
 
 /* Role line on a person card, between the name and the bio. */
@@ -306,14 +307,10 @@
   align-items: center;
 }
 
-/* 16:9 matches the section's placeholder ratio; reserved up front so the
-   image loading never shifts the text column beside it. */
-.feature-split__image {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: var(--card-radius);
+/* Callers passing media_image must pair it with a ~16:9 rendition
+   (e.g. fill-1200x675) so the shared image rule's cover never crops. */
+.feature-split__media {
+  --media-ratio: 16 / 9;
 }
 
 .feature-split__stats {
@@ -435,7 +432,7 @@
    carry no identifiable person). Stripe tints are derived from a token with
    color-mix() so there is no hard-coded colour. */
 .media-placeholder {
-  aspect-ratio: var(--placeholder-ratio, 1 / 1);
+  aspect-ratio: var(--placeholder-ratio, var(--media-ratio, 1 / 1));
   border: 1px solid var(--color-border-default);
   border-radius: var(--card-radius);
   background-image: repeating-linear-gradient(

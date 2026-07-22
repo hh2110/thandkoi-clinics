@@ -6,7 +6,9 @@ side. Collapses to one column below that.
 
 Context (all optional):
   reverse       — truthy to render media on the trailing (inline-end) side.
-  media_image / media_alt   — image; falls back to the placeholder.
+  media_image / media_alt   — image; falls back to the placeholder. Pass a ~16:9
+                  rendition (e.g. fill-1200x675) to match the slot's
+                  --media-ratio (layout.css), or the image gets centre-cropped.
   media_caption — caption for the placeholder when no image is set.
   eyebrow       — uppercase label.
   heading       — section heading.
@@ -21,7 +23,7 @@ Context (all optional):
         {% if media_image %}
           <img class="feature-split__image" src="{{ media_image }}" alt="{{ media_alt|default:'' }}" />
         {% else %}
-          {% include "partials/sections/_media_placeholder.html" with caption=media_caption ratio="16 / 9" %}
+          {% include "partials/sections/_media_placeholder.html" with caption=media_caption %}
         {% endif %}
       </div>
       <div class="feature-split__body">

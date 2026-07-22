@@ -14,7 +14,9 @@ Context (all optional — a section renders whatever it's given):
                          (amber is Donate-only, brand-guidelines.md §7).
   secondary_cta_label / secondary_cta_url — optional outline action.
   tagline              — Urdu tagline, rendered lang="ur" dir="rtl".
-  media_image / media_alt   — hero image; falls back to the placeholder.
+  media_image / media_alt   — hero image; falls back to the placeholder. Pass a
+                         4:5 rendition (hero_block.html uses fill-760x950) to
+                         match the slot's --media-ratio (layout.css).
   media_caption        — caption for the placeholder when no image is set.
   stat_value / stat_label   — optional floating stat card over the media.
 
@@ -42,7 +44,7 @@ Numbers and copy are inputs only — nothing here is baked in.
       {% if media_image %}
         <img class="hero__image" src="{{ media_image }}" alt="{{ media_alt|default:'' }}" />
       {% else %}
-        {% include "partials/sections/_media_placeholder.html" with caption=media_caption ratio="4 / 5" %}
+        {% include "partials/sections/_media_placeholder.html" with caption=media_caption %}
       {% endif %}
       {% if stat_value %}
         <div class="card hero__stat-card">
