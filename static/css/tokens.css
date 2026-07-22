@@ -64,6 +64,14 @@
      else it's used. */
   --color-stat-value: var(--color-brand);
 
+  /* Circle of Care wheel wedges (brand-guidelines.md §2: coral is hub-cross
+     only, wedges are teal tones) — the only component-local colours this
+     token set carries a per-component name for, since the wheel needs three
+     distinct teal tones rather than one semantic brand colour. */
+  --color-coc-seg-1: var(--color-teal-brand);
+  --color-coc-seg-2: var(--color-teal-bright);
+  --color-coc-seg-3: var(--color-teal-deep);
+
   /* Footer is always the dark teal ground, in both themes (brand-guidelines
      "Footer / deepest ground"), so it gets its own fixed tokens rather than
      reading the page's light/dark tokens. */
@@ -121,6 +129,9 @@
     --color-donate-text: var(--color-ink);
     --color-accent-soft-bg: var(--color-teal-deep);
     --color-stat-value: var(--color-pale-aqua);
+    --color-coc-seg-1: var(--color-teal-bright);
+    --color-coc-seg-2: #2cb0c4;
+    --color-coc-seg-3: #0a6b7c;
   }
 }
 
@@ -143,6 +154,9 @@
   --color-donate-text: var(--color-ink);
   --color-accent-soft-bg: var(--color-teal-deep);
   --color-stat-value: var(--color-pale-aqua);
+  --color-coc-seg-1: var(--color-teal-bright);
+  --color-coc-seg-2: #2cb0c4;
+  --color-coc-seg-3: #0a6b7c;
 }
 
 :root[data-theme="light"] {
@@ -163,4 +177,7 @@
   --color-donate-text: #ffffff;
   --color-accent-soft-bg: var(--color-aqua-tint);
   --color-stat-value: var(--color-brand);
+  --color-coc-seg-1: var(--color-teal-brand);
+  --color-coc-seg-2: var(--color-teal-bright);
+  --color-coc-seg-3: var(--color-teal-deep);
 }

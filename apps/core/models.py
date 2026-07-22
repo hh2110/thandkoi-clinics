@@ -43,10 +43,11 @@ from apps.core import blocks as core_blocks
 class HomePage(Page):
     """The site's root page — a StreamField body composed of Plan 03.5 sections.
 
-    The body's block templates map onto the hero / stat-band / cta-band partials;
-    a "latest daily report" teaser (feature split) renders conditionally beneath
-    it once Plan 06 supplies a report content type (``get_latest_report`` returns
-    ``None`` until then, so the section stays hidden rather than broken).
+    The body's block templates map onto the hero / stat-band / care-circle /
+    cta-band partials; a "latest daily report" teaser (feature split) renders
+    conditionally beneath it once Plan 06 supplies a report content type
+    (``get_latest_report`` returns ``None`` until then, so the section stays
+    hidden rather than broken).
     """
 
     # Legacy Plan 01 field, retained for data safety but no longer surfaced in
@@ -62,8 +63,14 @@ class HomePage(Page):
         [
             ("hero", core_blocks.HeroBlock()),
             ("impact_stats", core_blocks.ImpactStatsBlock()),
+            ("circle_of_care", core_blocks.CircleOfCareBlock()),
             ("donate_cta", core_blocks.DonateCTABlock()),
         ],
+        # The circle-of-care partial's hub uses a page-wide-unique id
+        # (``coc-hub-detail``) for its aria-controls target, so a second copy
+        # on the same page would collide — capped to one rather than relying
+        # on editors never adding it twice.
+        block_counts={"circle_of_care": {"max_num": 1}},
         blank=True,
         help_text="Compose the home page from the section kit.",
     )

@@ -118,6 +118,67 @@ class DonateCTABlock(blocks.StructBlock):
         template = "blocks/donate_cta_block.html"
 
 
+CIRCLE_OF_CARE_STAGE_COUNT_MESSAGE = (
+    "Exactly 6 stages are required — the wheel's segments and label positions "
+    "are fixed for a 6-part circle."
+)
+
+
+class CircleOfCareStageBlock(blocks.StructBlock):
+    """One stage of a patient's visit, on the "Quality of Care" wheel.
+
+    ``short`` is the on-ring label (the wedge geometry is fixed-width, so it
+    needs to stay brief); ``name`` + ``desc`` fill the centre hub once a stage
+    is selected.
+    """
+
+    name = blocks.CharBlock(
+        max_length=80, help_text="Full stage name, shown in the hub."
+    )
+    short = blocks.CharBlock(
+        max_length=28,
+        help_text="On-ring label — keep brief so it fits the wedge (the "
+        "longest example, 'Doctor's Consultation', is 21 characters).",
+    )
+    desc = blocks.TextBlock(
+        help_text="Detail shown in the hub when this stage is selected."
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = "Care stage"
+
+
+class CircleOfCareBlock(blocks.StructBlock):
+    """The six-wedge "Quality of Care" wheel → ``circle_of_care.html`` partial.
+
+    The wheel's SVG segments and on-ring label positions are fixed for exactly
+    six stages (external design handoff, "Circle of Care Homepage Update"), so
+    ``clean()`` refuses to save any other count rather than silently
+    mis-rendering a partial wheel.
+    """
+
+    heading = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text='Defaults to "Quality of Care" if left blank.',
+    )
+    stages = blocks.ListBlock(CircleOfCareStageBlock())
+
+    def clean(self, value):
+        result = super().clean(value)
+        if len(result.get("stages") or []) != 6:
+            raise StructBlockValidationError(
+                block_errors={"stages": [CIRCLE_OF_CARE_STAGE_COUNT_MESSAGE]}
+            )
+        return result
+
+    class Meta:
+        icon = "crosshairs"
+        label = "Quality of care circle"
+        template = "blocks/circle_of_care_block.html"
+
+
 CONSENT_REQUIRED_MESSAGE = "Confirm consent before publishing this photo."
 
 

@@ -1,0 +1,64 @@
+{% load i18n %}
+{% comment %}
+Circle of Care — the "Quality of Care Circle" homepage section.
+
+A six-wedge teal wheel; the stage names sit on the ring and the selected
+stage's detail is revealed in the hub. A coral medical-cross marks the hub at
+rest (the only sanctioned coral use — brand-guidelines.md §2). Progressive
+enhancement: with no JS the wheel + names + default hub still render; JS adds
+the hover/tap-to-reveal behaviour.
+
+Context:
+  heading  — optional section heading (defaults to "Quality of Care").
+  stages   — list of exactly 6 dicts, in clockwise order from the top:
+             { "name": str, "short": str, "desc": str }
+             `short` is the on-ring label; `name` + `desc` fill the hub.
+
+The wedge geometry (SVG paths) and label positions are fixed for 6 stages and
+must not be reordered — index 0 is the top-right wedge, going clockwise.
+{% endcomment %}
+<section class="section coc-section">
+  <div class="wrapper">
+    <div class="section-header coc-section__header">
+      {% include "partials/sections/section_header.html" with heading=heading|default:_("Quality of Care") %}
+    </div>
+
+    <div class="coc" data-coc>
+      <svg class="coc__wheel-svg" viewBox="0 0 400 400" aria-hidden="true" focusable="false">
+        <path class="coc__seg coc__seg--1" data-coc-seg="0" d="M205.30 10.07 A190 190 0 0 1 361.81 100.43 L278.35 151.79 A92 92 0 0 0 202.57 108.04 Z"></path>
+        <path class="coc__seg coc__seg--2" data-coc-seg="1" d="M367.11 109.58 A190 190 0 0 1 367.11 290.42 L280.91 243.78 A92 92 0 0 0 280.91 156.22 Z"></path>
+        <path class="coc__seg coc__seg--3" data-coc-seg="2" d="M361.81 299.57 A190 190 0 0 1 205.30 389.93 L202.57 291.96 A92 92 0 0 0 278.35 248.21 Z"></path>
+        <path class="coc__seg coc__seg--1" data-coc-seg="3" d="M194.70 389.93 A190 190 0 0 1 38.19 299.57 L121.65 248.21 A92 92 0 0 0 197.43 291.96 Z"></path>
+        <path class="coc__seg coc__seg--2" data-coc-seg="4" d="M32.89 290.42 A190 190 0 0 1 32.89 109.58 L119.09 156.22 A92 92 0 0 0 119.09 243.78 Z"></path>
+        <path class="coc__seg coc__seg--3" data-coc-seg="5" d="M38.19 100.43 A190 190 0 0 1 194.70 10.07 L197.43 108.04 A92 92 0 0 0 121.65 151.79 Z"></path>
+      </svg>
+
+      {% comment %} Fixed label positions (% of the square wheel), clockwise from top-right. {% endcomment %}
+      <div class="coc__labels">
+        {% for stage in stages %}
+          <button type="button"
+                  class="coc__label coc__label--{{ forloop.counter }}"
+                  data-coc-stage="{{ forloop.counter0 }}"
+                  data-coc-name="{{ stage.name }}"
+                  data-coc-desc="{{ stage.desc }}"
+                  aria-controls="coc-hub-detail">{{ stage.short }}</button>
+        {% endfor %}
+      </div>
+
+      <div class="coc__hub">
+        <div class="coc__hub-default" data-coc-default>
+          <svg class="coc__cross" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <rect x="8" y="2" width="4" height="16" rx="1"></rect>
+            <rect x="2" y="8" width="16" height="4" rx="1"></rect>
+          </svg>
+          <p class="coc__hub-brand">{% translate "Thandkoi Clinics" %}</p>
+          <p class="coc__hub-hint">{% translate "Select a stage" %}</p>
+        </div>
+        <div class="coc__hub-detail" id="coc-hub-detail" data-coc-detail hidden aria-live="polite">
+          <p class="coc__hub-name" data-coc-detail-name></p>
+          <p class="coc__hub-desc" data-coc-detail-desc></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

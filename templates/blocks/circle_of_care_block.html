@@ -1,0 +1,7 @@
+{% comment %}
+CircleOfCareBlock → the "Quality of Care" wheel partial. `value.stages` is a
+list of {name, short, desc} StructValues, iterated directly by
+circle_of_care.html. `clean()` on the block guarantees exactly 6 entries
+before this ever renders.
+{% endcomment %}
+{% include "partials/sections/circle_of_care.html" with heading=value.heading stages=value.stages %}

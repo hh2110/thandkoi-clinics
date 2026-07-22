@@ -370,14 +370,73 @@ def test_layout_css_uses_tokens_only_no_hardcoded_colours():
 def test_home_page_composes_layout_kit_sections(client, home_page):
     """Home renders the 03.5 kit sections from its StreamField body.
 
-    The default factory body is hero + impact-stat band + an unlinked donate
-    CTA, so the composed markup (hero, stat-band) is present — the Plan 04
-    "compose a page from the kit" path, exercised through the real chrome.
+    The default factory body is hero + impact-stat band + the Quality of Care
+    circle + an unlinked donate CTA, so the composed markup (hero, stat-band,
+    coc-section) is present — the Plan 04 "compose a page from the kit" path,
+    exercised through the real chrome.
     """
     content = client.get("/en/").content.decode()
     assert "hero" in content
     assert "stat-band" in content
     assert "467+" in content  # a supplied impact figure renders verbatim
+    assert "coc-section" in content
+    assert "Triage" in content  # a supplied care-stage label renders verbatim
+
+
+def test_circle_of_care_block_requires_exactly_six_stages():
+    """The wheel's geometry is fixed for 6 stages — any other count is refused.
+
+    Mirrors ``ConsentedImageBlock``'s own ``clean()``-raises-on-save-time-only
+    guard (Plan 04 convention).
+    """
+    from apps.core.blocks import CircleOfCareBlock
+
+    stage = {"name": "Triage", "short": "Triage", "desc": "Assessed on arrival."}
+    block = CircleOfCareBlock()
+    with pytest.raises(ValidationError):
+        block.clean(block.to_python({"heading": "", "stages": [stage] * 5}))
+    with pytest.raises(ValidationError):
+        block.clean(block.to_python({"heading": "", "stages": [stage] * 7}))
+    # Exactly 6 validates cleanly.
+    cleaned = block.clean(block.to_python({"heading": "", "stages": [stage] * 6}))
+    assert len(cleaned["stages"]) == 6
+
+
+def test_circle_of_care_block_renders_stages_in_the_hub(db):
+    """Each stage's name/short/desc reach the rendered hub markup verbatim.
+
+    ``db`` is required because instantiating ``HomePage()`` (for its
+    ``.body.stream_block``) triggers a ``ContentType`` lookup in Wagtail's
+    ``Page.__init__``.
+    """
+    from wagtail.blocks import StreamValue
+
+    from apps.core.models import HomePage as _HP
+
+    body = _HP().body.stream_block
+    value = StreamValue(
+        body,
+        [
+            (
+                "circle_of_care",
+                {
+                    "stages": [
+                        {
+                            "name": "Triage",
+                            "short": "Triage",
+                            "desc": "Assessed on arrival.",
+                        }
+                    ]
+                    * 6,
+                },
+            )
+        ],
+    )
+    html = value.render_as_block()
+    assert "coc-section" in html
+    assert "Quality of Care" in html  # default heading
+    assert "Assessed on arrival." in html
+    assert 'data-coc-stage="5"' in html  # 6 stages, zero-indexed
 
 
 @pytest.mark.parametrize(
