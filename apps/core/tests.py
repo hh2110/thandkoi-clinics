@@ -291,14 +291,14 @@ def test_media_grid_wraps_real_photo_in_a_lightbox_trigger():
             "items": [
                 {
                     "image": "/media/x.fill-640x640.jpg",
-                    "full": "/media/x.max-1600x1600.jpg",
+                    "full": "/media/x.max-1200x1200.jpg",
                     "alt": "A clinic day",
                 }
             ]
         },
     )
     assert "data-lightbox-trigger" in html
-    assert 'data-lightbox-src="/media/x.max-1600x1600.jpg"' in html
+    assert 'data-lightbox-src="/media/x.max-1200x1200.jpg"' in html
     assert 'data-lightbox-alt="A clinic day"' in html
 
 
@@ -839,7 +839,7 @@ def test_camp_report_photos_render_through_the_media_grid(client, home_page):
     assert "Crowd at the camp" in content
     assert 'alt="Camp crowd"' in content
     assert "data-lightbox-trigger" in content
-    assert "max-1600x1600" in content  # the modal's larger, uncropped rendition
+    assert "max-1200x1200" in content  # the modal's larger, uncropped rendition
 
 
 def test_newsletter_archive_lists_only_published_newest_first(client, home_page):
@@ -966,7 +966,7 @@ def test_gallery_image_click_to_expand_uses_an_uncropped_full_size_rendition(
     content = client.get("/en/gallery/").content.decode()
     assert "data-lightbox-trigger" in content
     assert "fill-640x640" in content  # the grid's own cropped thumbnail
-    assert "max-1600x1600" in content  # the modal's larger, uncropped rendition
+    assert "max-1200x1200" in content  # the modal's larger, uncropped rendition
 
 
 def test_gallery_images_query_resolves_image_fk_without_an_extra_query_each(

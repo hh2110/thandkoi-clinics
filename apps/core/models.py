@@ -510,14 +510,23 @@ def _photo_item(image, alt_text, caption):
     ``Image`` instance.
 
     ``full`` is a second rendition alongside the cropped grid thumbnail:
-    ``max-1600x1600`` fits the image within a 1600px box *without* cropping
+    ``max-1200x1200`` fits the image within a 1200px box *without* cropping
     (unlike the grid's ``fill-640x640``), so the lightbox modal
     (``static/js/lightbox.js``) can show it close to its original aspect
-    ratio instead of the square crop.
+    ratio instead of the square crop. Both renditions are generated eagerly
+    here (Wagtail caches the result after the first call, per image), so a
+    cold-cache page load now does two Willow/Pillow resizes per real photo
+    instead of one. Capped at 1200 rather than a larger box to keep that
+    per-photo cost down; a further, deliberately deferred option if the
+    gallery grows large is Wagtail's lazy `ServeView`-based rendition
+    serving, which defers the resize to the first request for that specific
+    rendition's URL instead of every page render — not wired up here since
+    this site's expected photo volume doesn't yet warrant the extra
+    infrastructure.
     """
     return {
         "image": image.get_rendition("fill-640x640").url,
-        "full": image.get_rendition("max-1600x1600").url,
+        "full": image.get_rendition("max-1200x1200").url,
         "alt": alt_text or image.title,
         "caption": caption,
     }
