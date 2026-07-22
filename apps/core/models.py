@@ -415,9 +415,7 @@ class DonatePage(Page):
         donors_partners_page = DonorsPartnersPage.objects.live().first()
         context["carousel_items"] = [
             {"kind": "partner", **item} for item in _partner_items(donors_partners_page)
-        ] + [
-            {"kind": "donor", **item} for item in _donor_items(donors_partners_page)
-        ]
+        ] + [{"kind": "donor", **item} for item in _donor_items(donors_partners_page)]
         return context
 
     class Meta:
