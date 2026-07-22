@@ -66,7 +66,20 @@ rules are architectural constraints, not preferences — never weaken them:
 - **One plan at a time.** Don't run ahead of the current step's plan.
 - **Branch, don't commit to `main`.** Branch names: `plan/NN-slug`,
   `feat/slug`, `fix/slug`, `docs/slug`, `chore/slug`.
-- **PR flow:** open a PR with `gh pr create`; keep PRs scoped to one plan/step.
+- **Review before a PR ever opens, every branch, no exceptions.** Once a
+  branch's changes are committed and tests/lint pass, run the
+  [`code-review-tc`](.claude/skills/code-review-tc/SKILL.md) skill (the
+  repo-local wrapper around the built-in local code-review workflow) and loop:
+  fix reasonable findings, reply to unreasonable ones with reasoning, re-run
+  until the review comes back clean. Do this **before** `gh pr create`, not
+  after — a PR only gets opened once its branch's review is clean. This
+  applies uniformly, including to branches an agent/session produced as part
+  of a larger batch — reviewing each one is not optional cleanup, it's the
+  step that comes before a PR exists at all.
+- **PR flow:** once review is clean, open a PR with `gh pr create` (draft —
+  see the personal lifecycle doc's "drafts stay drafts until I sign off");
+  keep PRs scoped to one plan/step. Merge once CI is green and the PR has been
+  taken out of draft.
 - **Secrets** live in environment variables / `.env` (gitignored) — never in the
   repo or in prompts.
 
