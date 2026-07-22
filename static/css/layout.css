@@ -116,6 +116,15 @@
   position: relative;
 }
 
+/* The rendition (fill-760x950) already crops to 4:5 — render it as-is rather
+   than forcing another aspect ratio, which would distort it. */
+.hero__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--card-radius);
+}
+
 /* Floating stat card, tucked over the media's leading edge. Uses logical
    `inset-inline-start` so it flips to the right under RTL. */
 .hero__stat-card {

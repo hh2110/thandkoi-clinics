@@ -40,7 +40,7 @@ Numbers and copy are inputs only — nothing here is baked in.
     </div>
     <div class="hero__media">
       {% if media_image %}
-        <img class="media-grid__item" src="{{ media_image }}" alt="{{ media_alt|default:'' }}" />
+        <img class="hero__image" src="{{ media_image }}" alt="{{ media_alt|default:'' }}" />
       {% else %}
         {% include "partials/sections/_media_placeholder.html" with caption=media_caption ratio="4 / 5" %}
       {% endif %}
