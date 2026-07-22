@@ -628,7 +628,7 @@
 .coc-section__header {
   text-align: center;
 }
-.coc-section__title {
+.coc-section__header .section-header__title {
   max-width: none;
   margin-inline: auto;
 }

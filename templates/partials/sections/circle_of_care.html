@@ -20,7 +20,7 @@ must not be reordered — index 0 is the top-right wedge, going clockwise.
 <section class="section coc-section">
   <div class="wrapper">
     <div class="section-header coc-section__header">
-      <h2 class="section-header__title coc-section__title">{{ heading|default:_("Quality of Care") }}</h2>
+      {% include "partials/sections/section_header.html" with heading=heading|default:_("Quality of Care") %}
     </div>
 
     <div class="coc" data-coc>

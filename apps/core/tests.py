@@ -402,8 +402,13 @@ def test_circle_of_care_block_requires_exactly_six_stages():
     assert len(cleaned["stages"]) == 6
 
 
-def test_circle_of_care_block_renders_stages_in_the_hub():
-    """Each stage's name/short/desc reach the rendered hub markup verbatim."""
+def test_circle_of_care_block_renders_stages_in_the_hub(db):
+    """Each stage's name/short/desc reach the rendered hub markup verbatim.
+
+    ``db`` is required because instantiating ``HomePage()`` (for its
+    ``.body.stream_block``) triggers a ``ContentType`` lookup in Wagtail's
+    ``Page.__init__``.
+    """
     from wagtail.blocks import StreamValue
 
     from apps.core.models import HomePage as _HP

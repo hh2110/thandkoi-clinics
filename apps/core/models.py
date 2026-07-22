@@ -66,6 +66,11 @@ class HomePage(Page):
             ("circle_of_care", core_blocks.CircleOfCareBlock()),
             ("donate_cta", core_blocks.DonateCTABlock()),
         ],
+        # The circle-of-care partial's hub uses a page-wide-unique id
+        # (``coc-hub-detail``) for its aria-controls target, so a second copy
+        # on the same page would collide — capped to one rather than relying
+        # on editors never adding it twice.
+        block_counts={"circle_of_care": {"max_num": 1}},
         blank=True,
         help_text="Compose the home page from the section kit.",
     )

@@ -59,12 +59,7 @@
       var seg = segs[i];
       if (seg) {
         seg.style.cursor = "pointer";
-        seg.addEventListener("mouseenter", function () { show(i); });
-        seg.addEventListener("mouseleave", reset);
-        seg.addEventListener("click", function () {
-          pinned = pinned === i ? null : i;
-          pinned === null ? reset() : show(i);
-        });
+        wire(seg, i); // focus/blur are no-ops here — an SVG <path> isn't focusable.
       }
     });
   }
