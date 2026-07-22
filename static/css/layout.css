@@ -116,12 +116,13 @@
   position: relative;
 }
 
-/* The rendition (fill-760x950) already crops to 4:5 — render it as-is rather
-   than forcing another aspect ratio, which would distort it. */
+/* 4:5 matches the fill-760x950 rendition, so the box is reserved before the
+   image loads (no layout shift) and object-fit never has to crop in practice. */
 .hero__image {
   display: block;
   width: 100%;
-  height: auto;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
   border-radius: var(--card-radius);
 }
 
@@ -303,6 +304,16 @@
   display: grid;
   gap: var(--space-4);
   align-items: center;
+}
+
+/* 16:9 matches the section's placeholder ratio; reserved up front so the
+   image loading never shifts the text column beside it. */
+.feature-split__image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--card-radius);
 }
 
 .feature-split__stats {

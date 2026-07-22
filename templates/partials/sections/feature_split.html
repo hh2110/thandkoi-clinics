@@ -19,7 +19,7 @@ Context (all optional):
     <div class="feature-split {% if reverse %}feature-split--reverse{% endif %}">
       <div class="feature-split__media">
         {% if media_image %}
-          <img class="media-grid__item" src="{{ media_image }}" alt="{{ media_alt|default:'' }}" />
+          <img class="feature-split__image" src="{{ media_image }}" alt="{{ media_alt|default:'' }}" />
         {% else %}
           {% include "partials/sections/_media_placeholder.html" with caption=media_caption ratio="16 / 9" %}
         {% endif %}
