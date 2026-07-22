@@ -391,9 +391,15 @@ def home_page(db):
     """A HomePage so ``publish_daily_report``'s ``ReportIndexPage`` auto-create
     (``apps.pipeline.report_publishing._get_or_create_report_index``) has
     somewhere to attach to — every test that calls ``ingest_export``/
-    ``publish_daily_report`` needs one to exist first, same as a real site
-    (mirrors ``apps.core.tests.home_page``'s role, scoped to this module)."""
-    return HomePageFactory()
+    ``publish_daily_report`` needs one to exist first, same as a real site.
+    Also repoints the default Site at it (mirrors ``apps.core.tests.home_page``
+    exactly), so tests resolving a real URL via ``client.get(...)`` don't each
+    need their own inline Site-rooting snippet."""
+    home = HomePageFactory()
+    site = Site.objects.get(is_default_site=True)
+    site.root_page = home
+    site.save()
+    return home
 
 
 # --- Parser registry unit tests ---------------------------------------------
@@ -1103,9 +1109,6 @@ def test_daily_report_page_rendering_reflects_ux_pass_copy_and_card_changes(
     """UX-pass copy/structure fixes: "By sex" -> "By gender"; the always-empty
     "New vs. follow-up" card and the "By department" section no longer render,
     while the still-wanted breakdown sections are unaffected."""
-    site = Site.objects.get(is_default_site=True)
-    site.root_page = home_page
-    site.save()
     index = ReportIndexPageFactory(parent=home_page, slug="reports")
     report_date = datetime.date(2026, 7, 10)
     aggregate = DailyAggregateFactory(
@@ -1137,9 +1140,6 @@ def test_report_index_page_renders_intro_when_set(client, home_page):
     """Mirrors ``OurWorkPage``/``NewsletterIndexPage``'s optional-intro pattern
     (same ``{% if page.intro %}`` guard, same ``RichTextField``) — the archive
     index is the "thin content page" the maintainer wants it on."""
-    site = Site.objects.get(is_default_site=True)
-    site.root_page = home_page
-    site.save()
     ReportIndexPageFactory(
         parent=home_page,
         slug="reports",
