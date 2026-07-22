@@ -29,9 +29,25 @@ break parsing):
 * Never read: ``MR #``, ``Patient Name``, ``Father's / Husband's Name``,
   ``Address``, all vitals (BP … Waist), all narrative columns (complaints,
   investigations, prescriptions, notes, plan). No code path locates their
-  column positions except the three identifying headers used to *sniff*.
+  column positions except the three identifying headers used to *sniff*, plus
+  ``MR #`` itself, checked for blank/non-blank only (never its value — see the
+  phantom-row note below) as one more identifying header.
 * No department / location / new-vs-follow-up signal exists in this format;
   those fields stay empty/unknown rather than being inferred.
+
+**Phantom continuation rows (bug found 2026-07-22, real 7-patient sample
+published as 17).** The clinic system's ``.xls`` writer spills a free-text
+column's wrapped content (observed on ``Presenting Complaints`` and
+``Prescribed Medicine``) onto extra physical spreadsheet rows when its text
+has multiple lines. Those continuation rows carry a value in only that one
+free-text column — every other cell, including ``MR #``, is ``None`` — so the
+old "is this row entirely blank" check (``all(value is None for value in
+row)``) didn't catch them and each one was counted as its own phantom visit.
+Fix: a row only counts as a visit if its ``MR #`` cell is non-blank — every
+genuine visit row carries one, and no continuation or leftover-formatting row
+does. The value itself is still never read into a ``ParsedVisitRow`` or
+persisted anywhere, per invariant #1 above; it is inspected only for
+blank/non-blank.
 """
 
 from __future__ import annotations
@@ -97,6 +113,11 @@ def _period_dates(rows: list[tuple]) -> tuple[datetime.date, datetime.date] | No
     return None
 
 
+def _is_blank(value) -> bool:
+    """True for ``None`` or a string that's empty once whitespace is trimmed."""
+    return value is None or (isinstance(value, str) and value.strip() == "")
+
+
 def _as_dob(value) -> datetime.date | None:
     """Coerce the text ``Date of Birth`` cell (``08-Jul-1990``) to a date."""
     if isinstance(value, datetime.datetime):
@@ -155,7 +176,13 @@ class TkcDailyActivityV1Parser(BaseExportParser):
         header = rows[header_at]
         col = {
             name: header_index(header, name)
-            for name in ("sex", "date of birth", "provisional diagnosis", "status")
+            for name in (
+                "mr #",
+                "sex",
+                "date of birth",
+                "provisional diagnosis",
+                "status",
+            )
         }
 
         def cell(row, name):
@@ -164,7 +191,13 @@ class TkcDailyActivityV1Parser(BaseExportParser):
 
         parsed_rows: list[ParsedVisitRow] = []
         for row in rows[header_at + 1 :]:
-            if row is None or all(value is None for value in row):
+            if row is None:
+                continue
+            # A genuine visit row always carries its "MR #"; a wrapped-text
+            # continuation row (or other leftover blank row) never does — see
+            # the module docstring's phantom-row note. This subsumes the old
+            # all-cells-None check: a fully blank row also has a blank MR #.
+            if _is_blank(cell(row, "mr #")):
                 continue
 
             dob = _as_dob(cell(row, "date of birth"))
