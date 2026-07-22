@@ -419,3 +419,35 @@ staging, before a single real export touches production.**
   is found, the affected `DeidentifiedVisit`/`DailyAggregate`/report pages are
   purged and rebuilt via the recompute command after the fix. Any concern about a
   published daily page → unpublish in the admin immediately.
+
+---
+
+## Update — 2026-07-22: the real export sample landed (as .xls)
+
+The first real clinic export arrived (`TKC JULY 8TH STAT.xls`) and changed two
+assumptions recorded above:
+
+1. **The clinic system exports legacy `.xls` (OLE2/BIFF), not `.xlsx`.** The
+   upload boundary now detects the OLE2 magic bytes and converts to `.xlsx`
+   **in memory** (`apps/pipeline/xls_compat.py`, xlrd) so the registry,
+   parsers, and view stay openpyxl-only. Invariant #1 unaffected — the
+   conversion never touches disk. (The unconverted file also surfaced a
+   production 500 on upload: its body embeds a zip signature, defeating the
+   `BadZipFile` guard — fixed in the same PR.)
+2. **The real schema differs entirely from the provisional one** documented at
+   the "first concrete parser" decision: sheet `Patient Report`, banner +
+   `Period: <d> to <d>` rows, then a 27-column header (`MR #`, `Patient Name`,
+   `Date of Birth`, `Sex`, `Address`, `Status`, vitals, narrative columns…).
+   A second parser, `tkc_daily_activity_v1`
+   (`apps/pipeline/parser_tkc_daily_v1.py`), handles it — exactly the
+   "new format = new subclass, no core change" extension path this plan
+   designed. Notable mapping decisions (recorded in its module docstring):
+   visit date comes from the `Period:` line (multi-day ranges are rejected
+   with a clear error, `ExportParseError`); `Status` (`zakat`/`regular`) maps
+   to `is_zakat_beneficiary`; no department/location/new-vs-follow-up signal
+   exists in this format, so those stay unknown rather than inferred; the
+   full `Address` column is never read (the coarse-location decision above
+   still stands, but this format simply has no coarse location to keep).
+
+`clinic_daily_export_v1` stays registered as the worked example it was
+written to be.

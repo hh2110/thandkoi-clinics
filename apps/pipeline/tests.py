@@ -19,9 +19,11 @@ import datetime
 import io
 import json
 import re
+import zipfile
 from types import SimpleNamespace
 
 import pytest
+import xlwt
 from django.contrib.auth.models import Group, Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.files.uploadhandler import (
@@ -32,7 +34,7 @@ from django.core.management import call_command
 from django.http import HttpResponse
 from django.test import Client, RequestFactory
 from django.urls import reverse
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from apps.core.factories import HomePageFactory
 from apps.pipeline import ai
@@ -61,6 +63,7 @@ from apps.pipeline.parser_registry import (
 )
 from apps.pipeline.rendering import render_daily_report
 from apps.pipeline.report_publishing import publish_daily_report
+from apps.pipeline.xls_compat import convert_xls_to_xlsx, looks_like_xls
 
 XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -564,6 +567,214 @@ def test_upload_view_never_writes_a_file_to_disk(
     assert response.status_code == 200
     assert list(tmp_path.iterdir()) == []
     assert DailyAggregate.objects.filter(clinic_date=CLINIC_V1_VISIT_DATE).exists()
+
+
+def _build_ole2_with_embedded_zip() -> bytes:
+    """Mimic the clinic system's real .xls export, without any PHI.
+
+    The production file (regression of 2026-07-22) is an OLE2 compound
+    document that happens to contain an embedded zip end-of-central-directory
+    record, so ``zipfile`` opens it as an archive and openpyxl fails past the
+    ``BadZipFile`` guard with ``OSError("File contains no valid workbook
+    part")``. Reproduce that shape: OLE2 magic bytes followed by a zip whose
+    only entry is a content-types manifest — no workbook part.
+    """
+    inner = io.BytesIO()
+    with zipfile.ZipFile(inner, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+        )
+    ole2_magic = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+    return ole2_magic + b"\x00" * 64 + inner.getvalue()
+
+
+def test_upload_view_rejects_ole2_xls_with_embedded_zip_gracefully(
+    client, home_page, django_user_model, caplog
+):
+    """Regression for the production 500 of 2026-07-22: the clinic's real
+    ``.xls`` export slipped past the ``BadZipFile`` catch (its OLE2 body
+    embeds a zip signature) and openpyxl's ``OSError`` went unhandled. The
+    view must answer with its ordinary "not a valid .xlsx" error — a 200,
+    nothing ingested — while logging the underlying exception so a recurring
+    failure stays visible to the operator."""
+    client.force_login(_administrator_user(django_user_model))
+
+    with caplog.at_level("WARNING", logger="apps.pipeline.admin_views"):
+        response = client.post(
+            reverse("pipeline:upload_export"),
+            data={
+                "export_file": SimpleUploadedFile(
+                    "TKC JULY 8TH STAT.xls",
+                    _build_ole2_with_embedded_zip(),
+                    content_type="application/vnd.ms-excel",
+                ),
+                "format_key": "clinic_daily_export_v1",
+            },
+        )
+
+    assert response.status_code == 200
+    # The swallowed exception is still diagnosable from the logs. (With .xls
+    # conversion in place, the OLE2 magic routes this payload to xlrd, which
+    # rejects it as not a real BIFF workbook — the graceful path either way.)
+    assert any(
+        "Rejected export upload" in record.getMessage() for record in caplog.records
+    )
+    # The apostrophe in "doesn't" is HTML-escaped in the rendered page, so
+    # assert on the fragment after it.
+    assert "look like a valid Excel export" in response.content.decode()
+    assert not IngestRun.objects.exists()
+    assert not DailyAggregate.objects.exists()
+
+
+def _build_tkc_daily_xls(
+    *, period: str = "Period: 08 Jul 2026 to 08 Jul 2026"
+) -> bytes:
+    """A synthetic legacy ``.xls`` mirroring the clinic system's real layout.
+
+    Same shape as the 2026-07-22 sample: banner row, ``Period:`` row, blank
+    row, header row, then data rows — with the same fake identifiers as
+    ``EXPORT_ROWS`` so the ``RAW_IDENTIFIERS`` guard applies. Built with
+    xlwt (dev dependency) because openpyxl cannot write BIFF.
+    """
+    book = xlwt.Workbook(encoding="utf-8")
+    sheet = book.add_sheet("Patient Report")
+    sheet.write(0, 0, "THE THANDKOI CLINICS — Daily Activity Report")
+    sheet.write(1, 0, period)
+    header = [
+        "S#",
+        "MR #",
+        "Patient Name",
+        "Father's / Husband's Name",
+        "Date of Birth",
+        "Sex",
+        "Address",
+        "Status",
+        "Presenting Complaints",
+        "Provisional Diagnosis",
+    ]
+    for column, name in enumerate(header):
+        sheet.write(3, column, name)
+    data = [
+        # (mrn, name, dob, sex, status, diagnosis)
+        ("MRN-001", "Fatima Bibi", "05-Mar-1988", "Female", "Zakat", "Hypertension"),
+        ("MRN-002", "Ahmed Khan", "", "Male", "Regular", "Diabetes"),
+        ("MRN-003", "Zainab Ali", "20-Dec-2015", "Female", "", "Hypertension"),
+    ]
+    for offset, (mrn, name, dob, sex, status, diagnosis) in enumerate(data):
+        row = 4 + offset
+        sheet.write(row, 0, offset + 1)
+        sheet.write(row, 1, mrn)
+        sheet.write(row, 2, name)
+        sheet.write(row, 3, "Someone Else")
+        sheet.write(row, 4, dob)
+        sheet.write(row, 5, sex)
+        sheet.write(row, 6, "House 12, Street 3, Thandkoi")
+        sheet.write(row, 7, status)
+        sheet.write(row, 8, "Headache")
+        sheet.write(row, 9, diagnosis)
+    buffer = io.BytesIO()
+    book.save(buffer)
+    return buffer.getvalue()
+
+
+TKC_VISIT_DATE = datetime.date(2026, 7, 8)
+
+
+def test_upload_view_ingests_real_format_xls(
+    client, home_page, settings, tmp_path, django_user_model
+):
+    """The clinic system's native ``.xls`` uploads end to end: detected by
+    magic bytes, converted to ``.xlsx`` in memory, sniffed as
+    ``tkc_daily_activity_v1``, parsed with the visit date taken from the
+    ``Period:`` banner — and, per invariant #1, without the raw upload or
+    its conversion ever touching disk."""
+    settings.MEDIA_ROOT = str(tmp_path)
+    client.force_login(_administrator_user(django_user_model))
+
+    response = client.post(
+        reverse("pipeline:upload_export"),
+        data={
+            "export_file": SimpleUploadedFile(
+                "TKC JULY 8TH STAT.xls",
+                _build_tkc_daily_xls(),
+                content_type="application/vnd.ms-excel",
+            ),
+            "format_key": "tkc_daily_activity_v1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert list(tmp_path.iterdir()) == []
+
+    aggregate = DailyAggregate.objects.get(clinic_date=TKC_VISIT_DATE)
+    assert aggregate.total_visits == 3
+    assert aggregate.female_patients == 2
+    assert aggregate.male_patients == 1
+
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+    assert visits.count() == 3
+    # Status column mapped: Zakat → True, Regular → False, blank → unknown.
+    assert visits.filter(is_zakat_beneficiary=True).count() == 1
+    assert visits.filter(is_zakat_beneficiary=False).count() == 1
+    assert visits.filter(is_zakat_beneficiary=None).count() == 1
+
+    # No direct identifier from the .xls survived into the response. Short
+    # tokens ("ali", "khan") are excluded — they false-positive as substrings
+    # of ordinary HTML ("align"); the distinctive names and MRNs suffice.
+    rendered = response.content.decode().lower()
+    for identifier in (i for i in RAW_IDENTIFIERS if len(i) > 4):
+        assert identifier not in rendered
+
+
+def test_upload_view_rejects_multi_day_xls_with_clear_error(
+    client, home_page, django_user_model
+):
+    """A multi-day ``Period:`` range can't attribute rows to a clinic date;
+    the parser raises ``ExportParseError`` (before anything is persisted)
+    and the view shows its message instead of a 500."""
+    client.force_login(_administrator_user(django_user_model))
+
+    response = client.post(
+        reverse("pipeline:upload_export"),
+        data={
+            "export_file": SimpleUploadedFile(
+                "TKC WEEKLY STAT.xls",
+                _build_tkc_daily_xls(period="Period: 06 Jul 2026 to 12 Jul 2026"),
+                content_type="application/vnd.ms-excel",
+            ),
+            "format_key": "tkc_daily_activity_v1",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Multi-day exports" in response.content.decode()
+    assert not IngestRun.objects.exists()
+    assert not DailyAggregate.objects.exists()
+
+
+def test_xls_conversion_preserves_date_cells():
+    """A real Excel date cell in a ``.xls`` comes out of the in-memory
+    conversion as a ``datetime`` — what openpyxl would give a parser for a
+    native ``.xlsx`` — not as a raw float serial."""
+    book = xlwt.Workbook()
+    sheet = book.add_sheet("Sheet1")
+    date_style = xlwt.easyxf(num_format_str="DD-MM-YYYY")
+    sheet.write(0, 0, "when")
+    sheet.write(1, 0, datetime.datetime(2026, 7, 8), date_style)
+    buffer = io.BytesIO()
+    book.save(buffer)
+    buffer.seek(0)
+
+    assert looks_like_xls(buffer)
+    converted = convert_xls_to_xlsx(buffer)
+    workbook = load_workbook(converted, read_only=True, data_only=True)
+    try:
+        rows = list(workbook.active.iter_rows(values_only=True))
+    finally:
+        workbook.close()
+    assert rows[0][0] == "when"
+    assert rows[1][0] == datetime.datetime(2026, 7, 8)
 
 
 def _extract_csrf_token(html: str) -> str:
