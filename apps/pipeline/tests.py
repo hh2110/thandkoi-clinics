@@ -55,6 +55,7 @@ from apps.pipeline.models import (
 )
 from apps.pipeline.parser_clinic_v1 import ClinicDailyExportV1Parser
 from apps.pipeline.parser_registry import (
+    ParserRegistry,
     age_band_for,
     content_hash_for_rows,
     diagnosis_category_for,
@@ -244,6 +245,37 @@ def test_real_anthropic_client_is_forbidden_in_tests():
 # only accepts a registered ``format_key``) use the real
 # ``tkc_daily_activity_v1`` fixture instead — see ``_build_tkc_daily_xls``.
 # =============================================================================
+
+
+def test_clinic_v1_format_is_not_registered_by_default():
+    """Pins the negative behavior this decision introduces: the provisional
+    format is gone from the dropdown and no longer resolvable — a future
+    accidental re-registration (e.g. a bad merge) would otherwise ship
+    silently, since nothing else in the suite asserts its absence."""
+    assert "clinic_daily_export_v1" not in dict(ParserRegistry.choices())
+    with pytest.raises(KeyError):
+        ParserRegistry.get("clinic_daily_export_v1")
+
+
+def test_clinic_v1_parser_can_still_be_registered_explicitly():
+    """The module's own docstring says register() is kept so "a test (or a
+    future need) can still register it explicitly" — exercise that claim
+    directly, since nothing else in the suite calls register() at all."""
+    from apps.pipeline import parser_clinic_v1
+
+    assert "clinic_daily_export_v1" not in ParserRegistry._parsers
+    try:
+        parser_clinic_v1.register()
+        assert isinstance(
+            ParserRegistry.get("clinic_daily_export_v1"),
+            parser_clinic_v1.ClinicDailyExportV1Parser,
+        )
+    finally:
+        # ParserRegistry._parsers is a shared class-level dict, not reset
+        # per-test — leaving this registered would silently make the format
+        # selectable again for every test that runs after this one.
+        ParserRegistry._parsers.pop("clinic_daily_export_v1", None)
+
 
 CLINIC_V1_HEADER = [
     "patient_name",
@@ -967,6 +999,48 @@ def test_corrected_reupload_replaces_rather_than_double_counts(home_page):
     aggregate = DailyAggregate.objects.get(clinic_date=CLINIC_V1_VISIT_DATE)
     assert aggregate.male_patients == 2  # row 1's corrected gender is reflected
     assert aggregate.female_patients == 1
+
+
+def _post_tkc_daily_upload(client, **xls_kwargs):
+    return client.post(
+        reverse("pipeline:upload_export"),
+        data={
+            "export_file": SimpleUploadedFile(
+                "TKC daily.xls",
+                _build_tkc_daily_xls(**xls_kwargs),
+                content_type="application/vnd.ms-excel",
+            ),
+            "format_key": "tkc_daily_activity_v1",
+        },
+    )
+
+
+def test_tkc_daily_reupload_via_upload_view_is_a_noop_duplicate(
+    client, home_page, django_user_model
+):
+    """Regression: dedup/replace coverage for the *currently registered*
+    format must go through the real ParserRegistry.get(parser_key) lookup
+    the upload view actually uses — not just the unregistered clinic_v1
+    fixture (see the format-removal decision above). A second identical
+    upload of the clinic's real tkc_daily_activity_v1 export is a no-op."""
+    client.force_login(_administrator_user(django_user_model))
+
+    first = _post_tkc_daily_upload(client)
+    assert first.status_code == 200
+    assert IngestRun.objects.filter(clinic_date=TKC_VISIT_DATE).first().status == (
+        IngestRun.STATUS_CREATED
+    )
+
+    second = _post_tkc_daily_upload(client)
+    assert second.status_code == 200
+    # One IngestRun per upload event, newest first (Meta.ordering) — the
+    # duplicate upload adds its own row rather than updating the first.
+    assert IngestRun.objects.filter(clinic_date=TKC_VISIT_DATE).first().status == (
+        IngestRun.STATUS_DUPLICATE
+    )
+    assert (
+        DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE).count() == 3
+    )
 
 
 # --- Daily report auto-publish + the AI summary sentence -------------------
