@@ -1,0 +1,25 @@
+{% load i18n %}
+{% comment %}
+Page-level lightbox — one native <dialog> shared by every media_grid.html
+click-to-expand trigger on the page, populated by static/js/lightbox.js.
+
+One shared dialog (rather than one per grid) keeps this to a single element
+regardless of how many media_grid.html instances a page renders, and keeps
+the markup out of media_grid.html itself so that partial stays focused on
+the grid.
+
+<dialog>.showModal() gives us, for free, without any extra JS:
+  - Esc closes it.
+  - Focus is trapped inside while open and restored to the trigger on close.
+  - A native ::backdrop, dimming the rest of the page.
+This is the one deliberate bit of JS beyond theme_toggle.html/nav.js — see
+static/js/lightbox.js's own header comment.
+{% endcomment %}
+<dialog id="lightbox" class="lightbox" aria-label="{% translate 'Photo' %}">
+  <button type="button" class="lightbox__close" data-lightbox-close aria-label="{% translate 'Close' %}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18"></path>
+    </svg>
+  </button>
+  <img class="lightbox__img" data-lightbox-image alt="" />
+</dialog>

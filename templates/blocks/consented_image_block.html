@@ -1,4 +1,4 @@
-{% load wagtailimages_tags %}
+{% load wagtailimages_tags i18n %}
 {% comment %}
 Render for ``ConsentedImageBlock`` (apps/core/blocks.py) — a simple photo +
 caption. Shared by every StreamField that reuses the block (Plan 06's
@@ -17,16 +17,36 @@ Mirrors media_grid.html's cell/item split: `.media-grid__item` is the
 fixed-aspect, `overflow: hidden` image box (static/css/layout.css) — a
 caption placed *inside* it would be clipped, so the caption sits outside as
 a sibling within the outer `.media-grid__cell`, matching the grid's own
-figure/figcaption arrangement.
+figure/figcaption arrangement. Also mirrors media_grid.html's click-to-expand
+trigger (static/js/lightbox.js) so a Newsletter/Camp Report body photo,
+rendered with the identical `.media-grid__item` classes, behaves the same
+way when clicked instead of looking clickable and silently doing nothing.
 
 Context: ``value`` — the block's StructValue (image, alt_text, caption).
 {% endcomment %}
 {% if value.image and value.consent_confirmed %}
-  <figure class="media-grid__cell">
-    <div class="media-grid__item">
-      {% image value.image fill-640x640 as photo %}
-      <img src="{{ photo.url }}" alt="{{ value.alt_text|default:value.image.title }}" />
-    </div>
-    {% if value.caption %}<figcaption class="media-grid__caption">{{ value.caption }}</figcaption>{% endif %}
-  </figure>
+  {% image value.image fill-640x640 as photo %}
+  {% image value.image max-1200x1200 as full_photo %}
+  {% with alt=value.alt_text|default:value.image.title %}
+    {% if value.alt_text %}
+      {% blocktranslate asvar lightbox_label with subject=value.alt_text %}View full-size: {{ subject }}{% endblocktranslate %}
+    {% else %}
+      {% translate "View full-size photo" as lightbox_label %}
+    {% endif %}
+    <figure class="media-grid__cell">
+      <div class="media-grid__item">
+        <button
+          type="button"
+          class="media-grid__trigger"
+          data-lightbox-trigger
+          data-lightbox-src="{{ full_photo.url }}"
+          data-lightbox-alt="{{ alt }}"
+          aria-label="{{ lightbox_label }}"
+        >
+          <img src="{{ photo.url }}" alt="{{ alt }}" />
+        </button>
+      </div>
+      {% if value.caption %}<figcaption class="media-grid__caption">{{ value.caption }}</figcaption>{% endif %}
+    </figure>
+  {% endwith %}
 {% endif %}

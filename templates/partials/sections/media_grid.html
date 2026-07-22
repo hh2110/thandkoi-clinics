@@ -8,11 +8,14 @@ Context:
   heading    — optional section heading.
   link_label / link_url   — optional trailing "View gallery →" link.
   columns    — 3 or 4 (wide-viewport column count); defaults to 4.
-  items      — a list of {image, alt, caption} dicts. Any item without `image`
-               renders the placeholder (caption shown inside it); an item
-               *with* an image shows its caption underneath (Plan 06 — the
-               Gallery and Camp Report photo captions this grid first serves
-               for real).
+  items      — a list of {image, alt, caption, full} dicts. Any item without
+               `image` renders the placeholder (caption shown inside it); an
+               item *with* an image shows its caption underneath (Plan 06 —
+               the Gallery and Camp Report photo captions this grid first
+               serves for real) and is click-to-expand: it opens the full-
+               size `full` rendition (falls back to `image` if `full` is
+               absent) in the page-level lightbox `<dialog>` from
+               templates/base.html, wired by static/js/lightbox.js.
 
 Empty state: with no items it shows a "coming soon" line, not an empty grid.
 {% endcomment %}
@@ -31,7 +34,21 @@ Empty state: with no items it shows a "coming soon" line, not an empty grid.
         <figure class="media-grid__cell">
           <div class="media-grid__item">
             {% if item.image %}
-              <img src="{{ item.image }}" alt="{{ item.alt|default:'' }}" />
+              {% if item.alt %}
+                {% blocktranslate asvar lightbox_label with subject=item.alt %}View full-size: {{ subject }}{% endblocktranslate %}
+              {% else %}
+                {% translate "View full-size photo" as lightbox_label %}
+              {% endif %}
+              <button
+                type="button"
+                class="media-grid__trigger"
+                data-lightbox-trigger
+                data-lightbox-src="{{ item.full|default:item.image }}"
+                data-lightbox-alt="{{ item.alt|default:'' }}"
+                aria-label="{{ lightbox_label }}"
+              >
+                <img src="{{ item.image }}" alt="{{ item.alt|default:'' }}" />
+              </button>
             {% else %}
               {% include "partials/sections/_media_placeholder.html" with caption=item.caption %}
             {% endif %}
