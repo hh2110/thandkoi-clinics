@@ -1,0 +1,27 @@
+{% comment %}
+Logo-card variant of the Plan 03.5 card grid — mirrors `_person_card.html`'s
+photo/placeholder pattern (Team page) but for an organisational partner's
+logo. Neither `_card.html` nor `_service_card.html` fits: `_card.html` has no
+image slot at all, and `_service_card.html` omits its photo slot entirely
+when unset rather than falling back to a placeholder — here an unset logo
+must still show an "obvious placeholder" (maintainer's explicit ask), not a
+silently text-only card.
+
+Context:
+  item — {name, description, logo} — `logo` is an already-resolved rendition
+         URL, or unset/None, in which case the shared media placeholder shows
+         the partner's name as its caption. Used by the Donors & Partners
+         page's partner grid and, via the same shape, the Donate page's
+         carousel (see `apps.core.models._partner_items`).
+{% endcomment %}
+<article class="card card--interactive logo-card">
+  <div class="card__photo logo-card__logo">
+    {% if item.logo %}
+      <img src="{{ item.logo }}" alt="{{ item.name }}" />
+    {% else %}
+      {% include "partials/sections/_media_placeholder.html" with caption=item.name ratio="2 / 1" %}
+    {% endif %}
+  </div>
+  {% if item.name %}<h3 class="card__title">{{ item.name }}</h3>{% endif %}
+  {% if item.description %}<p class="card__body">{{ item.description }}</p>{% endif %}
+</article>

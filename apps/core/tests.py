@@ -23,12 +23,15 @@ from apps.core.factories import (
     CampReportPageFactory,
     ContactPageFactory,
     DonatePageFactory,
+    DonorFactory,
+    DonorsPartnersPageFactory,
     GalleryImageFactory,
     GalleryPageFactory,
     HomePageFactory,
     NewsletterIndexPageFactory,
     NewsletterPageFactory,
     OurWorkPageFactory,
+    PartnerFactory,
     ServiceFactory,
     TeamMemberFactory,
     TeamPageFactory,
@@ -36,6 +39,7 @@ from apps.core.factories import (
 from apps.core.models import (
     CampReportPage,
     ContactBankSettings,
+    Donor,
     HomePage,
     NewsletterPage,
     Service,
@@ -506,6 +510,11 @@ def test_hero_cta_target_guard_and_donate_only_amber(home_page):
             "core/camp_report_index_page.html",
         ),
         (GalleryPageFactory, "gallery", "core/gallery_page.html"),
+        (
+            DonorsPartnersPageFactory,
+            "donors-partners",
+            "core/donors_partners_page.html",
+        ),
     ],
 )
 def test_core_pages_render_with_correct_template(
@@ -1056,3 +1065,104 @@ def test_newsletter_body_photo_block_requires_consent(db):
         photo_block.clean(
             photo_block.to_python({"image": image.pk, "consent_confirmed": False})
         )
+
+
+# --- Donors & Partners ---------------------------------------------------
+
+
+def test_donors_partners_page_shows_partner_placeholder_and_donor_text(
+    client, home_page
+):
+    """A logo-less partner gets the media placeholder; a donor is text-only.
+
+    No logo file exists yet for either real-world partner (maintainer-
+    confirmed) — the placeholder must show the partner's name as its caption
+    (an "obvious placeholder"), while a donor never renders any image slot at
+    all (deliberately anonymised, not "photo coming soon" — see Donor's own
+    docstring).
+    """
+    page = DonorsPartnersPageFactory(parent=home_page, slug="donors-partners")
+    PartnerFactory(page=page, name="Sugar Hospital", description="")
+    DonorFactory(page=page, name="Basit", description="Donated an X-ray plant.")
+
+    content = client.get("/en/donors-partners/").content.decode()
+    assert "Sugar Hospital" in content
+    assert "media-placeholder" in content
+    assert "Basit" in content
+    assert "Donated an X-ray plant." in content
+
+
+def test_donors_partners_page_shows_real_logo_when_set(client, home_page):
+    """A partner with a logo image renders it instead of the placeholder."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    page = DonorsPartnersPageFactory(parent=home_page, slug="donors-partners")
+    logo = Image.objects.create(
+        title="District Health Office logo", file=get_test_image_file()
+    )
+    PartnerFactory(page=page, name="District Health Office", logo=logo)
+
+    content = client.get("/en/donors-partners/").content.decode()
+    assert "District Health Office" in content
+    assert "<img" in content
+
+
+def test_donors_partners_page_shows_empty_states_with_no_entries(client, home_page):
+    """With no partners/donors entered yet, each grid shows its own coming-soon line."""
+    DonorsPartnersPageFactory(parent=home_page, slug="donors-partners")
+    content = client.get("/en/donors-partners/").content.decode()
+    assert "Partners coming soon." in content
+    assert "Donor stories coming soon." in content
+
+
+def test_donor_model_has_no_image_field():
+    """Guardrail: Donor never gains an image FK by accident.
+
+    Donors are named at exactly the anonymised level of detail given (first
+    name or "one family", no surname) — a deliberate privacy choice, not a
+    gap to fill in later. Unlike Partner.logo, no image field should exist
+    here at all.
+    """
+    field_names = {f.name for f in Donor._meta.get_fields()}
+    assert "logo" not in field_names
+    assert "image" not in field_names
+    assert "photo" not in field_names
+
+
+def test_donate_page_carousel_shows_empty_state_without_donors_partners_page(
+    client, home_page
+):
+    """No Donors & Partners page yet → the carousel shows its own empty state."""
+    DonatePageFactory(parent=home_page, slug="donate")
+    content = client.get("/en/donate/").content.decode()
+    assert "carousel__empty" in content
+
+
+def test_donate_page_carousel_reads_the_donors_partners_page(client, home_page):
+    """The Donate page carousel reuses the Donors & Partners page's own data.
+
+    Proves the "never duplicate content by hand" design: entering a partner
+    and a donor once, on the Donors & Partners page, is enough for both pages
+    to show them.
+    """
+    dp_page = DonorsPartnersPageFactory(parent=home_page, slug="donors-partners")
+    PartnerFactory(page=dp_page, name="Sugar Hospital", description="")
+    DonorFactory(page=dp_page, name="One family", description="Donated water coolers.")
+    DonatePageFactory(parent=home_page, slug="donate")
+
+    content = client.get("/en/donate/").content.decode()
+    assert "Sugar Hospital" in content
+    assert "One family" in content
+    assert "Donated water coolers." in content
+    assert "carousel__empty" not in content
+
+
+def test_home_page_shows_a_visible_org_name(client, home_page):
+    """The home page shows "The Thandkoi Clinics" as visible text near the top.
+
+    Small, scoped fix (Plan 11): the header logo is a wordless mark and the
+    hero's eyebrow/headline are free text, so without this the org name never
+    appeared as visible text above the footer.
+    """
+    content = client.get("/en/").content.decode()
+    assert '<p class="home-wordmark__text">The Thandkoi Clinics</p>' in content

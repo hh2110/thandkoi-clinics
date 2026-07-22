@@ -87,6 +87,7 @@ class HomePage(Page):
         "core.NewsletterIndexPage",
         "core.CampReportIndexPage",
         "core.GalleryPage",
+        "core.DonorsPartnersPage",
         "pipeline.ReportIndexPage",
     ]
 
@@ -361,7 +362,10 @@ class DonatePage(Page):
     here; they're pulled live from the shared ``ContactBankSettings`` singleton
     (Plan 04) so a correction only ever needs one edit, never two. Zakat and
     Sadaqa get their own section each (maintainer decision, Plan 05) rather than
-    one blended message.
+    one blended message. The partner/donor carousel further down this page
+    reads the live ``DonorsPartnersPage``'s children through
+    ``_partner_items``/``_donor_items`` (defined below, alongside that page),
+    so the two pages never duplicate content by hand.
     """
 
     intro = RichTextField(
@@ -408,6 +412,10 @@ class DonatePage(Page):
         context = super().get_context(request, *args, **kwargs)
         contact_page = ContactPage.objects.live().first()
         context["contact_page_url"] = contact_page.url if contact_page else None
+        donors_partners_page = DonorsPartnersPage.objects.live().first()
+        context["carousel_items"] = [
+            {"kind": "partner", **item} for item in _partner_items(donors_partners_page)
+        ] + [{"kind": "donor", **item} for item in _donor_items(donors_partners_page)]
         return context
 
     class Meta:
@@ -843,3 +851,158 @@ class GalleryImage(Orderable):
 
     def __str__(self):
         return self.caption or (self.image.title if self.image_id else "Untitled photo")
+
+
+# --- Donors & Partners --------------------------------------------------------
+
+
+class DonorsPartnersPage(Page):
+    """Public acknowledgement of organisational partners and named donors.
+
+    Two orderable child collections on one page, mirroring ``TeamPage``'s
+    "grouped orderable children" idiom (``members`` grouped by category in
+    Python) rather than ``GalleryPage``'s single collection — a partner (an
+    organisation, possibly with a logo) and a donor (a named person, never a
+    logo — see ``Donor``) are different shapes, so they get their own
+    ``InlinePanel`` each rather than one model forced to cover both.
+
+    ``partners``/``donors`` are also read by ``DonatePage.get_context`` (via
+    the shared ``_partner_items``/``_donor_items`` helpers below) to build its
+    carousel, so this page's content is the single source both surfaces show —
+    never duplicated by hand between the two.
+    """
+
+    intro = RichTextField(
+        blank=True,
+        help_text="Optional intro copy above the partners and donors below.",
+    )
+
+    content_panels = [
+        *Page.content_panels,
+        FieldPanel("intro"),
+        InlinePanel("partners", label="Organisational partners"),
+        InlinePanel("donors", label="Donors"),
+    ]
+
+    max_count = 1
+    parent_page_types = ["core.HomePage"]
+    subpage_types: list[str] = []
+
+    def get_context(self, request, *args, **kwargs):
+        context = super().get_context(request, *args, **kwargs)
+        context["partner_items"] = _partner_items(self)
+        context["donor_items"] = _donor_items(self)
+        return context
+
+    class Meta:
+        verbose_name = "Donors & Partners page"
+
+
+class Partner(Orderable):
+    """One organisational partner — an orderable child of ``DonorsPartnersPage``.
+
+    ``logo`` is optional and starts unset for every real-world partner entered
+    so far (Sugar Hospital, District Health Office — no logo files exist yet,
+    maintainer-confirmed): the template falls back to the shared media
+    placeholder captioned with the partner's name, mirroring ``TeamMember``'s
+    unset-photo fallback exactly. Unlike ``GalleryImage``, there is no consent
+    gate here — an organisation's own name/logo carries no personal-photography
+    consent question.
+    """
+
+    page = ParentalKey(
+        DonorsPartnersPage, on_delete=models.CASCADE, related_name="partners"
+    )
+    name = models.CharField(max_length=140)
+    logo = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Optional logo; falls back to a name placeholder until one "
+        "is supplied.",
+    )
+    description = models.TextField(blank=True)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("logo"),
+        FieldPanel("description"),
+    ]
+
+    def __str__(self):
+        return self.name
+
+
+class Donor(Orderable):
+    """One named individual/in-kind donor — an orderable child of
+    ``DonorsPartnersPage``.
+
+    Deliberately carries **no image field at all** (not even an optional one
+    that falls back to a placeholder) — the maintainer's feedback names donors
+    at exactly the anonymised level of detail they gave ("Basit", "one
+    family": first name or description only, no surname, no photo) and that is
+    a deliberate privacy choice, not a "photo coming soon" gap. Contrast with
+    ``Partner.logo``, which genuinely is pending real artwork.
+    """
+
+    page = ParentalKey(
+        DonorsPartnersPage, on_delete=models.CASCADE, related_name="donors"
+    )
+    name = models.CharField(
+        max_length=140,
+        help_text='Use exactly the level of detail given, e.g. "Basit" or '
+        '"One family" — do not add surnames or invented details.',
+    )
+    description = models.TextField(
+        blank=True, help_text='What was given, e.g. "Donated an X-ray plant."'
+    )
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("description"),
+    ]
+
+    def __str__(self):
+        return self.name
+
+
+def _partner_items(donors_partners_page):
+    """Build ``_logo_card.html``-shaped ``{name, description, logo}`` dicts.
+
+    Shared by ``DonorsPartnersPage.get_context`` (its own partner grid) and
+    ``DonatePage.get_context`` (the carousel) so a partner is only ever
+    assembled into card-shape in one place. ``logo`` is a resolved rendition
+    URL, or ``None`` when unset — matching ``_photo_item``'s own
+    resolved-URL convention. Returns ``[]`` when ``donors_partners_page`` is
+    ``None`` (no such page published yet), mirroring
+    ``DonatePage.get_context``'s existing ``contact_page_url`` guard.
+    """
+    if donors_partners_page is None:
+        return []
+    return [
+        {
+            "name": partner.name,
+            "description": partner.description,
+            "logo": partner.logo.get_rendition("max-320x160").url
+            if partner.logo_id
+            else None,
+        }
+        for partner in donors_partners_page.partners.all()
+    ]
+
+
+def _donor_items(donors_partners_page):
+    """Build ``_card.html``-shaped ``{title, body}`` dicts for named donors.
+
+    No image key at all (see ``Donor``'s docstring on why) — this reuses the
+    plain text card, not the logo/placeholder one. Returns ``[]`` when
+    ``donors_partners_page`` is ``None``, same as ``_partner_items``.
+    """
+    if donors_partners_page is None:
+        return []
+    return [
+        {"title": donor.name, "body": donor.description}
+        for donor in donors_partners_page.donors.all()
+    ]

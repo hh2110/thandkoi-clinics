@@ -34,6 +34,7 @@ from apps.core.models import (
     CampReportIndexPage,
     ContactPage,
     DonatePage,
+    DonorsPartnersPage,
     GalleryPage,
     HomePage,
     NewsletterIndexPage,
@@ -42,15 +43,17 @@ from apps.core.models import (
 )
 
 # (model, title, slug) for the core children, in nav order. Slugs MUST match
-# templates/partials/nav.html (/about/, /team/, /our-work/, /camp-reports/,
-# /newsletters/, /gallery/, /contact/, /donate/). The Newsletter/Camp Report
-# archives and the Gallery (Plan 06) are seeded empty — each shows its own
-# "coming soon" state until content is entered — so their nav links resolve
-# immediately after deploy rather than 404ing until the first admin visit.
+# templates/partials/nav.html (/about/, /team/, /our-work/, /donors-partners/,
+# /camp-reports/, /newsletters/, /gallery/, /contact/, /donate/). The
+# Newsletter/Camp Report archives, the Gallery (Plan 06), and Donors &
+# Partners (Plan 11) are seeded empty — each shows its own "coming soon" state
+# until content is entered — so their nav links resolve immediately after
+# deploy rather than 404ing until the first admin visit.
 CORE_CHILDREN = [
     (AboutPage, "About", "about"),
     (TeamPage, "Our Team", "team"),
     (OurWorkPage, "Our Work", "our-work"),
+    (DonorsPartnersPage, "Donors & Partners", "donors-partners"),
     (CampReportIndexPage, "Camp Reports", "camp-reports"),
     (NewsletterIndexPage, "Newsletters", "newsletters"),
     (GalleryPage, "Gallery", "gallery"),

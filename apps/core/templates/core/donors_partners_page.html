@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags i18n %}
+{% comment %}
+Donors & Partners page — public acknowledgement of organisational partners
+(e.g. Sugar Hospital, District Health Office) and named individual/in-kind
+donors (e.g. "Basit" donated an X-ray plant; "one family" donated water
+coolers), at exactly the level of detail the maintainer gave — no invented
+names or details.
+
+Placeholders only for now (maintainer-confirmed, no logo files exist yet):
+every partner without a logo shows the shared media placeholder captioned
+with its name, mirroring TeamMember's unset-photo fallback on the Team page.
+Donors never get an image slot at all (see Donor's docstring) — that's a
+deliberate anonymisation choice, not a "photo coming soon" gap.
+
+`page.partners.all` / `page.donors.all` (via `partner_items`/`donor_items` in
+get_context) are the single source this page and the Donate page's carousel
+both read from — content is never duplicated by hand between the two.
+{% endcomment %}
+
+{% block content %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>{{ page.title }}</h1>
+      {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrapper">
+      <div class="section-header">
+        {% include "partials/sections/section_header.html" with eyebrow=_("With thanks") heading=_("Organisational partners") %}
+      </div>
+      <div class="card-grid card-grid--3">
+        {% for item in partner_items %}
+          {% include "partials/sections/_logo_card.html" %}
+        {% empty %}
+          <p class="card-grid__empty text-faint">{% translate "Partners coming soon." %}</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tinted">
+    <div class="wrapper">
+      <div class="section-header">
+        {% include "partials/sections/section_header.html" with eyebrow=_("In their own way") heading=_("Donors") %}
+      </div>
+      <div class="card-grid card-grid--3">
+        {% for card in donor_items %}
+          {% include "partials/sections/_card.html" %}
+        {% empty %}
+          <p class="card-grid__empty text-faint">{% translate "Donor stories coming soon." %}</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

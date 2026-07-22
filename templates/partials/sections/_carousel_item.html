@@ -1,0 +1,19 @@
+{% comment %}
+One carousel entry — dispatches on `item.kind` to the matching card partial so
+a partner (logo-or-placeholder, via `_logo_card.html`) and a donor (plain text
+card, via `_card.html` — donors are deliberately anonymised, never a "photo
+coming soon" case; see `apps.core.models.Donor`) each render exactly the way
+they do on the Donors & Partners page itself. `.carousel__item` gives both a
+uniform scroll-snap slot regardless of which inner card rendered (layout.css).
+
+Context:
+  item — {kind: "partner", name, description, logo} or
+         {kind: "donor", title, body} (see `apps.core.models.DonatePage.get_context`).
+{% endcomment %}
+<div class="carousel__item">
+  {% if item.kind == "partner" %}
+    {% include "partials/sections/_logo_card.html" with item=item %}
+  {% else %}
+    {% include "partials/sections/_card.html" with card=item %}
+  {% endif %}
+</div>

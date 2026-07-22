@@ -87,6 +87,25 @@
   white-space: nowrap;
 }
 
+/* --- Home wordmark ----------------------------------------------------------
+   Small, scoped home-page-prominence fix (Plan 11): the org name is otherwise
+   never shown as visible text near the top of the home page (the header logo
+   is a wordless mark; the hero's eyebrow/headline are free text). Plain,
+   compact — no redesign, just a visible name above the hero. */
+.home-wordmark {
+  padding-block-start: var(--space-3);
+}
+
+.home-wordmark__text {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-brand);
+  margin-block: 0;
+}
+
 /* --- Hero -----------------------------------------------------------------
    Single column by default (mobile-first); two columns from the primary-nav
    breakpoint up (56rem, matching components.css). */
@@ -309,6 +328,15 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   margin-block: 0 var(--space-1);
+}
+
+/* Organisational-partner logo slot (Donors & Partners page / Donate page
+   carousel) — landscape rather than the person-card's 1/1, since a logo
+   crops badly to a square. Sets --media-ratio for the shared image rule and
+   the placeholder's aspect-ratio fallback alike (see the media-slot comment
+   above .hero__media). */
+.logo-card__logo {
+  --media-ratio: 2 / 1;
 }
 
 /* Hover lift — interactive cards only, gated below for reduced motion. */
@@ -547,6 +575,33 @@
   .card--interactive:hover {
     transform: none;
   }
+}
+
+/* --- Carousel (CSS-only scroll-snap) ----------------------------------------
+   No carousel/slider JS precedent exists anywhere in this repo (Plan 03's
+   "minimal JS" bias) — a horizontally-scrolling flex row using
+   scroll-snap-type/scroll-snap-align instead. Degrades gracefully to a plain
+   scrollable row with no JS; base.css's global prefers-reduced-motion rule
+   already forces scroll-behavior: auto, and nothing here adds smooth-scroll
+   or autoplay for it to override. Used by the Donate page's partner-logo /
+   donor carousel (carousel.html). */
+.carousel {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--space-3);
+  padding-block-end: var(--space-2);
+}
+
+.carousel__item {
+  flex: 0 0 auto;
+  width: 14rem;
+  scroll-snap-align: start;
+}
+
+.carousel__empty {
+  margin-block: 0;
 }
 
 /* --- Pagination -------------------------------------------------------------
