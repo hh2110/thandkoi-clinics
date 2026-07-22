@@ -30,7 +30,20 @@
 }
 
 .site-header__logo {
-  height: 2.5rem;
+  /* Sized up from the old 2.5rem per maintainer feedback ("tiny"). Stays on
+     logo.svg (the full mark + wordmark lockup) rather than the icon-only
+     logo-mark.svg: docs/brand-guidelines.md explicitly reserves the
+     icon-only mark for contexts too narrow for the full lockup (avatar/app
+     icon) and specifies the full lockup for header/footer/print — dropping
+     the wordmark here would also remove the only visible on-page text
+     naming the clinic for sighted visitors. logo.svg's intrinsic ratio is
+     768x575 (~1.336); at height:7rem (112px) the rendered width is ~150px,
+     clearing brand-guidelines.md's own "~140px wide... so the illustration
+     stays legible" floor for the full lockup -- a smaller height satisfies
+     "bigger than before" but not that legibility floor. .site-header__bar's
+     padding-block (--space-2, 1rem) grows the bar to accommodate rather
+     than the logo overflowing the bar's edges. */
+  height: 7rem;
   width: auto;
 }
 
