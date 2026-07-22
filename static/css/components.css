@@ -30,7 +30,11 @@
 }
 
 .site-header__logo {
-  height: 2.5rem;
+  /* Icon-only mark (logo-mark.svg), sized well above the old 2.5rem wordmark
+     lockup per maintainer feedback ("tiny ... maybe without the text logo").
+     .site-header__bar's padding-block (--space-2, 1rem) grows the bar to
+     accommodate rather than the logo overflowing the bar's edges. */
+  height: 4rem;
   width: auto;
 }
 
