@@ -914,6 +914,32 @@ def test_camp_report_archive_lists_only_published_newest_first(client, home_page
     assert content.index("Camp Two") < content.index("Camp One")
 
 
+def test_camp_report_archive_merges_manual_and_uploaded_camp_reports(client, home_page):
+    """The camp-upload flow (2026-07-22): ``get_camp_reports`` merges the
+    manually-authored ``CampReportPage`` (Plan 06) with the pipeline's
+    auto-published ``CampUploadReportPage`` under the same archive, newest
+    first, rather than the archive only ever showing one or the other."""
+    from apps.pipeline.factories import CampUploadReportPageFactory
+
+    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
+    CampReportPageFactory(
+        parent=index,
+        slug="camp-manual",
+        title="Manually Authored Camp",
+        camp_date=datetime.date(2026, 1, 1),
+    )
+    CampUploadReportPageFactory(
+        parent=index,
+        camp_date=datetime.date(2026, 6, 1),
+        camp_title="Uploaded Camp",
+    )
+
+    content = client.get("/en/camp-reports/").content.decode()
+    assert "Manually Authored Camp" in content
+    assert "Uploaded Camp" in content
+    assert content.index("Uploaded Camp") < content.index("Manually Authored Camp")
+
+
 def test_home_teaser_shows_latest_published_newsletter_only(client, home_page):
     """Home's newsletter teaser renders the latest published issue, never a draft."""
     index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")

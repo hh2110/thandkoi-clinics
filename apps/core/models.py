@@ -646,17 +646,34 @@ class CampReportIndexPage(Page):
 
     max_count = 1
     parent_page_types = ["core.HomePage"]
-    subpage_types = ["core.CampReportPage"]
+    # "pipeline.CampUploadReportPage" (camp-upload flow, 2026-07-22) is the
+    # pipeline's auto-published counterpart to the hand-authored
+    # CampReportPage — see that model's docstring for why it's a distinct
+    # type sharing this one archive rather than a reuse of CampReportPage's
+    # fields.
+    subpage_types = ["core.CampReportPage", "pipeline.CampUploadReportPage"]
 
     def get_camp_reports(self):
         """Published camp reports under this index, newest first.
 
-        Orders by ``-pk`` after ``-camp_date`` for the same reason as
-        ``NewsletterIndexPage.get_newsletters`` — a stable order when two
-        reports share a date.
+        Merges two page types sharing this one archive (camp-upload flow,
+        2026-07-22): the manually-authored ``CampReportPage`` (Plan 06) and
+        the pipeline's auto-published ``pipeline.CampUploadReportPage`` — see
+        that model's docstring for why it's a distinct type rather than a
+        reuse of this one's fields. Merged and sorted in Python (not a single
+        queryset — they're different models) using each page's
+        ``camp_date``/``pk``, for the same reason ``NewsletterIndexPage.
+        get_newsletters`` orders by ``-pk`` after ``-camp_date``: a stable
+        order when two reports share a date. Imported locally to avoid a
+        module-level import cycle — ``apps.pipeline.models`` already imports
+        from this module at the top level (for ``paginate_archive``).
         """
-        return (
-            CampReportPage.objects.live().child_of(self).order_by("-camp_date", "-pk")
+        from apps.pipeline.models import CampUploadReportPage
+
+        manual = list(CampReportPage.objects.live().child_of(self))
+        uploaded = list(CampUploadReportPage.objects.live().child_of(self))
+        return sorted(
+            manual + uploaded, key=lambda page: (page.camp_date, page.pk), reverse=True
         )
 
     def get_context(self, request, *args, **kwargs):
