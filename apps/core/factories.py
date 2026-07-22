@@ -35,8 +35,9 @@ from apps.core.models import (
 )
 
 # A ready-made StreamField body composing the Plan 03.5 section kit (hero +
-# impact-stat band + a donate CTA left unlinked, so the band stays hidden — the
-# current pre-Plan-05 state). Numbers/copy here are test fixtures only.
+# impact-stat band + the Quality of Care circle + a donate CTA left unlinked,
+# so the band stays hidden — the current pre-Plan-05 state). Numbers/copy here
+# are test fixtures only.
 DEFAULT_HOME_BODY = [
     (
         "hero",
@@ -59,6 +60,47 @@ DEFAULT_HOME_BODY = [
                 {"value": "189", "label": "patients served"},
                 {"value": "426", "label": "welfare (free) patients"},
                 {"value": "100%", "label": "donor-funded, no fees"},
+            ],
+        },
+    ),
+    (
+        "circle_of_care",
+        {
+            "stages": [
+                {
+                    "name": "Patient Registration",
+                    "short": "Patient Registration",
+                    "desc": "Secure, computerised records created for every visit.",
+                },
+                {
+                    "name": "Triage",
+                    "short": "Triage",
+                    "desc": "Complaint and vital signs assessed the moment you arrive.",
+                },
+                {
+                    "name": "Doctor's Consultation",
+                    "short": "Doctor's Consultation",
+                    "desc": "Care for children and adults, with dedicated women's "
+                    "and maternal health.",
+                },
+                {
+                    "name": "Diagnostic Services",
+                    "short": "Diagnostic Services",
+                    "desc": "Accessible testing and imaging to support timely "
+                    "clinical care.",
+                },
+                {
+                    "name": "Free Medication & Health Education",
+                    "short": "Free Medication",
+                    "desc": "Free essential medicines, plus prevention and "
+                    "self-care guidance.",
+                },
+                {
+                    "name": "Referral & Follow-up",
+                    "short": "Referral & Follow-up",
+                    "desc": "Coordinated referrals and continuity of care beyond "
+                    "the visit.",
+                },
             ],
         },
     ),

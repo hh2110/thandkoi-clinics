@@ -616,3 +616,143 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-faint);
 }
+
+/* --- Circle of Care wheel ---------------------------------------------------
+   The "Quality of Care" six-wedge wheel (external design handoff, "Circle of
+   Care Homepage Update"). The three wedge tones are semantic tokens
+   (--color-coc-seg-1/2/3 in tokens.css) rather than being declared here, per
+   this file's own "every colour comes from tokens.css, zero per-component
+   dark-mode overrides" rule above. Text inside the wheel is sized in
+   container query units (cqw) so the whole graphic scales cleanly from
+   desktop to a narrow phone with no breakpoints. */
+.coc-section__header {
+  text-align: center;
+}
+.coc-section__title {
+  max-width: none;
+  margin-inline: auto;
+}
+
+.coc {
+  position: relative;
+  width: min(460px, 100%);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  container-type: inline-size;
+}
+
+.coc__wheel-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.coc__seg {
+  stroke: var(--color-surface);
+  stroke-width: 3;
+  transition: opacity 0.2s ease;
+}
+.coc__seg--1 { fill: var(--color-coc-seg-1); }
+.coc__seg--2 { fill: var(--color-coc-seg-2); }
+.coc__seg--3 { fill: var(--color-coc-seg-3); }
+
+/* Labels are real buttons overlaid on the ring — keyboard focusable. */
+.coc__labels {
+  position: absolute;
+  inset: 0;
+}
+.coc__label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22cqw;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 3.2cqw;
+  line-height: 1.1;
+  color: var(--color-on-brand);
+  text-align: center;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.coc__label:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+/* Positions: clockwise from the top-right wedge. */
+.coc__label--1 { left: 67.6%; top: 19.5%; }
+.coc__label--2 { left: 85.25%; top: 50%; }
+.coc__label--3 { left: 67.6%; top: 80.5%; }
+.coc__label--4 { left: 32.4%; top: 80.5%; }
+.coc__label--5 { left: 14.75%; top: 50%; }
+.coc__label--6 { left: 32.4%; top: 19.5%; }
+
+/* Hub card in the donut hole. */
+.coc__hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 47cqw;
+  height: 47cqw;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--card-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6.5cqw;
+}
+.coc__hub > * { width: 100%; }
+
+.coc__cross {
+  width: 9cqw;
+  height: 9cqw;
+  display: block;
+  margin: 0 auto 2cqw;
+}
+.coc__cross rect { fill: var(--color-coral); }
+
+.coc__hub-brand {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 5cqw;
+  line-height: 1.05;
+  color: var(--color-brand-deep);
+  margin: 0;
+}
+.coc__hub-hint {
+  font-size: 2.7cqw;
+  color: var(--color-text-faint);
+  margin: 2cqw 0 0;
+}
+.coc__hub-name {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 4.6cqw;
+  line-height: 1.1;
+  color: var(--color-brand-deep);
+  margin: 0 0 1.5cqw;
+}
+.coc__hub-desc {
+  font-size: 3.1cqw;
+  line-height: 1.45;
+  color: var(--color-text-soft);
+  margin: 0;
+}
+
+/* Active / dimmed states, toggled by circle-of-care.js. */
+.coc.is-selecting .coc__seg { opacity: 0.4; }
+.coc.is-selecting .coc__label { opacity: 0.45; }
+.coc .coc__seg.is-active { opacity: 1; }
+.coc .coc__label.is-active { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .coc__seg, .coc__label { transition: none; }
+}
