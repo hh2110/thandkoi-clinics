@@ -26,6 +26,18 @@ from typing import BinaryIO
 
 from apps.pipeline.models import DeidentifiedVisit
 
+
+class ExportParseError(Exception):
+    """A parser recognised the file but cannot safely parse it.
+
+    Raised from ``parse()`` *before* anything is persisted, with a message
+    that is safe to show the uploading admin verbatim (so it must never
+    contain a cell value — only structural facts about the file). The upload
+    view catches it around ``ingest_export`` and renders the message; parse
+    always completes before persistence begins, so "nothing was saved" holds.
+    """
+
+
 # --- Column-lookup helper shared by every concrete parser -------------------
 
 

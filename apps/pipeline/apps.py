@@ -24,6 +24,7 @@ class PipelineConfig(AppConfig):
         to happen so every registered parser is available regardless of
         which view or management command runs first.
         """
-        from apps.pipeline import parser_clinic_v1
+        from apps.pipeline import parser_clinic_v1, parser_tkc_daily_v1
 
         parser_clinic_v1.register()
+        parser_tkc_daily_v1.register()

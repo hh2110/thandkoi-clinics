@@ -14,7 +14,7 @@ from apps.pipeline.parser_registry import ParserRegistry
 
 
 class ExportUploadForm(forms.Form):
-    export_file = forms.FileField(label="Daily export (.xlsx)")
+    export_file = forms.FileField(label="Daily export (.xls or .xlsx)")
     format_key = forms.ChoiceField(label="Export format")
 
     def __init__(self, *args, **kwargs):

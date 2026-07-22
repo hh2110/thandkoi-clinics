@@ -38,10 +38,13 @@ from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from xlrd import XLRDError
+from xlrd.compdoc import CompDocError
 
 from apps.pipeline.forms import ExportUploadForm
 from apps.pipeline.ingest import ingest_export
-from apps.pipeline.parser_registry import ParserRegistry
+from apps.pipeline.parser_registry import ExportParseError, ParserRegistry
+from apps.pipeline.xls_compat import convert_xls_to_xlsx, looks_like_xls
 
 logger = logging.getLogger(__name__)
 
@@ -69,36 +72,49 @@ def upload_export(request):
         if form.is_valid():
             uploaded = form.cleaned_data["export_file"]
             format_key = form.cleaned_data["format_key"]
-            # The not-really-an-.xlsx catch is scoped to opening/sniffing the
-            # workbook only. ``ingest_export`` commits one transaction per
-            # clinic-date and publishes a page per date, so an OSError-family
-            # exception escaping *it* (TimeoutError, ConnectionError, ...)
-            # must surface as a logged 500 — after a partial ingest, "Nothing
-            # was saved" would be a lie.
+            # The not-really-an-Excel-file catch is scoped to the
+            # convert/open/sniff step only. ``ingest_export`` commits one
+            # transaction per clinic-date and publishes a page per date, so
+            # an OSError-family exception escaping *it* (TimeoutError,
+            # ConnectionError, ...) must surface as a logged 500 — after a
+            # partial ingest, "Nothing was saved" would be a lie.
             try:
+                if looks_like_xls(uploaded):
+                    # The clinic system exports legacy .xls; convert once,
+                    # in memory, so everything downstream stays .xlsx-only.
+                    uploaded = convert_xls_to_xlsx(uploaded)
                 workbook = load_workbook(uploaded, read_only=True, data_only=True)
                 try:
                     suggested = ParserRegistry.sniff_all(workbook)
                 finally:
                     workbook.close()
-            except (InvalidFileException, BadZipFile, OSError) as exc:
-                # BadZipFile: a non-.xlsx file (e.g. a PDF renamed) isn't a
+            except (
+                InvalidFileException,
+                BadZipFile,
+                OSError,
+                XLRDError,
+                CompDocError,
+            ) as exc:
+                # BadZipFile: a non-Excel file (e.g. a PDF renamed) isn't a
                 # zip archive at all, so openpyxl never gets far enough to
                 # raise its own InvalidFileException.
-                # OSError: the clinic system's real .xls export is an OLE2
-                # file that happens to embed a zip end-of-central-directory
-                # record, so ``zipfile`` opens it and openpyxl only fails
-                # later with ``OSError("File contains no valid workbook
-                # part")`` — production 500 of 2026-07-22.
+                # OSError: an OLE2 file whose body happens to embed a zip
+                # end-of-central-directory record gets past BadZipFile and
+                # openpyxl only fails later with ``OSError("File contains no
+                # valid workbook part")`` — production 500 of 2026-07-22
+                # (now normally pre-empted by the .xls conversion above).
+                # XLRDError / CompDocError: an OLE2 container that isn't a
+                # readable .xls (corrupt, encrypted, or a non-spreadsheet
+                # Office file). CompDocError subclasses Exception, not
+                # XLRDError, so it needs its own entry.
                 logger.warning(
-                    "Rejected export upload as not a readable .xlsx: %s: %s",
+                    "Rejected export upload as not a readable Excel file: %s: %s",
                     type(exc).__name__,
                     exc,
                 )
                 error = (
-                    "That file doesn't look like a valid .xlsx export. "
-                    "If this is the clinic's .xls export, re-save it as "
-                    ".xlsx first. Nothing was saved."
+                    "That file doesn't look like a valid Excel export "
+                    "(.xls or .xlsx). Nothing was saved."
                 )
             else:
                 if suggested and format_key not in suggested:
@@ -112,9 +128,15 @@ def upload_export(request):
                         "Proceeding with your selected format anyway."
                     )
                 uploaded.seek(0)
-                summary = ingest_export(
-                    uploaded, parser_key=format_key, uploaded_by=request.user
-                )
+                try:
+                    summary = ingest_export(
+                        uploaded, parser_key=format_key, uploaded_by=request.user
+                    )
+                except ExportParseError as exc:
+                    # Raised by a parser before anything is persisted, with a
+                    # message written to be shown to the admin verbatim.
+                    logger.warning("Export upload failed to parse: %s", exc)
+                    error = f"{exc} Nothing was saved."
         else:
             error = "; ".join(
                 f"{field}: {', '.join(errs)}" for field, errs in form.errors.items()
