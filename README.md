@@ -86,8 +86,9 @@ Select one with the `DJANGO_SETTINGS_MODULE` environment variable.
 
 ## Deployment
 
-Production runs on [Render](https://render.com/) (Starter compute) against a
-single [Neon](https://neon.tech/) Postgres database, described by
+Production is live at **[thandkoiclinics.com](https://thandkoiclinics.com)**,
+running on [Render](https://render.com/) (Starter compute) against a single
+[Neon](https://neon.tech/) Postgres database, described by
 [`render.yaml`](render.yaml). Deploys are **manual and tag-based** — merging to
 `main` never changes production by itself; a person runs the `Deploy` workflow
 against a chosen release tag. Full flow, rollback, versioning, and how AI
