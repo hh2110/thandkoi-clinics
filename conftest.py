@@ -10,6 +10,9 @@ The three things here that matter for Plan 02's testing philosophy:
   attribute, same shape as the real SDK, so Plan 11 C2's AI-call-cost logging
   (``apps.pipeline.ai._log_ai_call``) has something to read in every test that
   exercises a real call site — see ``FAKE_INPUT_TOKENS``/``FAKE_OUTPUT_TOKENS``.
+  It also carries ``stop_reason="end_turn"`` (a clean completion), matching
+  the real SDK — ``_draft_short_text``'s stop-reason check (2026-07-23) reads
+  this on every short-drafting call, not just the newsletter's tool-turn loop.
 * ``_forbid_real_anthropic`` (autouse) — patches
   :func:`apps.pipeline.ai.get_anthropic_client` to raise. This makes it
   impossible for any test, anywhere in the suite, to construct a real client or
@@ -48,6 +51,7 @@ class _RecordingMessages:
     def create(self, **kwargs):
         self.calls.append(kwargs)
         return SimpleNamespace(
+            stop_reason="end_turn",
             content=[SimpleNamespace(text=self._text)],
             usage=SimpleNamespace(
                 input_tokens=FAKE_INPUT_TOKENS, output_tokens=FAKE_OUTPUT_TOKENS
