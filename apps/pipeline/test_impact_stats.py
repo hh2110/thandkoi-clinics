@@ -36,6 +36,7 @@ def test_compute_alltime_impact_stats_sums_every_dailyaggregate_row(db):
 
     assert stats.total_visits == 22
     assert stats.zakat_beneficiary_patients == 10
+    assert stats.as_of == datetime.date(2026, 8, 1)
 
 
 def test_compute_alltime_impact_stats_with_no_rows_returns_zero(db):
@@ -43,3 +44,4 @@ def test_compute_alltime_impact_stats_with_no_rows_returns_zero(db):
 
     assert stats.total_visits == 0
     assert stats.zakat_beneficiary_patients == 0
+    assert stats.as_of is None

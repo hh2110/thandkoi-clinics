@@ -30,5 +30,10 @@ headline as a smaller sub-line beneath it — see templates/blocks/hero_block.ht
     {% include "partials/sections/feature_split.html" with eyebrow=_("Latest newsletter") heading=latest_newsletter.title body=latest_newsletter.summary cta_label=_("Read the newsletter →") cta_url=latest_newsletter.url %}
   {% endif %}
 
-  {% include "partials/sections/stat_band.html" with stats=live_impact_stats caption=_("Our impact so far") %}
+  {% if live_impact_stats_as_of %}
+    {% blocktranslate asvar live_impact_caption with date=live_impact_stats_as_of|date:"d M Y" %}Our impact so far (updated at {{ date }}){% endblocktranslate %}
+  {% else %}
+    {% translate "Our impact so far" as live_impact_caption %}
+  {% endif %}
+  {% include "partials/sections/stat_band.html" with stats=live_impact_stats caption=live_impact_caption %}
 {% endblock %}
