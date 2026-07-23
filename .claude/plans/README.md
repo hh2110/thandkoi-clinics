@@ -44,6 +44,7 @@ plan from 03.5 onward carries three lifecycle sections:
 | 09 | [AI monthly newsletter](09-ai-monthly-newsletter.md) — Anthropic SDK, deterministic-numbers guardrail, draft → review | 🚧 In progress |
 | 10 | [Media object storage](10-media-object-storage.md) — serve/persist Wagtail uploads from S3-compatible object storage (Cloudflare R2); prod media was 404ing on ephemeral disk | 🚧 In progress |
 | 11 | [Stakeholder feedback triage (July 2026)](11-stakeholder-feedback-2026-07.md) — backlog of report/admin/content/process items from the maintainer's review round, sorted into tracks and priorities, to be sliced into follow-up plans. Track E's options review: [E1/E2 research](11-e1-e2-research-2026-07.md) | 🚧 In progress |
+| 12 | [Generic report stats & flexible key figures](12-generic-report-stats.md) — replace `CampReportPage`'s hardcoded Paediatrics/General/Welfare split with a flexible key-figure block + document attachment, so the Camp Reports archive can hold any one-off report (medical camp or institutional event), not just camps | 📝 Drafted |
 
 **Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ⏸ Paused/parked (work stopped, not abandoned) · ✅ Done
 
