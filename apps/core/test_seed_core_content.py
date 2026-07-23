@@ -16,6 +16,7 @@ from apps.core.management.commands.seed_core_content import (
     DOCTORS,
     SERVICES_ACTIVE,
     SERVICES_PLANNED,
+    SOCIAL_LINKS,
 )
 from apps.core.models import (
     AboutPage,
@@ -132,6 +133,22 @@ def test_bank_setting_filled_but_never_overwrites_a_human_edit():
     setting.save()
     call_command("seed_core_content")
     assert ContactBankSettings.for_site(site).bank_iban == "PK00MANUAL0000000000000000"
+
+
+@pytest.mark.django_db
+def test_social_links_seeded_but_never_duplicated():
+    _seed_tree()
+    site = Site.objects.get(is_default_site=True)
+
+    call_command("seed_core_content")
+    setting = ContactBankSettings.for_site(site)
+    links = list(setting.social_links.all())
+    assert len(links) == len(SOCIAL_LINKS)
+    assert [(link.label, link.url) for link in links] == SOCIAL_LINKS
+
+    # Re-running must not add duplicates.
+    call_command("seed_core_content")
+    assert ContactBankSettings.for_site(site).social_links.count() == len(SOCIAL_LINKS)
 
 
 @pytest.mark.django_db
