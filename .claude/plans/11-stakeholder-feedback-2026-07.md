@@ -39,9 +39,9 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       (`~/Downloads/TKC july 20th Stat.xls`) before a fix. Distinct from the
       500-error fix already shipped (`fix/upload-xls-500`, #46).
       **Priority: P0** — production data-integrity bug, user-facing wrong numbers.
-      **Done (2026-07-22, branch `fix/patient-count-mismatch`):** root cause was
-      wrapped free-text continuation rows with no `MR #` counted as phantom
-      visits; fixed + regression test added, PR not yet opened.
+      **Done (2026-07-22, branch `fix/patient-count-mismatch`),** merged PR
+      #47. Root cause was wrapped free-text continuation rows with no `MR #`
+      counted as phantom visits; fixed + regression test added.
 
 ### Track B — Daily report page UX
 
@@ -53,8 +53,8 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
 - [x] **B6.** Reduce the large vertical gaps between report sections.
 - [x] **B7.** Reuse the "Our Work" page's intro-text pattern on the reports index
       and on every other thin-content page.
-      **B1–B7 done (2026-07-22, branch `feat/daily-report-ux-pass`),** PR not
-      yet opened. The same B3/B4/B5 fixes were also applied to the new camp
+      **B1–B7 done (2026-07-22, branch `feat/daily-report-ux-pass`),** merged
+      PR #49. The same B3/B4/B5 fixes were also applied to the new camp
       upload report page (`feat/camp-report-upload-type`), since it shares the
       same parser limitations.
 - [x] **B8.** Claude-generated summary of free-text columns (Presenting
@@ -135,13 +135,14 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
 - [x] **C1.** Remove the now-unused "provisional schema" option from the upload
       format dropdown.
       **Done (2026-07-22, branch `chore/remove-provisional-schema-option`),**
-      PR not yet opened. Kept the module (still used as test fixture data),
-      just unregistered it from the dropdown.
+      merged PR #48. Kept the module (still used as test fixture data), just
+      unregistered it from the dropdown.
 - [x] **C2.** Surface Anthropic API cost in the admin panel (needs a metering
       approach — Anthropic's API doesn't return cost per call; likely
       token-count × published rate, tracked per `IngestRun`/AI call and summed).
-      **Done (2026-07-23, branch `feat/admin-ai-cost-metering`),** PR not yet
-      opened. New `AiCallLog` model (call site, model, input/output tokens,
+      **Done (2026-07-23, branch `feat/admin-ai-cost-metering`),** merged PR
+      #58 (see Status below for the rebase/review detail). New `AiCallLog`
+      model (call site, model, input/output tokens,
       computed cost, timestamp) logged once per real Anthropic call in
       `apps.pipeline.ai` — including once per tool-use turn in the monthly
       newsletter's multi-turn loop. Cost computed via a new
@@ -159,8 +160,8 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       export, plus a camp-title field on upload. Merge the "Reports" and "Camp
       Reports" nav items into one "Reports" menu with two sections (daily
       reports, other reports).
-      **Done (2026-07-22, branch `feat/camp-report-upload-type`),** PR not yet
-      opened. Added a `report_kind` discriminator so a camp and the clinic's
+      **Done (2026-07-22, branch `feat/camp-report-upload-type`),** merged PR
+      #50. Added a `report_kind` discriminator so a camp and the clinic's
       own daily activity sharing a date never merge/collide — see that
       branch's commit message for the full design decision.
 - [x] **C4.** Verify the configured Anthropic model is `claude-sonnet-5`
@@ -171,7 +172,8 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       **Resolved (2026-07-22):** confirmed the split matched CLAUDE.md exactly
       (nothing was on Sonnet). Maintainer decision: keep `claude-haiku-4-5` for
       the daily summary sentence, switch newsletter drafting to
-      `claude-sonnet-5` (branch `chore/newsletter-model-sonnet`).
+      `claude-sonnet-5` (branch `chore/newsletter-model-sonnet`, merged PR
+      #54).
 
   **Priority: P1** for C1/C3, **P2** for C2 (nice-to-have visibility, no
   functional blocker), **P0 (quick check, not a build)** for C4.
@@ -197,8 +199,8 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
 - [x] **D2.** Relabel "Our impact so far" → "Our impact so far (updated at
       <date>)"; document/confirm how the figure is calculated (see open
       questions).
-      **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),** PR
-      not yet opened. The figure was never computed — `ImpactStatBlock` is a
+      **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),**
+      merged PR #59. The figure was never computed — `ImpactStatBlock` is a
       hand-typed admin field; this adds an optional `as_of` date the admin
       sets manually alongside it. Documented in
       [docs/architecture-and-ai-brief.md](../../docs/architecture-and-ai-brief.md),
@@ -210,8 +212,8 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       page.
 - [x] **D4.** Newsletter branding: the clay-lamp ("chiragh") image/motif; remove
       "چراغ شفا" from the Urdu home page per the maintainer's explicit ask.
-      **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),** PR
-      not yet opened. Removed from two live occurrences — the site-wide
+      **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),**
+      merged PR #59. Removed from two live occurrences — the site-wide
       footer (renders on every page, not Home alone) and the Home page's
       hero tagline — plus matching seed/fixture data, and updated CLAUDE.md's
       Bilingual section. **Scope confirmed with the maintainer (2026-07-23):**
@@ -225,8 +227,8 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
 - [x] **D7.** Partner-logo carousel + in-kind donor examples on the donate page
       (style reference: [fwdr.org.pk](https://fwdr.org.pk/)); make "Thandkoi
       Clinics" more visually prominent on the home page.
-      **D6/D7 done (2026-07-22, branch `feat/donors-partners-page`),** PR not
-      yet opened, placeholders throughout per maintainer decision. **Still
+      **D6/D7 done (2026-07-22, branch `feat/donors-partners-page`),** merged
+      PR #53, placeholders throughout per maintainer decision. **Still
       needed from the maintainer: the Sugar Hospital and District Health
       Office logo files** — no image needed for named donors, by design.
 - [ ] **D8.** Main nav items should support dropdown submenus (groundwork for D6
@@ -236,8 +238,8 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       plan/task when nav complexity actually demands it.
 - [x] **D9.** Gallery: clicking a cropped thumbnail should open a full-size
       modal.
-      **Done (2026-07-22, branch `feat/gallery-lightbox-modal`),** PR not yet
-      opened. Native `<dialog>`, no JS library, per the site's minimal-JS
+      **Done (2026-07-22, branch `feat/gallery-lightbox-modal`),** merged PR
+      #52. Native `<dialog>`, no JS library, per the site's minimal-JS
       convention.
 - [ ] **D10 (round 2, 2026-07-23).** Remove the "Donors & Partners" nav item.
       **Grounding — resolved, maintainer decision 2026-07-23.** The doc says
