@@ -6,11 +6,20 @@ Newsletter archive — Plan 06. Wagtail's standard index + child-page pattern
 existed before this plan). Lists only published issues, newest first — drafts
 stay invisible (NewsletterIndexPage.get_newsletters queries `.live()`).
 Paginated so a growing archive doesn't turn into one long list.
+
+Newsletter branding (Plan 11 D4): a clay-lamp ("chiragh") motif marks this as
+the newsletter masthead. No asset exists yet (maintainer-confirmed, no image
+files provided), so it shows the shared media placeholder for now — same
+"placeholder only, no logo files yet" pattern as the Donors & Partners page
+(`core/donors_partners_page.html`), not a bespoke one.
 {% endcomment %}
 
 {% block content %}
   <section class="section">
     <div class="wrapper prose">
+      <div style="max-width: 9rem; margin-block-end: var(--space-3);">
+        {% include "partials/sections/_media_placeholder.html" with caption=_("Chiragh motif — asset pending") ratio="1 / 1" %}
+      </div>
       <h1>{{ page.title }}</h1>
       {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
     </div>

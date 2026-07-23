@@ -96,5 +96,10 @@ rules are architectural constraints, not preferences — never weaken them:
 
 ## Bilingual
 
-Content is English + Urdu (tagline: صحت سب کے لیے / چراغ شفا). Build with i18n in
-mind; Pashto may follow.
+Content is English + Urdu (tagline: صحت سب کے لیے). Build with i18n in mind;
+Pashto may follow.
+
+> **2026-07-23:** the "چراغ شفا" half of the tagline was deliberately retired
+> (maintainer's explicit ask, Plan 11 D4) — this is a content removal, not a
+> doc that fell out of sync. Newsletter branding instead carries a clay-lamp
+> ("chiragh") motif; see the newsletter archive template.
