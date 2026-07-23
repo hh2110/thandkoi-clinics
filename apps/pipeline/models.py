@@ -194,6 +194,46 @@ class DeidentifiedVisit(models.Model):
         "not recorded in the source export.",
     )
 
+    # --- Plan 11 Track B8/B9: free-text columns (added 2026-07-23) ---------
+    #
+    # A later, narrower exception to this model's own "safe by construction"
+    # docstring above: these seven fields hold *raw* free text, not a fixed
+    # category or a coarsened value. That's only safe because the maintainer
+    # separately confirmed (2026-07-23) that the clinic software's data-entry
+    # UI structurally cannot accept a patient identifier into these specific
+    # columns — see ``apps.pipeline.freetext``'s module docstring for the
+    # full grounding note and ``ParsedVisitRow``'s docstring for the same
+    # note at the parser boundary. This does NOT reopen de-identification for
+    # any other free-text column; `location`/`diagnosis_category` above stay
+    # coarsened exactly as before.
+    #
+    # Used only as the source for two review-gated AI calls (B8's summary,
+    # B9's empty-column flag — see ``apps.pipeline.ai`` and
+    # ``DailyReportPage.freetext_summary_draft``/``empty_columns_flag_draft``)
+    # — never for a numeric aggregate, and never rendered directly on a
+    # public page themselves.
+    presenting_complaints = models.TextField(blank=True, default="")
+    investigation = models.TextField(blank=True, default="")
+    provisional_diagnosis_text = models.TextField(
+        blank=True,
+        default="",
+        help_text="Raw free text, distinct from `diagnosis_category` above "
+        "(a fixed keyword-mapped category derived from this same source "
+        "column) — kept separately because B8/B9 need the actual text, not "
+        "the category.",
+    )
+    prescribed_medicine = models.TextField(blank=True, default="")
+    clinical_notes = models.TextField(
+        blank=True,
+        default="",
+        help_text="Doctor's/Nurse's/Dietitian's notes, whichever the source "
+        "export carries for this visit, concatenated if more than one is "
+        "present — see apps.pipeline.parser_tkc_daily_v1 for how these are "
+        "combined.",
+    )
+    diet_and_drug_compliance = models.TextField(blank=True, default="")
+    plan_notes = models.TextField(blank=True, default="")
+
     class Meta:
         indexes = [models.Index(fields=["visit_date"])]
 
@@ -373,10 +413,61 @@ class DailyReportPage(Page):
         "numbers above still stand on their own.",
     )
 
+    # --- Plan 11 Track B8/B9: free-text summary + empty-column flag --------
+    #
+    # Unlike `summary_sentence` above (CLAUDE.md invariant #4's one narrow,
+    # explicit exception — Plan 08), these two AI outputs are new
+    # AI-authored content and get invariant #4's *default* rule: a person
+    # must review and explicitly approve before either is shown on the
+    # public page. `report_publishing.publish_daily_report` populates only
+    # the `_draft` field below on every (re-)ingest — it never touches the
+    # `_approved` flag, which only a person sets, in the Wagtail admin,
+    # before re-publishing this page. A re-ingest (a corrected re-upload)
+    # regenerates the draft from the corrected data but deliberately leaves
+    # a previously-approved flag untouched; if that happens, the approved
+    # flag is now stale against the refreshed draft and a person should
+    # re-review it — flagged here rather than silently auto-resetting the
+    # flag, which would be its own surprising behaviour.
+    freetext_summary_draft = models.TextField(
+        blank=True,
+        help_text="AI-drafted summary of today's free-text clinical columns "
+        "(Plan 11 Track B8). NOT shown on the public page until a person "
+        "checks 'Free-text summary approved' below and (re)publishes this "
+        "page. Regenerated on every (re-)ingest for this date.",
+    )
+    freetext_summary_approved = models.BooleanField(
+        default=False,
+        help_text="Check this once a person has reviewed (and, if needed, "
+        "edited) the free-text summary above and it's ready for the public "
+        "page. Never set automatically by the pipeline.",
+    )
+    empty_columns_flag_draft = models.TextField(
+        blank=True,
+        help_text="AI-drafted note on which free-text columns were left "
+        "blank today (Plan 11 Track B9) — same review gate as the free-text "
+        "summary above.",
+    )
+    empty_columns_flag_approved = models.BooleanField(
+        default=False,
+        help_text="Check this once a person has reviewed the empty-columns "
+        "flag above and it's ready for the public page. Never set "
+        "automatically by the pipeline.",
+    )
+
     content_panels = [
         *Page.content_panels,
         FieldPanel("report_date"),
         FieldPanel("summary_sentence"),
+        FieldPanel(
+            "freetext_summary_draft",
+            heading="Free-text summary (AI draft — review before approving)",
+        ),
+        FieldPanel("freetext_summary_approved"),
+        FieldPanel(
+            "empty_columns_flag_draft",
+            heading="Empty-columns flag (AI draft — review before approving)",
+        ),
+        FieldPanel("empty_columns_flag_approved"),
     ]
 
     parent_page_types = ["pipeline.ReportIndexPage"]
@@ -392,6 +483,20 @@ class DailyReportPage(Page):
         fallback line" option in the plan's AI-summary-sentence decision.
         """
         return self.summary_sentence or "See the figures for this day below."
+
+    @property
+    def freetext_summary(self) -> str:
+        """The reviewed, approved free-text summary (Plan 11 B8), or ``""``
+        until a person checks ``freetext_summary_approved`` and (re)publishes
+        this page. Unlike ``summary``/``summary_sentence`` above, this is
+        CLAUDE.md invariant #4's *default* human-in-the-loop gate, not Plan
+        08's narrow exception."""
+        return self.freetext_summary_draft if self.freetext_summary_approved else ""
+
+    @property
+    def empty_columns_flag(self) -> str:
+        """Same review gate as ``freetext_summary`` above, for Plan 11 B9."""
+        return self.empty_columns_flag_draft if self.empty_columns_flag_approved else ""
 
     @property
     def headline_stats(self) -> list[dict[str, str]]:

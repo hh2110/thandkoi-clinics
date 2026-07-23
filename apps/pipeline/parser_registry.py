@@ -162,6 +162,17 @@ class ParsedVisitRow:
 
     Every field is already de-identified/coarsened by the parser that built
     it; there is no field here that could carry a direct identifier.
+
+    The seven free-text fields below (default ``""``, so an existing parser
+    that doesn't populate them — ``parser_clinic_v1`` — needs no change) are a
+    later, narrower addition (Plan 11 Track B8/B9, maintainer decision
+    2026-07-23): unlike everything above, which is a fixed category or a
+    coarsened value, these carry the *raw* free text from the source export.
+    That's only safe because the maintainer confirmed the clinic software's
+    data-entry UI structurally cannot accept a patient identifier in these
+    specific columns — see ``apps.pipeline.freetext``'s module docstring for
+    the full grounding note. A new free-text column added later needs that
+    same question asked explicitly, not assumed by analogy.
     """
 
     visit_date: date
@@ -172,8 +183,42 @@ class ParsedVisitRow:
     diagnosis_category: str
     is_new_patient: bool | None
     is_zakat_beneficiary: bool | None
+    presenting_complaints: str = ""
+    investigation: str = ""
+    provisional_diagnosis_text: str = ""
+    prescribed_medicine: str = ""
+    clinical_notes: str = ""
+    diet_and_drug_compliance: str = ""
+    plan_notes: str = ""
 
     def _canonical_tuple(self) -> tuple:
+        # Includes the seven Plan 11 Track B8/B9 free-text fields below —
+        # this went back and forth during code-review-tc, so the reasoning
+        # is recorded here rather than left to be re-litigated:
+        #
+        # An earlier revision excluded these fields, reasoning that every
+        # IngestRun.content_hash already persisted in production was computed
+        # before they existed, so including them would make a byte-identical
+        # re-upload of an already-ingested date hash differently and get
+        # reclassified STATUS_REPLACED instead of STATUS_DUPLICATE. That's
+        # true, but a second review pass found the exclusion's real cost is
+        # worse and permanent: a staff member correcting only a free-text
+        # column (Doctor's Notes, Prescribed Medicine, etc.) on a genuine
+        # re-upload — the actual workflow B8/B9 exists to support — would
+        # forever hash identically to the uncorrected version and be
+        # silently skipped as a no-op duplicate, with the stale AI drafts
+        # never regenerated.
+        #
+        # Decision: include them. The one-time production transition this
+        # causes is not a misclassification — before this deploy, free text
+        # was never parsed or persisted at all, so an unchanged file's old
+        # hash correctly reflected "nothing new to extract"; after this
+        # deploy, that same file yields genuinely new persistable
+        # information (the free text), so the first re-upload of any
+        # already-ingested date correctly reclassifying as a replace (and
+        # backfilling that date's free-text data + drafts) is the desired
+        # behavior, not a bug. Every subsequent re-upload of that same file
+        # then hashes identically going forward, same as before.
         return (
             self.visit_date.isoformat(),
             self.department,
@@ -183,6 +228,13 @@ class ParsedVisitRow:
             self.diagnosis_category,
             self.is_new_patient,
             self.is_zakat_beneficiary,
+            self.presenting_complaints,
+            self.investigation,
+            self.provisional_diagnosis_text,
+            self.prescribed_medicine,
+            self.clinical_notes,
+            self.diet_and_drug_compliance,
+            self.plan_notes,
         )
 
 

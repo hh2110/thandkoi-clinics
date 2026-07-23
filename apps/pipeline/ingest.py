@@ -209,6 +209,15 @@ def _ingest_one_date(
                     diagnosis_category=row.diagnosis_category,
                     is_new_patient=row.is_new_patient,
                     is_zakat_beneficiary=row.is_zakat_beneficiary,
+                    # Plan 11 Track B8/B9 free-text columns (2026-07-23) —
+                    # see ParsedVisitRow's docstring for the grounding note.
+                    presenting_complaints=row.presenting_complaints,
+                    investigation=row.investigation,
+                    provisional_diagnosis_text=row.provisional_diagnosis_text,
+                    prescribed_medicine=row.prescribed_medicine,
+                    clinical_notes=row.clinical_notes,
+                    diet_and_drug_compliance=row.diet_and_drug_compliance,
+                    plan_notes=row.plan_notes,
                 )
                 for row in rows
             ]

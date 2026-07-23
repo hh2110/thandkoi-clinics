@@ -20,7 +20,18 @@ rules are architectural constraints, not preferences — never weaken them:
 2. **Never send patient data to any AI model.** Only de-identified numbers and
    category counts may cross into a model call. For schema inference on new
    formats, the model sees column names/dtypes and a synthetic/de-identified
-   sample — never real patient rows.
+   sample — never real patient rows. **One narrow, explicit exception**
+   (decided 2026-07-23, Plan 11 Track B8/B9): the clinic export's seven named
+   free-text columns (Presenting Complaints, Investigation, Provisional
+   Diagnosis, Prescribed Medicine, Doctor's/Nurse's/Dietitian's Notes, Diet &
+   Drug Compliance, Plan) may cross into a model call as raw text, because
+   the maintainer confirmed the clinic software's data-entry UI structurally
+   cannot accept a patient identifier in these specific fields — they are
+   free of identifiers by construction, not by any scrub step this codebase
+   performs. This exception covers *only* those seven named columns; a new
+   free-text column added later needs that same question asked explicitly
+   before it may cross into a model call, never assumed by analogy. See
+   `apps.pipeline.freetext`'s module docstring for the full grounding note.
 3. **Numbers are deterministic.** All published figures are computed in Python
    and injected into prompts. The AI writes prose only; it must never invent or
    restate statistics from memory.

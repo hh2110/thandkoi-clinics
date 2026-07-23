@@ -27,12 +27,29 @@ break parsing):
   never persisted. Empty on the whole first sample.
 * ``Status`` — the payment column: ``zakat`` / ``regular`` →
   ``is_zakat_beneficiary`` True / False; anything else unknown.
-* Never read: ``MR #``, ``Patient Name``, ``Father's / Husband's Name``,
-  ``Address``, all vitals (BP … Waist), all narrative columns (complaints,
-  investigations, prescriptions, notes, plan). No code path locates their
-  column positions except the three identifying headers used to *sniff*, plus
-  ``MR #`` itself, checked for blank/non-blank only (never its value — see the
-  phantom-row note below) as one more identifying header.
+* Never read: ``MR #`` (except to check blank/non-blank — see the
+  phantom-row note below), ``Patient Name``, ``Father's / Husband's Name``,
+  ``Address``, all vitals (BP … Waist). No code path locates their column
+  positions except the three identifying headers used to *sniff*, plus
+  ``MR #`` itself.
+* **The narrative columns are now read** (Plan 11 Track B8/B9, maintainer
+  decision 2026-07-23) — ``Presenting Complaints``, ``Investigation``,
+  ``Provisional Diagnosis`` (the raw text, kept alongside — not instead of —
+  the fixed ``diagnosis_category`` derived from the same column),
+  ``Prescribed Medicine``, ``Doctor's Notes`` / ``Nurse's Notes`` /
+  ``Dietitian's Notes`` (whichever are present, concatenated into one
+  ``clinical_notes`` value), ``Diet & Drug Compliance``, and ``Plan``. This
+  reverses the "never read" note this docstring previously carried for these
+  columns — see ``apps.pipeline.freetext``'s module docstring for why
+  reading raw text from *these specific columns* doesn't violate CLAUDE.md
+  invariant #2. **Header text confirmed (2026-07-23)** against the real
+  ``TKC july 20th Stat.xls`` sample (header row only — never patient rows):
+  every guessed name (``Presenting Complaints``, ``Investigation``,
+  ``Provisional Diagnosis``, ``Prescribed Medicine``, ``Doctor's Notes``,
+  ``Nurse's Notes``, ``Dietitian's Notes``, ``Diet & Drug Compliance``,
+  ``Plan``) matches exactly, straight apostrophes included. ``header_index``
+  still degrades harmlessly (field stays blank) if a future export's header
+  text ever drifts.
 * No department / location / new-vs-follow-up signal exists in this format;
   those fields stay empty/unknown rather than being inferred.
 
@@ -46,9 +63,17 @@ old "is this row entirely blank" check (``all(value is None for value in
 row)``) didn't catch them and each one was counted as its own phantom visit.
 Fix: a row only counts as a visit if its ``MR #`` cell is non-blank — every
 genuine visit row carries one, and no continuation or leftover-formatting row
-does. The value itself is still never read into a ``ParsedVisitRow`` or
-persisted anywhere, per invariant #1 above; it is inspected only for
-blank/non-blank.
+does.
+
+**Continuation-row text is stitched back, not dropped (2026-07-23, found by
+code-review-tc).** When the seven Plan 11 Track B8/B9 free-text columns
+below were added, a continuation row's own free-text cell was initially
+still discarded outright (only the genuine visit row's first line survived)
+— silently truncating a wrapped complaint/prescription/note with nothing
+downstream ever indicating the true value ran longer, which could also make
+B9 misreport a column as "empty" when its content only existed on a wrapped
+line. A continuation row's non-blank free-text cells are now appended onto
+the previous visit's matching field instead.
 """
 
 from __future__ import annotations
@@ -183,6 +208,17 @@ class TkcDailyActivityV1Parser(BaseExportParser):
                 "date of birth",
                 "provisional diagnosis",
                 "status",
+                # Plan 11 Track B8/B9 free-text columns (2026-07-23) — see
+                # the module docstring's caveat on the exact header text for
+                # the ones not yet confirmed against a real sample.
+                "presenting complaints",
+                "investigation",
+                "prescribed medicine",
+                "doctor's notes",
+                "nurse's notes",
+                "dietitian's notes",
+                "diet & drug compliance",
+                "plan",
             )
         }
 
@@ -190,7 +226,28 @@ class TkcDailyActivityV1Parser(BaseExportParser):
             index = col[name]
             return row[index] if index is not None and index < len(row) else None
 
-        parsed_rows: list[ParsedVisitRow] = []
+        def text_cell(row, name) -> str:
+            """``cell()``, coerced to a stripped string — "" if blank/missing."""
+            return str(cell(row, name) or "").strip()
+
+        # Continuation-row free-text fields, staged as mutable dicts and only
+        # turned into frozen ParsedVisitRow objects at the end — this lets a
+        # continuation row's text be stitched onto the previous visit rather
+        # than silently dropped (found by code-review-tc: the earlier version
+        # kept only the visit row's own first line of each free-text column).
+        _CONTINUATION_FIELDS = (
+            ("presenting_complaints", "presenting complaints"),
+            ("investigation", "investigation"),
+            ("provisional_diagnosis_text", "provisional diagnosis"),
+            ("prescribed_medicine", "prescribed medicine"),
+            ("doctors_notes", "doctor's notes"),
+            ("nurses_notes", "nurse's notes"),
+            ("dietitians_notes", "dietitian's notes"),
+            ("diet_and_drug_compliance", "diet & drug compliance"),
+            ("plan_notes", "plan"),
+        )
+
+        staged: list[dict] = []
         for row in rows[header_at + 1 :]:
             if row is None:
                 continue
@@ -199,29 +256,79 @@ class TkcDailyActivityV1Parser(BaseExportParser):
             # the module docstring's phantom-row note. This subsumes the old
             # all-cells-None check: a fully blank row also has a blank MR #.
             if _is_blank(cell(row, "mr #")):
+                if not staged:
+                    continue  # leftover blank row before any real visit
+                previous = staged[-1]
+                for field, header_name in _CONTINUATION_FIELDS:
+                    addition = text_cell(row, header_name)
+                    if not addition:
+                        continue
+                    previous[field] = (
+                        f"{previous[field]} {addition}" if previous[field] else addition
+                    )
                 continue
 
             dob = _as_dob(cell(row, "date of birth"))
             status = str(cell(row, "status") or "").strip().lower()
 
-            parsed_rows.append(
-                ParsedVisitRow(
-                    visit_date=visit_date,
-                    department="",
-                    age_band=age_band_for(dob=dob, age_years=None, on=visit_date),
-                    sex=normalise_sex(cell(row, "sex")),
-                    location="",
-                    diagnosis_category=diagnosis_category_for(
-                        cell(row, "provisional diagnosis")
-                    ),
-                    is_new_patient=None,
-                    is_zakat_beneficiary=(
+            staged.append(
+                {
+                    "sex": normalise_sex(cell(row, "sex")),
+                    "dob": dob,
+                    "diagnosis_raw": cell(row, "provisional diagnosis"),
+                    "is_zakat_beneficiary": (
                         True
                         if status == "zakat"
                         else False
                         if status == "regular"
                         else None
                     ),
+                    "presenting_complaints": text_cell(row, "presenting complaints"),
+                    "investigation": text_cell(row, "investigation"),
+                    "provisional_diagnosis_text": text_cell(
+                        row, "provisional diagnosis"
+                    ),
+                    "prescribed_medicine": text_cell(row, "prescribed medicine"),
+                    "doctors_notes": text_cell(row, "doctor's notes"),
+                    "nurses_notes": text_cell(row, "nurse's notes"),
+                    "dietitians_notes": text_cell(row, "dietitian's notes"),
+                    "diet_and_drug_compliance": text_cell(
+                        row, "diet & drug compliance"
+                    ),
+                    "plan_notes": text_cell(row, "plan"),
+                }
+            )
+
+        parsed_rows = []
+        for data in staged:
+            clinical_notes = "; ".join(
+                f"{role}: {text}"
+                for role, text in (
+                    ("Doctor", data["doctors_notes"]),
+                    ("Nurse", data["nurses_notes"]),
+                    ("Dietitian", data["dietitians_notes"]),
+                )
+                if text
+            )
+            parsed_rows.append(
+                ParsedVisitRow(
+                    visit_date=visit_date,
+                    department="",
+                    age_band=age_band_for(
+                        dob=data["dob"], age_years=None, on=visit_date
+                    ),
+                    sex=data["sex"],
+                    location="",
+                    diagnosis_category=diagnosis_category_for(data["diagnosis_raw"]),
+                    is_new_patient=None,
+                    is_zakat_beneficiary=data["is_zakat_beneficiary"],
+                    presenting_complaints=data["presenting_complaints"],
+                    investigation=data["investigation"],
+                    provisional_diagnosis_text=data["provisional_diagnosis_text"],
+                    prescribed_medicine=data["prescribed_medicine"],
+                    clinical_notes=clinical_notes,
+                    diet_and_drug_compliance=data["diet_and_drug_compliance"],
+                    plan_notes=data["plan_notes"],
                 )
             )
         return ParsedExport(rows=parsed_rows)
