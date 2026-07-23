@@ -292,7 +292,11 @@ def build_freetext_summary_payload(
                     f"Summarise {clinic_date.isoformat()}'s free-text clinical "
                     "columns, given as {column label: [every non-blank entry "
                     "recorded that day]}:\n"
-                    + json.dumps(body, sort_keys=True, indent=2)
+                    # ensure_ascii=False: this is bilingual clinic (CLAUDE.md
+                    # "Bilingual") free text, so Urdu entries must reach the
+                    # model as real characters, not \uXXXX escapes (found by
+                    # code-review-tc).
+                    + json.dumps(body, sort_keys=True, indent=2, ensure_ascii=False)
                 ),
             }
         ],

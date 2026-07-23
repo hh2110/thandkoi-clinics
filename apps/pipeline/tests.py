@@ -78,6 +78,7 @@ from apps.pipeline.parser_tkc_daily_v1 import TkcDailyActivityV1Parser
 from apps.pipeline.rendering import render_daily_report
 from apps.pipeline.report_publishing import publish_camp_report, publish_daily_report
 from apps.pipeline.xls_compat import convert_xls_to_xlsx, looks_like_xls
+from conftest import _StubAnthropicClient
 
 XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -1024,11 +1025,18 @@ def test_tkc_daily_parser_skips_wrapped_text_continuation_rows_without_mr_number
     content spills onto an extra physical row carrying no ``MR #``; the old
     "all cells are None" blank check didn't catch it (one cell held text) so
     each continuation row was counted as its own phantom visit. The fix
-    requires a non-blank ``MR #`` for a row to count as a visit."""
+    requires a non-blank ``MR #`` for a row to count as a visit — and
+    (2026-07-23, found by code-review-tc) the continuation row's own text is
+    stitched onto the previous visit rather than silently dropped."""
     parsed = TkcDailyActivityV1Parser().parse(
         io.BytesIO(_build_tkc_daily_workbook_with_wrapped_text_continuation_rows())
     )
     assert len(parsed.rows) == 2
+    assert (
+        parsed.rows[0].presenting_complaints
+        == "first line of complaint second line of complaint (wrapped, no MR #)"
+    )
+    assert parsed.rows[1].presenting_complaints == "another complaint"
 
 
 def test_xls_conversion_preserves_date_cells():
@@ -1336,20 +1344,6 @@ def _ingest_tkc_daily_fixture(**xls_kwargs):
     )
 
 
-def _stub_client_with_text(text):
-    """A minimal recording stub, same shape as conftest's `_StubAnthropicClient`
-    but with caller-chosen canned text — used where a test needs two
-    *different* draft texts across two calls (conftest's fixture is one
-    fixed text per instance)."""
-    calls: list[dict] = []
-
-    def _create(**kwargs):
-        calls.append(kwargs)
-        return SimpleNamespace(content=[SimpleNamespace(text=text)])
-
-    return SimpleNamespace(messages=SimpleNamespace(create=_create))
-
-
 def test_parser_captures_freetext_columns_onto_deidentified_visit(home_page):
     """The seven Plan 11 Track B8/B9 columns are captured per-visit onto
     ``DeidentifiedVisit`` — the parser's new extension point (2026-07-23),
@@ -1425,6 +1419,20 @@ def test_freetext_summary_payload_contains_only_freetext_columns(
     assert "prescribed medicine" in sent
 
 
+def test_freetext_summary_payload_sends_urdu_text_unescaped():
+    """Found by code-review-tc: json.dumps' default ensure_ascii=True turned
+    Urdu free text (plausible per CLAUDE.md's "Bilingual" section) into
+    \\uXXXX escape sequences before it reached the model — the model would
+    have been drafting from unreadable escape codes, not the real clinical
+    language."""
+    payload = ai.build_freetext_summary_payload(
+        TKC_VISIT_DATE, {"presenting_complaints": ["بخار اور کھانسی"]}
+    )
+    sent = payload["messages"][0]["content"]
+    assert "بخار اور کھانسی" in sent
+    assert "\\u" not in sent
+
+
 def test_empty_columns_flag_payload_contains_only_booleans(
     home_page, mock_anthropic_client
 ):
@@ -1465,7 +1473,7 @@ def test_draft_freetext_summary_accepts_a_realistic_full_length_response(home_pa
     long_text = long_text.strip()
     assert 800 < len(long_text) < ai.MAX_FREETEXT_SUMMARY_LENGTH
 
-    client = _stub_client_with_text(long_text)
+    client = _StubAnthropicClient(text=long_text)
     summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, client)
 
     assert summary == long_text
@@ -1548,7 +1556,7 @@ def test_republish_refreshes_freetext_draft_but_leaves_a_prior_approval_untouche
     page.save_revision().publish()
 
     page = publish_daily_report(
-        TKC_VISIT_DATE, client=_stub_client_with_text("A different draft.")
+        TKC_VISIT_DATE, client=_StubAnthropicClient(text="A different draft.")
     )
 
     assert page.freetext_summary_draft == "A different draft."
