@@ -36,6 +36,18 @@ HEALTH_URL="https://thandkoiclinics.com/healthz"
 
 log()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 fail() { printf '\n\033[1;31mERROR:\033[0m %s\n' "$1" >&2; exit 1; }
+# Prompts $1, returns success only on a "y"/"Y" answer. Gates on `read`'s own
+# exit status, not just its output — a closed/non-interactive stdin makes
+# `read` fail outright, which would otherwise let `set -e` kill the script
+# before the caller's own abort message ever prints. One shared helper
+# (found by code-review-tc: this used to be copy-pasted at both call sites,
+# so a fix to one could silently miss the other) backs both the main deploy
+# confirmation and the --skip-ci-check override confirmation below.
+confirm() {
+  local reply=""
+  read -r -p "$1 " reply || true
+  [[ "$reply" =~ ^[Yy]$ ]]
+}
 
 REF=""
 ASSUME_YES=0
@@ -106,7 +118,10 @@ if [[ -z "$REF" ]]; then
   CONCLUSION=$(echo "$CI_RUN" | jq -r '.conclusion')
   [[ "$STATUS" == "completed" ]] || fail "CI for $REMOTE_MAIN is still running (status: $STATUS). Wait for it to finish."
   if [[ "$CONCLUSION" != "success" ]]; then
-    if [[ "$CONCLUSION" == "cancelled" && "$SKIP_CI_CHECK" -eq 1 ]]; then
+    if [[ "$CONCLUSION" == "cancelled" ]]; then
+      if [[ "$SKIP_CI_CHECK" -ne 1 ]]; then
+        fail "CI for $REMOTE_MAIN did not pass (conclusion: cancelled). Do not release a red commit. If you've verified this is a false negative (e.g. a concurrency-group cancellation during a fast-merge burst, not a real failure), re-run with --skip-ci-check."
+      fi
       echo "WARNING — CI for $REMOTE_MAIN shows 'cancelled', not 'success'."
       echo "This is only safe if you've separately confirmed the code is good (e.g."
       echo "its PR passed CI before merge, and this push-triggered run was cancelled"
@@ -116,15 +131,16 @@ if [[ -z "$REF" ]]; then
       # --skip-ci-check always prompts its own confirmation, even under --yes —
       # stacking two unattended bypasses (skip the CI gate AND skip confirming
       # it) is exactly the scenario this exists to prevent (found by
-      # code-review-tc). `read`'s own exit status (not just its output) gates
-      # the fail() call, so a closed/non-interactive stdin — which makes
-      # `read` fail outright — is treated as "not confirmed" and reaches the
-      # intended error message, instead of `set -e` killing the script first.
-      CI_CONFIRM=""
-      read -r -p "Proceed anyway, treating this as a verified false negative? [y/N] " CI_CONFIRM || true
-      [[ "$CI_CONFIRM" =~ ^[Yy]$ ]] || fail "Aborted — CI did not pass and the cancellation was not confirmed as a false negative."
+      # code-review-tc).
+      confirm "Proceed anyway, treating this as a verified false negative? [y/N]" \
+        || fail "Aborted — CI did not pass and the cancellation was not confirmed as a false negative."
     else
-      fail "CI for $REMOTE_MAIN did not pass (conclusion: $CONCLUSION). Do not release a red commit. If you've verified this is a false negative (e.g. a concurrency-group cancellation during a fast-merge burst, not a real failure), re-run with --skip-ci-check."
+      # --skip-ci-check only covers the "cancelled" case above (a known,
+      # verifiable false-negative shape) — a real failure/timeout/other
+      # non-success conclusion always blocks, regardless of the flag, so the
+      # message must not tell the operator to retry with a flag they may
+      # have already passed (found by code-review-tc).
+      fail "CI for $REMOTE_MAIN did not pass (conclusion: $CONCLUSION). Do not release a red commit. --skip-ci-check only overrides a 'cancelled' conclusion (a verified concurrency-group false negative) — this conclusion is not that, and always blocks."
     fi
   else
     echo "OK — CI passed on $REMOTE_MAIN"
@@ -136,10 +152,10 @@ fi
 
 log "Checking the deploy hook secret exists"
 SECRETS_ERR="$(mktemp)"
+trap 'rm -f "$SECRETS_ERR"' EXIT  # fail() exits before an inline `rm -f` would run, so this must be a trap, not a step (found by code-review-tc)
 SECRET_NAMES="$(gh api "repos/$REPO/environments/production/secrets" --jq '.secrets[].name' 2>"$SECRETS_ERR")" || {
   fail "Could not check the production environment's secrets (gh api call failed): $(cat "$SECRETS_ERR"). This is a permissions/network/auth problem, not necessarily a missing secret — check \`gh auth status\` before assuming First-time setup is incomplete."
 }
-rm -f "$SECRETS_ERR"
 if ! grep -qx "RENDER_DEPLOY_HOOK_URL" <<<"$SECRET_NAMES"; then
   fail "RENDER_DEPLOY_HOOK_URL is not set on the production environment. See docs/deploying.md's 'First-time setup' — this is a one-off, maintainer-only step."
 fi
@@ -186,12 +202,8 @@ echo "Target: production (https://thandkoiclinics.com)"
 echo
 
 if [[ "$ASSUME_YES" -ne 1 ]]; then
-  # `read`'s exit status (not just $CONFIRM) gates the abort message — a
-  # closed/non-interactive stdin makes `read` fail outright, which would
-  # otherwise let `set -e` kill the script before "Aborted..." ever prints.
-  CONFIRM=""
-  read -r -p "Deploy $REF to production? [y/N] " CONFIRM || true
-  [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted — nothing was tagged or deployed."; exit 1; }
+  confirm "Deploy $REF to production? [y/N]" \
+    || { echo "Aborted — nothing was tagged or deployed."; exit 1; }
 fi
 
 # --- Cut and push the tag (only when we made a new one) ---------------------
@@ -205,7 +217,15 @@ fi
 # --- Trigger the deploy -------------------------------------------------------
 
 log "Triggering the Deploy workflow for $REF"
-TRIGGERED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+# 2-minute buffer before "now", not "now" itself — GitHub's server-recorded
+# createdAt could otherwise sort earlier than a client clock running a few
+# seconds fast, silently dropping the real run out of the candidate list
+# (found by code-review-tc). Widening the window is safe: candidates are
+# still positively confirmed by their own log content below, not by timing
+# alone. date -r (BSD/macOS) falls back to date -d @ (GNU/Linux).
+SINCE_EPOCH=$(($(date -u +%s) - 120))
+TRIGGERED_AT=$(date -u -r "$SINCE_EPOCH" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+  || date -u -d "@$SINCE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
 gh workflow run deploy.yml --repo "$REPO" -f ref="$REF"
 
 # Find the run this dispatch actually created — never assume it's whatever
