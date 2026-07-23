@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import datetime
 import json
+from collections.abc import Callable
 from typing import Any, Protocol
 
 from apps.pipeline.aggregation import ClinicAggregate
@@ -170,32 +171,48 @@ def build_daily_summary_payload(aggregate: DailyAggregate) -> dict[str, Any]:
     }
 
 
+def _draft_short_text(
+    build_payload: Callable[[], dict[str, Any]],
+    client: _AnthropicLike | None,
+    max_length: int,
+) -> str | None:
+    """Shared shape behind every short, fixed-template drafting call below.
+
+    Returns ``None`` — never raises — on any failure: client construction,
+    payload building, the API call itself, or a response that fails the
+    basic sanity check (empty, or over ``max_length``). ``build_payload`` is
+    called *inside* the try so a payload-building error degrades the same
+    way an API error does — none of these calls may ever bubble up and block
+    their caller. Extracted (found by code-review-tc) so a future change to
+    this shape only has one place to land, instead of three near-identical
+    copies drifting apart.
+    """
+    try:
+        active_client = client or get_anthropic_client()
+        payload = build_payload()
+        response = active_client.messages.create(**payload)
+        text = response.content[0].text.strip()
+    except Exception:  # noqa: BLE001 - any failure means "no text this run"
+        return None
+
+    if not text or len(text) > max_length:
+        return None
+    return text
+
+
 def draft_daily_summary_sentence(
     aggregate: DailyAggregate, client: _AnthropicLike | None = None
 ) -> str | None:
     """Ask the model to phrase the day's aggregate as one sentence, or give up.
 
-    Returns ``None`` — never raises — on any failure: client construction,
-    the API call itself, or a response that fails the basic sanity check
-    (empty, or over :data:`MAX_DAILY_SUMMARY_LENGTH`). The caller always has
-    a safe value to fall back to, which is exactly what lets the daily report
-    page auto-publish unconditionally (see this module's Plan 08 section
-    above). The broad ``except Exception`` here is deliberate: *any* failure
-    mode of an external API call — network error, timeout, malformed
-    response — must degrade to "no sentence", never bubble up and block the
-    deterministic numbers.
+    See :func:`_draft_short_text` for the failure contract. The caller always
+    has a safe value to fall back to, which is exactly what lets the daily
+    report page auto-publish unconditionally (see this module's Plan 08
+    section above).
     """
-    try:
-        active_client = client or get_anthropic_client()
-        payload = build_daily_summary_payload(aggregate)
-        response = active_client.messages.create(**payload)
-        text = response.content[0].text.strip()
-    except Exception:  # noqa: BLE001 - any failure falls back to no sentence
-        return None
-
-    if not text or len(text) > MAX_DAILY_SUMMARY_LENGTH:
-        return None
-    return text
+    return _draft_short_text(
+        lambda: build_daily_summary_payload(aggregate), client, MAX_DAILY_SUMMARY_LENGTH
+    )
 
 
 # --- Plan 11 Track B8/B9: free-text summary + empty-column flag ------------
@@ -283,25 +300,19 @@ def draft_freetext_summary(
 ) -> str | None:
     """Ask the model to summarise the day's free-text columns, or give up.
 
-    Returns ``None`` — never raises — on any failure, mirroring
-    :func:`draft_daily_summary_sentence`'s broad ``except Exception``. Unlike
-    that function, a ``None`` (or a drafted string) here is never auto-shown
-    on the public page: :func:`apps.pipeline.report_publishing.publish_daily_report`
-    stores whatever this returns (or ``""``) in ``freetext_summary_draft`` and
-    a person must separately approve it (CLAUDE.md invariant #4's default
+    See :func:`_draft_short_text` for the failure contract. Unlike
+    :func:`draft_daily_summary_sentence`, a ``None`` (or a drafted string)
+    here is never auto-shown on the public page:
+    :func:`apps.pipeline.report_publishing.publish_daily_report` stores
+    whatever this returns (or ``""``) in ``freetext_summary_draft`` and a
+    person must separately approve it (CLAUDE.md invariant #4's default
     rule, not Plan 08's narrow exception).
     """
-    try:
-        active_client = client or get_anthropic_client()
-        payload = build_freetext_summary_payload(clinic_date, columns)
-        response = active_client.messages.create(**payload)
-        text = response.content[0].text.strip()
-    except Exception:  # noqa: BLE001 - any failure means "no draft this run"
-        return None
-
-    if not text or len(text) > MAX_FREETEXT_SUMMARY_LENGTH:
-        return None
-    return text
+    return _draft_short_text(
+        lambda: build_freetext_summary_payload(clinic_date, columns),
+        client,
+        MAX_FREETEXT_SUMMARY_LENGTH,
+    )
 
 
 _EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT = (
@@ -356,20 +367,13 @@ def draft_empty_columns_flag(
     """Ask the model to phrase which columns are empty, or give up.
 
     Same failure/review-gate contract as :func:`draft_freetext_summary` above
-    — returns ``None`` on any failure, never raises, and whatever it returns
-    is stored as a draft only; see that function's docstring.
+    — see :func:`_draft_short_text`.
     """
-    try:
-        active_client = client or get_anthropic_client()
-        payload = build_empty_columns_flag_payload(clinic_date, empty_columns)
-        response = active_client.messages.create(**payload)
-        text = response.content[0].text.strip()
-    except Exception:  # noqa: BLE001 - any failure means "no draft this run"
-        return None
-
-    if not text or len(text) > MAX_EMPTY_COLUMNS_FLAG_LENGTH:
-        return None
-    return text
+    return _draft_short_text(
+        lambda: build_empty_columns_flag_payload(clinic_date, empty_columns),
+        client,
+        MAX_EMPTY_COLUMNS_FLAG_LENGTH,
+    )
 
 
 # --- Plan 09: the monthly newsletter — one-shot prompt with tooling --------

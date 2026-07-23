@@ -192,6 +192,17 @@ class ParsedVisitRow:
     plan_notes: str = ""
 
     def _canonical_tuple(self) -> tuple:
+        # Deliberately excludes the seven Plan 11 Track B8/B9 free-text
+        # fields below (maintainer decision 2026-07-23, found by
+        # code-review-tc): this tuple feeds content_hash_for_rows(), and
+        # every IngestRun.content_hash already persisted in production was
+        # computed before these fields existed. Including them would change
+        # the hash for a byte-identical re-upload of an already-ingested
+        # date, misclassifying it as STATUS_REPLACED instead of
+        # STATUS_DUPLICATE and needlessly re-triggering all three AI calls.
+        # If free text ever needs to participate in dedup detection, that's
+        # a deliberate follow-up, not an incidental side effect of adding
+        # the fields.
         return (
             self.visit_date.isoformat(),
             self.department,
@@ -201,13 +212,6 @@ class ParsedVisitRow:
             self.diagnosis_category,
             self.is_new_patient,
             self.is_zakat_beneficiary,
-            self.presenting_complaints,
-            self.investigation,
-            self.provisional_diagnosis_text,
-            self.prescribed_medicine,
-            self.clinical_notes,
-            self.diet_and_drug_compliance,
-            self.plan_notes,
         )
 
 

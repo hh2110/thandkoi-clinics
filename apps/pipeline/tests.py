@@ -15,6 +15,7 @@ The real Anthropic client is impossible to construct here — see the autouse
 
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import io
 import json
@@ -526,6 +527,42 @@ def test_content_hash_for_rows_is_order_independent_and_change_sensitive():
     assert content_hash_for_rows(parsed_a.rows) != content_hash_for_rows(
         parsed_changed.rows
     )
+
+
+def test_content_hash_for_rows_is_unaffected_by_freetext_columns():
+    """Found by code-review-tc: the seven Plan 11 Track B8/B9 free-text
+    fields must stay out of ``content_hash_for_rows``'s fingerprint.
+    Every ``IngestRun.content_hash`` already persisted in production was
+    computed before these fields existed — including them would make a
+    byte-identical re-upload of an already-ingested date hash differently
+    after this deploy, misclassifying it as a replace instead of a
+    duplicate and needlessly re-triggering every AI call."""
+    from apps.pipeline.parser_registry import ParsedVisitRow
+
+    base = ParsedVisitRow(
+        visit_date=datetime.date(2026, 7, 8),
+        department="General Medicine",
+        age_band=DeidentifiedVisit.AGE_BAND_18_40,
+        sex=DeidentifiedVisit.SEX_MALE,
+        location="Thandkoi",
+        diagnosis_category=DeidentifiedVisit.DIAGNOSIS_OTHER,
+        is_new_patient=True,
+        is_zakat_beneficiary=True,
+        presenting_complaints="Headache",
+        investigation="",
+        provisional_diagnosis_text="Migraine",
+        prescribed_medicine="Paracetamol",
+        clinical_notes="Doctor: Review in a week",
+        diet_and_drug_compliance="Good",
+        plan_notes="Follow up",
+    )
+    changed = dataclasses.replace(
+        base,
+        presenting_complaints="A completely different complaint",
+        clinical_notes="Doctor: Something else entirely",
+    )
+
+    assert content_hash_for_rows([base]) == content_hash_for_rows([changed])
 
 
 def test_clinic_v1_parser_sniffs_its_own_required_columns():
@@ -1500,6 +1537,37 @@ def test_republish_refreshes_freetext_draft_but_leaves_a_prior_approval_untouche
     assert page.freetext_summary_draft == "A different draft."
     assert page.freetext_summary_approved is True  # untouched — now stale
     assert page.freetext_summary == "A different draft."
+
+
+def test_republish_with_failing_ai_call_preserves_a_prior_approved_draft(
+    home_page, mock_anthropic_client
+):
+    """Found by code-review-tc: a transient AI failure on a later re-ingest
+    used to overwrite ``freetext_summary_draft``/``empty_columns_flag_draft``
+    with "" while leaving `_approved` at True — silently blanking content a
+    person already approved for the live page. A failed draft call must
+    leave the existing (already-reviewed) draft untouched instead."""
+    _ingest_tkc_daily_fixture()
+    page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
+    page.freetext_summary_approved = True
+    page.empty_columns_flag_approved = True
+    page.save_revision().publish()
+    approved_summary = page.freetext_summary_draft
+    approved_flag = page.empty_columns_flag_draft
+
+    def _raise(**kwargs):
+        raise TimeoutError("simulated AI timeout")
+
+    raising_client = SimpleNamespace(messages=SimpleNamespace(create=_raise))
+    page = publish_daily_report(TKC_VISIT_DATE, client=raising_client)
+
+    assert page.live is True
+    assert page.freetext_summary_draft == approved_summary
+    assert page.empty_columns_flag_draft == approved_flag
+    assert page.freetext_summary_approved is True
+    assert page.empty_columns_flag_approved is True
+    assert page.freetext_summary == approved_summary
+    assert page.empty_columns_flag == approved_flag
 
 
 # --- Camp-upload flow (2026-07-22) ------------------------------------------

@@ -68,6 +68,19 @@ def collect_freetext_entries(
     return collected
 
 
+def empty_columns_from_entries(entries: dict[str, list[str]]) -> dict[str, bool]:
+    """``True`` for a column with zero non-blank entries in ``entries``.
+
+    ``entries`` is the dict :func:`collect_freetext_entries` already built —
+    callers that need both B8's entries and B9's empty-flags (e.g.
+    ``apps.pipeline.report_publishing.publish_daily_report``) should call
+    that once and pass its result here, rather than re-collecting from
+    ``visits`` a second time (found by code-review-tc: the two used to run
+    the same per-visit strip/filter/sort pass twice over).
+    """
+    return {name: len(values) == 0 for name, values in entries.items()}
+
+
 def compute_empty_columns(visits: Iterable[DeidentifiedVisit]) -> dict[str, bool]:
     """``True`` for a column with zero non-blank entries across ``visits``.
 
@@ -76,6 +89,8 @@ def compute_empty_columns(visits: Iterable[DeidentifiedVisit]) -> dict[str, bool
     rows; the AI call in ``apps.pipeline.ai`` is only ever handed this dict
     and asked to phrase it, never to decide it. A date with no visits at all
     counts every column as empty — there is nothing to have filled in.
+
+    Convenience wrapper over :func:`empty_columns_from_entries` for callers
+    that only need the flags, not the entries themselves (e.g. tests).
     """
-    entries = collect_freetext_entries(visits)
-    return {name: len(values) == 0 for name, values in entries.items()}
+    return empty_columns_from_entries(collect_freetext_entries(visits))

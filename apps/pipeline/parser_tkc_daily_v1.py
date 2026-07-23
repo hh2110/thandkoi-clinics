@@ -42,15 +42,14 @@ break parsing):
   reverses the "never read" note this docstring previously carried for these
   columns — see ``apps.pipeline.freetext``'s module docstring for why
   reading raw text from *these specific columns* doesn't violate CLAUDE.md
-  invariant #2. **Caveat, flagged rather than silently assumed:** the exact
-  header text for ``Doctor's Notes``/``Nurse's Notes``/``Dietitian's Notes``,
-  ``Diet & Drug Compliance``, and ``Plan`` is inferred from the maintainer's
-  plan-doc wording, not yet confirmed against a real full-column sample (only
-  ``Presenting Complaints``/``Provisional Diagnosis`` are confirmed from the
-  2026-07-22 sample). ``header_index`` degrades harmlessly if a guessed name
-  is wrong — the field just stays blank, matching every other optional
-  column here — but this should be verified against the real export the next
-  time one is available.
+  invariant #2. **Header text confirmed (2026-07-23)** against the real
+  ``TKC july 20th Stat.xls`` sample (header row only — never patient rows):
+  every guessed name (``Presenting Complaints``, ``Investigation``,
+  ``Provisional Diagnosis``, ``Prescribed Medicine``, ``Doctor's Notes``,
+  ``Nurse's Notes``, ``Dietitian's Notes``, ``Diet & Drug Compliance``,
+  ``Plan``) matches exactly, straight apostrophes included. ``header_index``
+  still degrades harmlessly (field stays blank) if a future export's header
+  text ever drifts.
 * No department / location / new-vs-follow-up signal exists in this format;
   those fields stay empty/unknown rather than being inferred.
 
