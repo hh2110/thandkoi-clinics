@@ -1,6 +1,6 @@
 # Thandkoi Clinics — Brand Guidelines
 
-_Last updated: 2026-07-19 · Status: draft for sign-off_
+_Last updated: 2026-07-23 · Status: draft for sign-off_
 
 These guidelines define the visual identity for the website and all digital
 material. **The logo is the authority** — all colours below are sampled from the
@@ -24,16 +24,14 @@ swaddled child) with a red medical cross where the ring opens, above the wordmar
   <img alt="The Thandkoi Clinics logo" src="../brand/logo.svg" width="300">
 </picture>
 
-### Vector assets (primary — use these)
+### Vector assets
 
-The logo is now true vector (SVG), professionally traced, transparent
-background. Because the ring is an outline (not a solid disc) with enough
-contrast in its own right, **one asset works on both light and dark
-backgrounds** — no separate light/dark files needed.
+The logo is also available as true vector (SVG), traced from
+`brand/logo-primary.jpg`, transparent background.
 
 | File | Use |
 |---|---|
-| [`brand/logo.svg`](../brand/logo.svg) | Full lockup — mark + wordmark. Primary logo for header, footer, print. |
+| [`brand/logo.svg`](../brand/logo.svg) | Full lockup — mark + wordmark. Used for print and design-reference contexts. |
 | [`brand/logo-mark.svg`](../brand/logo-mark.svg) | Mark only, no wordmark. Square-ish crop, for contexts too narrow for the full lockup (social avatar, app icon). |
 | [`brand/favicon.svg`](../brand/favicon.svg) / `favicon-32.png` / `favicon-180.png` / `favicon-512.png` | Browser tab / bookmark / home-screen icons. |
 
@@ -47,13 +45,36 @@ backgrounds** — no separate light/dark files needed.
   a deliberately simplified icon (ring + cross only) would read better than
   shrinking the full mark further.
 
-### Legacy raster assets
+### Header lockups (primary — use these for the live site)
 
-[`brand/logo-primary.jpg`](../brand/logo-primary.jpg) and
-[`brand/logo-reversed.png`](../brand/logo-reversed.png) are the original raster
-files the vector assets above were traced from — kept for reference, superseded
-by the SVGs for all actual use. Other assets in [`brand/`](../brand/):
-`logo-variant-orange-cap.jpg` and product mockups.
+2026-07-23: two rounds of trying to keep the full mark + wordmark lockup in
+the header (first a recoloured `logo.svg`, then a recoloured
+`logo-reversed.png`) both still read as two different logos across themes —
+`logo.svg` and `logo-reversed.png` are traced from two different source
+illustrations (different ring weight, colour saturation, proportions), and
+matching the wordmark's contrast per theme was a recurring problem on top
+of that. **Maintainer decision: drop the wordmark from the header and use
+the mark (ring + family + cross) only.** The clinic's name stays visible
+elsewhere on every page (site-footer's copyright line, and the page
+`<title>`/OG tags), so this doesn't remove the only on-page name text —
+it moves it out of the header specifically.
+
+| File | Use |
+|---|---|
+| [`brand/logo-dark.png`](../brand/logo-dark.png) | Dark theme. A crop of `logo-reversed.png` with the wordmark rows removed — the same approved illustration, just less of the canvas. |
+| [`brand/logo-light.svg`](../brand/logo-light.svg) | Light theme. Commissioned from an external design pass as a mark-only vector (not derived from any asset already in this repo) once recolouring attempts on the existing assets kept losing to the "two different logos" problem above. |
+
+These two aren't pixel-derived from one another and have different
+intrinsic aspect ratios (`logo-dark.png` ~1.24, `logo-light.svg` ~1.07);
+`.site-header__logo` in `static/css/components.css` sizes both by a shared
+*width* rather than height so they read as the same size regardless.
+
+`brand/logo.svg` and `brand/logo-mark.svg` (an existing mark-only crop of
+the `logo.svg` family) remain the vector source for print and any future
+context that needs true vector (not raster) art — they are not currently
+used on the live site, and `logo-mark.svg` in particular was not reused for
+the header precisely because it inherits `logo.svg`'s "different
+illustration than logo-reversed.png" problem.
 
 ## 2. Colour palette
 

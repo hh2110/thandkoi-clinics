@@ -11,19 +11,39 @@ even `request` — so LANGUAGE_CODE may be entirely absent, not just falsy.
 
 Header brand lockup with theme-aware logo (Plan 11 D11). logo.svg has a
 hard-coded dark wordmark, so on the dark theme "THE THANDKOI" sat
-near-invisible on the dark background. We now ship BOTH lockups and let CSS
-show the right one per theme:
-  - logo.svg          → light theme (dark wordmark on light bg)
-  - logo-reversed.png → dark theme  (light wordmark, white ring; transparent)
+near-invisible on the dark background. Two earlier fixes tried shipping a
+full lockup (mark + wordmark) per theme — first a recoloured logo.svg,
+then a recoloured logo-reversed.png — but both attempts still read as
+different logos across themes (different ring weight/saturation, and the
+wordmark's own contrast needed separate per-theme tuning on top of that).
+
+2026-07-23 re-scope: maintainer decision — drop the wordmark from the
+header entirely and use the mark (ring + family + cross) only. This sidesteps
+the wordmark-contrast problem altogether rather than continuing to chase it,
+and the clinic's name is still visible elsewhere on every page (site-footer's
+copyright line, and the <title>/OG tags in base.html), so this isn't a loss
+of the only on-page name text, just a move of it out of the header:
+  - logo-light.svg → light theme. Delivered by an external design pass
+    (see PR #75's follow-up) as a mark-only vector, not derived from any
+    asset already in this repo.
+  - logo-dark.png  → dark theme. A crop of logo-reversed.png (the lockup
+    the maintainer had already approved) that removes the wordmark rows —
+    literally the same approved pixels, just less of the canvas.
+These two are NOT pixel-derived from one another (one's a fresh vector,
+one's a raster crop) and have different intrinsic aspect ratios (1.07 vs
+1.24), but both render at the same on-page width (see components.css) and
+were visually confirmed side by side to read as the same mark before this
+landed — a closer match than either full-lockup attempt achieved.
 
 Both <img>s are always in the DOM; components.css toggles their `display`
 off the :root[data-theme] / prefers-color-scheme cascade, so the swap is
 instant with no JS and no FOUC. Only one is ever visible, so the alt text
-lives on whichever is shown (the hidden one is aria-hidden + alt="").
-width/height below are each image's own natural pixel size (not matched to
-each other) so the browser's auto aspect-ratio doesn't distort/reflow either
-lockup — actual on-page size is set by .site-header__logo's height:7rem in
-components.css.
+lives on whichever is shown (the hidden one is aria-hidden + alt="") — the
+wrapping <a>'s own aria-label is what screen readers actually announce
+either way, so the img alt text is belt-and-braces, not load-bearing.
+width/height below are each image's own natural pixel size so the
+browser's auto aspect-ratio doesn't distort/reflow either; actual on-page
+size is set by .site-header__logo's width:9.375rem in components.css.
 {% endcomment %}
 {% with lang=LANGUAGE_CODE|default:"en" %}
 {% with home_path="/"|add:lang|add:"/" %}
@@ -32,18 +52,18 @@ components.css.
     <a class="site-header__brand" href="{{ home_path }}" aria-label="{% translate 'The Thandkoi Clinics — home' %}">
       <img
         class="site-header__logo site-header__logo--light"
-        src="{% static 'images/logo.svg' %}"
+        src="{% static 'images/logo-light.svg' %}"
         alt="{% translate 'The Thandkoi Clinics' %}"
-        width="192"
-        height="144"
+        width="276"
+        height="259"
       />
       <img
         class="site-header__logo site-header__logo--dark"
-        src="{% static 'images/logo-reversed.png' %}"
+        src="{% static 'images/logo-dark.png' %}"
         alt=""
         aria-hidden="true"
-        width="900"
-        height="769"
+        width="503"
+        height="405"
       />
     </a>
     <div class="site-header__controls">
