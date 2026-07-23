@@ -1490,54 +1490,27 @@ def test_draft_freetext_summary_accepts_a_realistic_full_length_response(home_pa
     assert summary == long_text
 
 
-def test_publish_daily_report_drafts_freetext_summary_but_does_not_auto_publish(
+def test_publish_daily_report_auto_publishes_freetext_summary_and_flag(
     home_page, mock_anthropic_client
 ):
-    """The CLAUDE.md invariant #4 *default* gate, not Plan 08's narrow
-    exception: B8/B9 output lands in the page's draft fields, but neither is
-    approved and neither is exposed via the `freetext_summary`/
-    `empty_columns_flag` properties the template reads — even though the
-    page itself (numbers + summary_sentence) is live regardless, per PR #15's
-    no-draft-step decision for the deterministic content."""
+    """CLAUDE.md invariant #4's exception (Plan 08's daily-summary sentence),
+    widened 2026-07-23 to also cover B8/B9: both are written straight onto
+    the live page, same as `summary_sentence`, with no separate approval
+    step."""
     _ingest_tkc_daily_fixture()
 
     page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
 
     assert page.live is True
-    assert page.freetext_summary_draft  # a draft was generated
-    assert page.empty_columns_flag_draft
-    assert page.freetext_summary_approved is False
-    assert page.empty_columns_flag_approved is False
-    # The template-facing properties stay blank until a person approves.
-    assert page.freetext_summary == ""
-    assert page.empty_columns_flag == ""
-
-
-def test_freetext_summary_becomes_visible_once_approved(
-    home_page, mock_anthropic_client
-):
-    """Once a person checks the approved flag (the admin action this review
-    gate relies on) and the page is re-saved, the reviewed text is what the
-    properties — and therefore the template — expose."""
-    _ingest_tkc_daily_fixture()
-    page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
-    draft_text = page.freetext_summary_draft
-
-    page.freetext_summary_approved = True
-    page.save_revision().publish()
-    page.refresh_from_db()
-
-    assert page.freetext_summary == draft_text
-    # B9's flag is untouched by approving B8's summary — the two gates are
-    # independent of each other.
-    assert page.empty_columns_flag == ""
+    assert page.freetext_summary
+    assert page.empty_columns_flag
 
 
 def test_daily_report_page_publishes_numbers_even_when_freetext_ai_calls_fail(
     home_page,
 ):
     """Same guarantee as the summary-sentence call: a client whose call
-    raises still results in a published page, with both B8/B9 drafts left
+    raises still results in a published page, with both B8/B9 fields left
     blank rather than blocking anything."""
     _ingest_tkc_daily_fixture()
 
@@ -1548,48 +1521,39 @@ def test_daily_report_page_publishes_numbers_even_when_freetext_ai_calls_fail(
     page = publish_daily_report(TKC_VISIT_DATE, client=raising_client)
 
     assert page.live is True
-    assert page.freetext_summary_draft == ""
-    assert page.empty_columns_flag_draft == ""
+    assert page.freetext_summary == ""
+    assert page.empty_columns_flag == ""
 
 
-def test_republish_refreshes_freetext_draft_but_leaves_a_prior_approval_untouched(
+def test_republish_refreshes_freetext_summary_from_latest_data(
     home_page, mock_anthropic_client
 ):
-    """Documents a deliberate trade-off (see `DailyReportPage`'s docstring): a
-    corrected re-upload (modelled here the same way
+    """A corrected re-upload (modelled here the same way
     `test_daily_report_page_publishes_numbers_even_when_ai_client_fails`
     models a republish — calling `publish_daily_report` again directly)
-    regenerates the draft from the latest data, but does not reset a
-    previously-set approval flag. A person must notice and re-review it."""
+    regenerates and re-publishes the summary from the latest data."""
     _ingest_tkc_daily_fixture()
-    page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
-    page.freetext_summary_approved = True
-    page.save_revision().publish()
+    publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
 
     page = publish_daily_report(
         TKC_VISIT_DATE, client=_StubAnthropicClient(text="A different draft.")
     )
 
-    assert page.freetext_summary_draft == "A different draft."
-    assert page.freetext_summary_approved is True  # untouched — now stale
     assert page.freetext_summary == "A different draft."
 
 
-def test_republish_with_failing_ai_call_preserves_a_prior_approved_draft(
+def test_republish_with_failing_ai_call_preserves_the_prior_live_summary(
     home_page, mock_anthropic_client
 ):
-    """Found by code-review-tc: a transient AI failure on a later re-ingest
-    used to overwrite ``freetext_summary_draft``/``empty_columns_flag_draft``
-    with "" while leaving `_approved` at True — silently blanking content a
-    person already approved for the live page. A failed draft call must
-    leave the existing (already-reviewed) draft untouched instead."""
+    """Found by code-review-tc (when this was still a review-gated draft,
+    before the 2026-07-23 auto-publish widening — the same protection
+    matters even more now that these values reach the public page directly):
+    a transient AI failure on a later re-ingest must not blank an
+    already-live summary/flag."""
     _ingest_tkc_daily_fixture()
     page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
-    page.freetext_summary_approved = True
-    page.empty_columns_flag_approved = True
-    page.save_revision().publish()
-    approved_summary = page.freetext_summary_draft
-    approved_flag = page.empty_columns_flag_draft
+    live_summary = page.freetext_summary
+    live_flag = page.empty_columns_flag
 
     def _raise(**kwargs):
         raise TimeoutError("simulated AI timeout")
@@ -1598,12 +1562,8 @@ def test_republish_with_failing_ai_call_preserves_a_prior_approved_draft(
     page = publish_daily_report(TKC_VISIT_DATE, client=raising_client)
 
     assert page.live is True
-    assert page.freetext_summary_draft == approved_summary
-    assert page.empty_columns_flag_draft == approved_flag
-    assert page.freetext_summary_approved is True
-    assert page.empty_columns_flag_approved is True
-    assert page.freetext_summary == approved_summary
-    assert page.empty_columns_flag == approved_flag
+    assert page.freetext_summary == live_summary
+    assert page.empty_columns_flag == live_flag
 
 
 # --- Camp-upload flow (2026-07-22) ------------------------------------------

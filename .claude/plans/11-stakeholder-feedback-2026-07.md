@@ -46,11 +46,17 @@ the doc itself is not re-read going forward.
       yet opened. The same B3/B4/B5 fixes were also applied to the new camp
       upload report page (`feat/camp-report-upload-type`), since it shares the
       same parser limitations.
-- [ ] **B8.** Claude-generated summary of free-text columns (Presenting
+- [x] **B8.** Claude-generated summary of free-text columns (Presenting
       Complaints, Investigation, Provisional Diagnosis, Prescribed Medicine,
       Doctor's/Nurse's/Dietitian's Notes, Diet & Drug Compliance, Plan).
-- [ ] **B9.** Separate Claude prompt that flags which of those columns are
+- [x] **B9.** Separate Claude prompt that flags which of those columns are
       empty, to prompt the clinic to fill them in.
+      **B8/B9 done (2026-07-23, branch `feat/daily-report-freetext-summary`,
+      merged PR #60),** initially shipped review-gated (draft fields + an
+      approval checkbox), then widened to auto-publish (maintainer decision
+      2026-07-23, `feat/freetext-summary-autopublish`) — same CLAUDE.md
+      invariant #4 exception as the existing daily-summary sentence, no
+      separate review step.
 
   **Priority: P1.**
 
@@ -306,25 +312,43 @@ to revisit), D8 (nav dropdown submenus — parked until nav complexity actually
 demands it, see "Parked, deliberately").
 
 **Four sessions run in parallel (maintainer decision 2026-07-23), each its
-own branch — status of each as of this write-up:**
+own branch:**
 
-1. **B8 + B9** — `feat/daily-report-freetext-summary`. Implemented, tested,
-   through two rounds of code-review-tc fixes (a re-ingest-time draft
-   blanking bug, a content-hash dedup decision reversed after a second review
-   pass — see `ParsedVisitRow._canonical_tuple`'s comment — sanity-check
-   bounds too tight for their own `max_tokens`, and cleanup). Re-review in
-   progress; PR not yet opened.
-2. **C2** — `feat/admin-ai-cost-metering`. Implemented, tested, through two
-   rounds of code-review-tc fixes (a logging-failure-discards-a-good-response
-   bug, a `cost_usd` precision bug that truncated small calls to $0.00).
-   Re-review in progress; PR not yet opened.
-3. **Track D remainder (D2 + D4)** — `feat/impact-label-chiragh-branding`.
-   Implemented, tested, through code-review-tc fixes (a bare-caption
-   rendering bug) plus a maintainer scope confirmation on D4 (site-wide
-   footer removal was intended). Marked done above; PR not yet opened.
+1. **B8 + B9** — `feat/daily-report-freetext-summary`, PR #60, merged. Went
+   through several rounds of code-review-tc (a re-ingest-time draft-blanking
+   bug, a content-hash dedup decision reversed after a second review pass —
+   see `ParsedVisitRow._canonical_tuple`'s comment — sanity-check bounds too
+   tight for their own `max_tokens`, Urdu text getting JSON-escaped before
+   reaching the model, a wrapped-continuation-row data-loss bug, and
+   cleanup). Shipped review-gated (draft fields + an admin approval
+   checkbox) — see the follow-up below for why that changed.
+2. **C2** — `feat/admin-ai-cost-metering`, PR #58, merged (rebased onto
+   main after B8/B9 to resolve a migration-number collision, same pattern as
+   past merges in this plan — renumbered `0006`/`0007` to `0007`/`0008`).
+   Went through several rounds of code-review-tc (a logging-failure-
+   discards-a-good-response bug, a `cost_usd` precision bug that truncated
+   small calls to $0.00, and cleanup).
+3. **Track D remainder (D2 + D4)** — `feat/impact-label-chiragh-branding`,
+   PR #59, merged. Fixed a bare-caption rendering bug via code-review-tc,
+   plus a maintainer scope confirmation on D4 (site-wide footer removal was
+   intended).
 4. **E1 + E2 research** — done, no build. See
    [11-e1-e2-research-2026-07.md](11-e1-e2-research-2026-07.md).
 
-None of the three code branches are merged yet — each still needs its
-review loop to land clean, then a draft PR, then CI, before merge and
-deploy.
+Plus a status-tracking session (`docs/plan-11-status-2026-07-23`, PR #57,
+merged) for this file's own updates.
+
+**Follow-up, same day:** B8/B9 shipped review-gated per CLAUDE.md invariant
+#4's default rule (new AI-authored content needs human approval before
+publishing). The maintainer then decided to widen invariant #4's one narrow
+exception (previously scoped only to the daily-summary sentence, Plan 08) to
+also cover B8's free-text summary and B9's empty-columns flag — both now
+auto-publish alongside the numbers, same as the sentence. Branch
+`feat/freetext-summary-autopublish` drops the `_draft`/`_approved` fields in
+favour of plain `freetext_summary`/`empty_columns_flag` fields, and CLAUDE.md
+invariant #4 is amended with the dated widening note.
+
+**Unrelated to this plan, landed on `main` during the same session:** PR #61,
+`fix(pipeline): drop Other/unknown and Unrecorded rows from report
+gender/zakat cards` — bundled into the same deploy as this plan's work
+simply because it merged to `main` first; not part of Plan 11's scope.
