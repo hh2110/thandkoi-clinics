@@ -129,6 +129,47 @@ This set is a proposed default, easy to change at the task-slicing stage
 (Stage 6) — it's a labeling/selection choice, not an architecture decision,
 so it doesn't block confirming the rest of this doc.
 
+### 4a. Historical offset for the camp figure (maintainer decision, 2026-07-23)
+
+The very first camp predates this pipeline entirely — it has no
+`DailyReportPage`/`DailyAggregate` row, and per the maintainer it never will
+(no report will be entered for it retroactively). Without correction, the
+"Camp patients (all time)" figure would silently under-count by however many
+patients that first camp actually served, for as long as the site exists.
+
+**Decision:** `compute_alltime_impact_stats()` adds a fixed historical offset
+of **187** on top of whatever `DailyAggregate` rows with `report_kind="camp"`
+sum to, applied only to the camp `total_visits` total:
+
+```python
+CAMP_PATIENTS_PRE_PIPELINE_OFFSET = 187  # the first camp, never digitized — see decision note
+
+camp_total_visits = CAMP_PATIENTS_PRE_PIPELINE_OFFSET + Sum(...)  # report_kind="camp" rows only
+```
+
+- **A named module-level constant, not a Wagtail-editable setting.** This is a
+  one-time historical correction for a fact that cannot recur (there is only
+  ever one "first camp" from before the pipeline existed) — an admin-editable
+  field would be unused surface area for a number that should essentially
+  never change, not house style being followed. If more pre-pipeline camps
+  turn out to be un-recorded later, that's a new decision to make explicitly
+  then, not a case for building configurability now.
+- **Scoped to the camp total only — not the Zakat-beneficiary figure.** The
+  maintainer's ask was specifically about the camp patient count; whether
+  those 187 patients were Zakat beneficiaries is unknown to this doc. Folding
+  an unverified split into the Zakat figure would be inventing a number
+  invariant #3 doesn't allow, whereas leaving the Zakat total exactly as
+  computed from real rows is honest about what's actually known — it just
+  slightly under-states the Zakat total by however many of those 187 would
+  have qualified. **Open question for the maintainer:** if the split for that
+  first camp is known (e.g. "all 187 were Zakat beneficiaries"), say so and
+  this doc will add a second offset constant for the Zakat sum too.
+- Documented in the module's docstring the same way this repo documents every
+  other magic number (e.g. `ImpactStatBlock`'s "Real figures are entered by
+  hand for now" note, `DailyAggregate`'s `report_kind` docstring) — why it
+  exists, its exact value, and that changing it needs a matching decision
+  recorded here, not a silent edit.
+
 ### 5. StreamField `ImpactStatsBlock` — left alone
 
 No change to `ImpactStatsBlock`/`ImpactStatBlock`. The live stats become a
@@ -195,6 +236,8 @@ aggregation is correct. They can be built and shipped in either order.
 - Whether to retire `ImpactStatsBlock` from the home page once the live
   section ships (section 5) — maintainer's call, not required for F2.
 - Exact caption/eyebrow copy for the new section.
+- Whether the 187-patient historical camp offset (section 4a) also has a
+  known Zakat/regular split — currently applied only to the camp total.
 
 ## Reference material
 
