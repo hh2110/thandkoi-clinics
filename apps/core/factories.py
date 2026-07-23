@@ -239,9 +239,6 @@ class CampReportPageFactory(_TreePageFactory):
     slug = factory.Sequence(lambda n: f"camp-{n}")
     camp_date = factory.LazyFunction(datetime.date.today)
     location = "Thandkoi, Swabi"
-    patients_children = 100
-    patients_general = 50
-    patients_welfare = 25
 
 
 class GalleryPageFactory(_TreePageFactory):

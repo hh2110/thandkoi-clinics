@@ -61,18 +61,6 @@ class IngestRun(models.Model):
     row per (clinic_date, upload event), not per file — a single uploaded
     export may cover more than one clinic-date and produces one ``IngestRun``
     per date it touches.
-
-    ``report_kind`` (added for the camp-upload flow, 2026-07-22) discriminates
-    the clinic's normal daily activity from a medical camp upload. This is
-    load-bearing, not cosmetic: a camp and the clinic's own daily activity can
-    fall on the *same calendar date*, and ``DeidentifiedVisit``/
-    ``DailyAggregate`` are otherwise keyed only by ``visit_date``/
-    ``clinic_date``. Without this discriminator, a camp upload sharing a date
-    with a daily upload would silently merge into (or wholesale replace, via
-    the "supersede" delete in ``apps.pipeline.ingest._ingest_one_date``) the
-    clinic's own aggregate — corrupting figures that are meant to be
-    independent. See ``DailyAggregate.report_kind`` for the matching half of
-    this decision.
     """
 
     STATUS_CREATED = "created"
@@ -84,17 +72,7 @@ class IngestRun(models.Model):
         (STATUS_DUPLICATE, "Duplicate (no-op, identical re-upload)"),
     ]
 
-    KIND_DAILY = "daily"
-    KIND_CAMP = "camp"
-    REPORT_KIND_CHOICES = [
-        (KIND_DAILY, "Daily clinic activity"),
-        (KIND_CAMP, "Medical camp"),
-    ]
-
     clinic_date = models.DateField(db_index=True)
-    report_kind = models.CharField(
-        max_length=20, choices=REPORT_KIND_CHOICES, default=KIND_DAILY
-    )
     parser_key = models.CharField(max_length=60)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -280,21 +258,10 @@ class DailyAggregate(models.Model):
     the ``recompute_daily_aggregates`` management command — never hand-edited.
     Named integer columns cover the common metrics; ``category_counts`` is a
     JSON field so new category breakdowns don't need a migration each time.
-
-    ``report_kind`` (camp-upload flow, 2026-07-22) mirrors ``IngestRun``'s
-    field of the same name — see that model's docstring for why a camp and
-    the clinic's own daily activity must never share one aggregate row even
-    when they land on the same calendar date. ``clinic_date`` is therefore no
-    longer unique on its own; the natural key is now ``(clinic_date,
-    report_kind)``.
+    ``clinic_date`` is the natural key — one aggregate row per clinic-date.
     """
 
     clinic_date = models.DateField(db_index=True)
-    report_kind = models.CharField(
-        max_length=20,
-        choices=IngestRun.REPORT_KIND_CHOICES,
-        default=IngestRun.KIND_DAILY,
-    )
 
     total_visits = models.PositiveIntegerField(default=0)
 
@@ -331,13 +298,13 @@ class DailyAggregate(models.Model):
         ordering = ["-clinic_date"]
         constraints = [
             models.UniqueConstraint(
-                fields=["clinic_date", "report_kind"],
-                name="pipeline_dailyaggregate_unique_date_kind",
+                fields=["clinic_date"],
+                name="pipeline_dailyaggregate_unique_date",
             )
         ]
 
     def __str__(self):
-        return f"{self.get_report_kind_display()} aggregate for {self.clinic_date}"
+        return f"Aggregate for {self.clinic_date}"
 
     def as_dict(self) -> dict[str, object]:
         """Plain, JSON-serialisable, aggregates-only representation.
@@ -566,127 +533,6 @@ class DailyReportPage(Page):
 
     class Meta:
         verbose_name = "Daily report"
-
-
-class CampUploadReportPage(Page):
-    """One camp upload's auto-published report — the camp-upload flow (2026-07-22).
-
-    Maintainer request: the same daily-export format can be uploaded for a
-    medical camp instead of the clinic's normal daily activity, with a
-    maintainer-supplied camp title. Design decisions, recorded here since
-    there is no dedicated plan doc for this small feature:
-
-    * **A new model, not a reuse of ``core.CampReportPage``.** Plan 06's
-      ``CampReportPage`` is a manually-authored page whose fields (patients
-      split into children/general/Welfare-free-service, a narrative,
-      consented photos, partner credits) are an editor's categorisation of a
-      source PDF — there is no correspondence between those categories and
-      this pipeline's parsed columns (department/diagnosis_category/age_band/
-      sex/zakat-beneficiary). Forcing the aggregate into that shape would
-      mean inventing a mapping the source data doesn't support. This model
-      instead mirrors ``DailyReportPage`` almost exactly (an ``aggregate`` FK
-      read live, plus one editable free-text field) — the same numbers-driven
-      shape, just for a camp instead of a clinic-day.
-    * **Placed under ``core.CampReportIndexPage`` (Plan 06's existing camp
-      archive), not a new pipeline-owned index.** A camp report belongs in
-      the archive readers already know as "Camp Reports", sitting alongside
-      the hand-authored ones — see ``CampReportIndexPage.get_camp_reports``
-      for how the two page types are merged for display. This is the
-      "reuse the destination page, not the content type" middle ground
-      flagged to the maintainer for confirmation.
-    * **No AI summary sentence at publish time.** CLAUDE.md's invariant #4
-      exception (2026-07-19) for auto-publishing an AI sentence alongside
-      deterministic numbers is scoped explicitly to "a deterministic daily
-      report page" and says widening it is "a decision to make deliberately
-      again, not something a future plan should assume by analogy" — and the
-      existing prompt template (``apps.pipeline.ai``) is hard-coded to talk
-      about "a clinic's day", not a camp. So this page auto-publishes with
-      numbers only; ``summary_sentence`` starts blank and is left as an
-      ordinary editable field (invariant #4's default human-in-the-loop) for
-      a maintainer to fill in by hand if wanted. The **numbers**-only
-      auto-publish itself mirrors PR #15's decision ("no draft step, since
-      the parser producing [the] numbers is committed and code-reviewed"),
-      which is about the reviewed pipeline's output in general, not narrowly
-      about the word "daily" — so that part *is* extended by direct
-      precedent, unlike the AI-sentence exception.
-
-    ``camp_date`` is unique, mirroring ``DailyReportPage.report_date`` — one
-    upload's aggregate (``report_kind='camp'``) per date. Two camps landing on
-    the exact same calendar date is an out-of-scope edge case for now (a
-    second upload for that date would be treated as a correcting re-upload of
-    the *same* camp, per the existing dedup/replace semantics in
-    ``apps.pipeline.ingest``) — flagged rather than silently handled.
-    """
-
-    camp_date = models.DateField(unique=True, help_text="The date of the camp.")
-    camp_title = models.CharField(
-        max_length=200,
-        help_text="The camp's title, as entered by the admin at upload time "
-        "(e.g. 'Free Medical Camp — Union Council X').",
-    )
-    aggregate = models.ForeignKey(
-        DailyAggregate,
-        on_delete=models.PROTECT,
-        related_name="camp_report_page",
-        help_text="This camp's aggregate (report_kind='camp'). Figures are "
-        "read live from here, never copied onto the page.",
-    )
-    summary_sentence = models.CharField(
-        max_length=400,
-        blank=True,
-        help_text="Optional free-text summary. Not AI-generated at publish "
-        "time (see this model's docstring) — a maintainer may fill it in by "
-        "hand.",
-    )
-
-    content_panels = [
-        *Page.content_panels,
-        FieldPanel("camp_date"),
-        FieldPanel("camp_title"),
-        FieldPanel("summary_sentence"),
-    ]
-
-    parent_page_types = ["core.CampReportIndexPage"]
-    subpage_types: list[str] = []
-
-    @property
-    def summary(self) -> str:
-        return self.summary_sentence or "See the figures for this camp below."
-
-    @property
-    def total_patients_served(self) -> int:
-        """Duck-types alongside ``CampReportPage.total_patients_served`` so
-        ``CampReportIndexPage``'s shared archive template can render either
-        page type without branching on which one it is."""
-        return self.aggregate.total_visits
-
-    @property
-    def location(self) -> str:
-        """``CampReportPage`` has a free-text location; this pipeline-fed
-        page has none (not part of the parsed schema) — empty string so the
-        shared archive template's ``{% if camp_report.location %}`` stays
-        false rather than erroring on a missing attribute."""
-        return ""
-
-    def get_context(self, request, *args, **kwargs):
-        context = super().get_context(request, *args, **kwargs)
-        context["aggregate"] = self.aggregate
-        # "By department" is intentionally not surfaced here, same reasoning
-        # as DailyReportPage (see the sibling UX-pass fix, 2026-07-22): a
-        # camp upload uses the same parser, which never populates
-        # `department`, so this would always render as one dead "Unknown: N"
-        # line. `category_counts["by_department"]` is still computed at the
-        # model layer.
-        context["by_diagnosis_category"] = sorted(
-            self.aggregate.category_counts.get("by_diagnosis_category", {}).items()
-        )
-        context["by_age_band"] = sorted(
-            self.aggregate.category_counts.get("by_age_band", {}).items()
-        )
-        return context
-
-    class Meta:
-        verbose_name = "Camp upload report"
 
 
 class NewsletterDraftRun(models.Model):

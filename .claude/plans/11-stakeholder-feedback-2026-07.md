@@ -219,6 +219,13 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       #50. Added a `report_kind` discriminator so a camp and the clinic's
       own daily activity sharing a date never merge/collide — see that
       branch's commit message for the full design decision.
+      **2026-07-23 update:** this feature was later removed entirely
+      (maintainer decision — no generic/auto-parsed camp report system
+      wanted; see branch `chore/remove-camp-upload-feature`). The
+      `CampUploadReportPage` model, the `report_kind` discriminator, and the
+      upload form's camp-title field are all gone; `CampReportPage` is
+      hand-authored only again, with a simplified field set (see the
+      2026-07-23 note on Plan 06).
 - [x] **C4.** Verify the configured Anthropic model is `claude-sonnet-5`
       end-to-end (CLAUDE.md says Opus for drafting/schema inference, Haiku for
       translation — confirm whether the maintainer wants Sonnet substituted in,

@@ -655,34 +655,12 @@ class CampReportIndexPage(Page):
 
     max_count = 1
     parent_page_types = ["core.HomePage"]
-    # "pipeline.CampUploadReportPage" (camp-upload flow, 2026-07-22) is the
-    # pipeline's auto-published counterpart to the hand-authored
-    # CampReportPage — see that model's docstring for why it's a distinct
-    # type sharing this one archive rather than a reuse of CampReportPage's
-    # fields.
-    subpage_types = ["core.CampReportPage", "pipeline.CampUploadReportPage"]
+    subpage_types = ["core.CampReportPage"]
 
     def get_camp_reports(self):
-        """Published camp reports under this index, newest first.
-
-        Merges two page types sharing this one archive (camp-upload flow,
-        2026-07-22): the manually-authored ``CampReportPage`` (Plan 06) and
-        the pipeline's auto-published ``pipeline.CampUploadReportPage`` — see
-        that model's docstring for why it's a distinct type rather than a
-        reuse of this one's fields. Merged and sorted in Python (not a single
-        queryset — they're different models) using each page's
-        ``camp_date``/``pk``, for the same reason ``NewsletterIndexPage.
-        get_newsletters`` orders by ``-pk`` after ``-camp_date``: a stable
-        order when two reports share a date. Imported locally to avoid a
-        module-level import cycle — ``apps.pipeline.models`` already imports
-        from this module at the top level (for ``paginate_archive``).
-        """
-        from apps.pipeline.models import CampUploadReportPage
-
-        manual = list(CampReportPage.objects.live().child_of(self))
-        uploaded = list(CampUploadReportPage.objects.live().child_of(self))
-        return sorted(
-            manual + uploaded, key=lambda page: (page.camp_date, page.pk), reverse=True
+        """Published camp reports under this index, newest first."""
+        return list(
+            CampReportPage.objects.live().child_of(self).order_by("-camp_date", "-pk")
         )
 
     def get_context(self, request, *args, **kwargs):
@@ -695,82 +673,50 @@ class CampReportIndexPage(Page):
 
 
 class CampReportPage(Page):
-    """One medical camp's report — date, patients served, credits, photos.
+    """One medical camp's report — date, location, narrative, photos.
 
-    Patients served is **structured, split by category** (children / general /
-    Welfare-free-service, matching the source PDF's own breakdown) rather than
-    one lumped total, with the total *derived* rather than entered separately
-    (maintainer decision, Plan 06) — the clinic already tracks it this way, and
-    structured fields let a future plan aggregate across camps without
-    re-parsing prose. Photos reuse ``ConsentedImageBlock`` (Plan 04) and are
-    this plan's other real load-bearing use of the consent gate alongside the
-    Gallery — camp photography is exactly the case it was built for.
+    Simplified 2026-07-23 (maintainer decision, branch
+    `chore/remove-camp-upload-feature`): dropped the structured
+    patients-served-by-category split (children/general/Welfare-free-service)
+    along with ``services_offered`` and ``partner_credits`` in favour of an
+    optional attached report document — the maintainer moved away from
+    wanting a generic/structured-stats breakdown here. Photos reuse
+    ``ConsentedImageBlock`` (Plan 04) and remain this plan's other real
+    load-bearing use of the consent gate alongside the Gallery — camp
+    photography is exactly the case it was built for.
     """
 
     camp_date = models.DateField(help_text="The date of the camp.")
     location = models.CharField(max_length=180, blank=True)
-    patients_children = models.PositiveIntegerField(
-        default=0, help_text="Patients served — Paediatrics / children."
-    )
-    patients_general = models.PositiveIntegerField(
-        default=0, help_text="Patients served — General Medicine / adults."
-    )
-    patients_welfare = models.PositiveIntegerField(
-        default=0,
-        help_text="Patients served under the Welfare (free-of-cost) category.",
-    )
-    services_offered = StreamField(
-        [("service", blocks.CharBlock(max_length=120))],
-        blank=True,
-        help_text="Services offered at this camp, one entry each.",
-    )
-    partner_credits = models.TextField(
-        blank=True, help_text="Partner organisations and volunteers, one per line."
-    )
     narrative = RichTextField(blank=True, help_text="The camp's story.")
     photos = StreamField(
         [("photo", core_blocks.ConsentedImageBlock())],
         blank=True,
         help_text="Camp photos — consent required before publish.",
     )
+    report_document = models.ForeignKey(
+        "wagtaildocs.Document",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Optional source report PDF to offer as a download.",
+    )
 
     content_panels = [
         *Page.content_panels,
         FieldPanel("camp_date"),
         FieldPanel("location"),
-        MultiFieldPanel(
-            [
-                FieldPanel("patients_children"),
-                FieldPanel("patients_general"),
-                FieldPanel("patients_welfare"),
-            ],
-            heading="Patients served (by category)",
-        ),
-        FieldPanel("services_offered"),
-        FieldPanel("partner_credits"),
         FieldPanel("narrative"),
         FieldPanel("photos"),
+        FieldPanel("report_document"),
     ]
 
     parent_page_types = ["core.CampReportIndexPage"]
     subpage_types: list[str] = []
 
-    @property
-    def total_patients_served(self):
-        """The derived total — never entered directly (Plan 06 decision)."""
-        return self.patients_children + self.patients_general + self.patients_welfare
-
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
-        context["patient_stats"] = [
-            {"value": str(self.patients_children), "label": "Children"},
-            {"value": str(self.patients_general), "label": "General"},
-            {"value": str(self.patients_welfare), "label": "Welfare (free)"},
-            {
-                "value": str(self.total_patients_served),
-                "label": "Total patients served",
-            },
-        ]
         context["camp_photos"] = [
             _photo_item(
                 block.value["image"], block.value["alt_text"], block.value["caption"]

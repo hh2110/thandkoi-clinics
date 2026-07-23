@@ -960,7 +960,7 @@ def test_newsletter_never_renders_an_unconsented_photo(client, home_page):
 
 
 def test_camp_report_page_renders_under_its_index(client, home_page):
-    """A camp report is independently linkable and shows the derived total."""
+    """A camp report is independently linkable."""
     index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
     CampReportPageFactory(
         parent=index,
@@ -968,9 +968,6 @@ def test_camp_report_page_renders_under_its_index(client, home_page):
         title="Inauguration Camp",
         camp_date=datetime.date(2026, 5, 16),
         location="Thandkoi, Swabi",
-        patients_children=100,
-        patients_general=200,
-        patients_welfare=79,
     )
     response = client.get("/en/camp-reports/inauguration-camp/")
     assert response.status_code == 200
@@ -978,8 +975,30 @@ def test_camp_report_page_renders_under_its_index(client, home_page):
     content = response.content.decode()
     assert "Inauguration Camp" in content
     assert "Thandkoi, Swabi" in content
-    # The derived total (100 + 200 + 79), never entered directly.
-    assert "379" in content
+    # No report_document set — no download link renders.
+    assert "Download the full report" not in content
+
+
+def test_camp_report_page_renders_report_document_link_when_set(client, home_page):
+    """A camp report with a ``report_document`` renders a download link to it."""
+    from django.core.files.base import ContentFile
+    from wagtail.documents.models import Document
+
+    document = Document.objects.create(
+        title="Inauguration report",
+        file=ContentFile(b"%PDF-1.4 fake pdf content", name="report.pdf"),
+    )
+    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
+    CampReportPageFactory(
+        parent=index,
+        slug="camp-with-report",
+        title="Camp With Report",
+        camp_date=datetime.date(2026, 5, 16),
+        report_document=document,
+    )
+    content = client.get("/en/camp-reports/camp-with-report/").content.decode()
+    assert "Download the full report" in content
+    assert document.url in content
 
 
 def test_camp_report_photos_render_through_the_media_grid(client, home_page):
@@ -1071,32 +1090,6 @@ def test_camp_report_archive_lists_only_published_newest_first(client, home_page
     assert "Camp Two" in content
     assert "Draft Camp" not in content
     assert content.index("Camp Two") < content.index("Camp One")
-
-
-def test_camp_report_archive_merges_manual_and_uploaded_camp_reports(client, home_page):
-    """The camp-upload flow (2026-07-22): ``get_camp_reports`` merges the
-    manually-authored ``CampReportPage`` (Plan 06) with the pipeline's
-    auto-published ``CampUploadReportPage`` under the same archive, newest
-    first, rather than the archive only ever showing one or the other."""
-    from apps.pipeline.factories import CampUploadReportPageFactory
-
-    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
-    CampReportPageFactory(
-        parent=index,
-        slug="camp-manual",
-        title="Manually Authored Camp",
-        camp_date=datetime.date(2026, 1, 1),
-    )
-    CampUploadReportPageFactory(
-        parent=index,
-        camp_date=datetime.date(2026, 6, 1),
-        camp_title="Uploaded Camp",
-    )
-
-    content = client.get("/en/camp-reports/").content.decode()
-    assert "Manually Authored Camp" in content
-    assert "Uploaded Camp" in content
-    assert content.index("Uploaded Camp") < content.index("Manually Authored Camp")
 
 
 def test_home_teaser_shows_latest_published_newsletter_only(client, home_page):
