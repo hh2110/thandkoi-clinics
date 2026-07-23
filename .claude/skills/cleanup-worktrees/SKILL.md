@@ -40,13 +40,22 @@ already gone from disk, and its output tells you what it dropped.
 
 For every registered worktree and every local branch, determine:
 
-1. **Is its branch merged into `main`?**
-   `git merge-base --is-ancestor <sha> main` (or `git branch --merged main`
-   for local branches). A branch pointing at a commit that's an ancestor of
-   `main` is done — its work already landed.
+1. **Is its branch merged into `main`?** Treat the `gh pr list --state
+   merged --json headRefName` output from step 1 (or `gh pr view <branch>
+   --json state,mergedAt`) as authoritative, not `git merge-base
+   --is-ancestor <sha> main` / `git branch --merged main`. This repo squash-
+   merges PRs, so a merged branch's own commit is never an ancestor of
+   `main` — the ancestor check reports "not merged" for every squash-merged
+   branch, a false negative confirmed in practice (2026-07-23: PR #64's own
+   branch failed both the ancestor check and `git branch -d`'s identical
+   check, despite `gh` showing it merged an hour earlier). Use the ancestor
+   check only as a secondary signal for repos/branches where it agrees with
+   `gh` — never let it override a `gh`-confirmed merge.
 2. **Does the branch have an open, non-merged PR?** Cross-check with
    `gh pr list` / `gh pr view <branch> --json state`. If a PR is open or in
-   draft, it's active — never touch it.
+   draft, it's active — never touch it. If `gh` shows no PR at all for the
+   branch, don't treat that as "merged" — it just means no cross-check is
+   available; fall back to the ancestor check and, if still ambiguous, ask.
 3. **Does the worktree have uncommitted changes or untracked files?**
    `git -C <path> status --short`. Anything here is unsaved and would be
    permanently lost on deletion.
@@ -63,10 +72,13 @@ For every registered worktree and every local branch, determine:
 - **Merged branch, no open PR, clean status, nothing unpushed** → safe.
   Remove the worktree (`git worktree remove <path>`, or `--force` only if
   `status --short` was empty — never force through real diffs), delete the
-  local branch (`git branch -d`, not `-D`), and ask before deleting the
-  *remote* branch (deleting a remote ref is shared-state and hard to
-  reverse — confirm even if the user pre-approved the local half, unless
-  they've explicitly pre-authorized it for this run).
+  local branch, and ask before deleting the *remote* branch (deleting a
+  remote ref is shared-state and hard to reverse — confirm even if the user
+  pre-approved the local half, unless they've explicitly pre-authorized it
+  for this run). Try `git branch -d` first; if it refuses with "not fully
+  merged" for a branch `gh` has already confirmed merged, that's the
+  squash-merge false negative above, not a real risk — use `git branch -D`
+  instead of second-guessing the `gh` result.
 - **Orphaned directory with no `.git` file, or a dangling one** → inspect
   before deleting even though git itself can't identify it:
   - If everything inside is build/dependency artifacts (`.venv`,
