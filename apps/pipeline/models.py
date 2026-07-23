@@ -753,21 +753,25 @@ class AiCallLog(models.Model):
     without cross-referencing Anthropic's own billing console.
 
     Deliberately no FK back to ``IngestRun``/``NewsletterDraftRun``/
-    ``DailyAggregate``, unlike those audit models. The three current call
-    sites in ``apps.pipeline.ai`` have no *common* triggering record to hang
+    ``DailyAggregate``, unlike those audit models. None of the five call
+    sites in ``apps.pipeline.ai`` share a *common* triggering record to hang
     one off: ``draft_daily_summary_sentence`` has a ``DailyAggregate``,
     ``draft_monthly_newsletter_body`` runs before its caller's
-    ``NewsletterDraftRun`` row even exists, and ``draft_newsletter_prose``
+    ``NewsletterDraftRun`` row even exists, ``draft_newsletter_prose``
     (presently unused in production — see its call site's comment) takes an
-    in-memory ``ClinicAggregate`` that isn't a persisted row at all. Adding a
-    FK to only one of the three would misleadingly suggest the others have
-    one too; ``call_site`` already identifies which caller produced a row.
-    Add a nullable FK later if a real cross-referencing need shows up.
+    in-memory ``ClinicAggregate`` that isn't a persisted row at all, and
+    ``draft_freetext_summary``/``draft_empty_columns_flag`` (B8/B9) take a
+    bare ``clinic_date`` plus a dict, not a model instance. Adding a FK to
+    only some of the five would misleadingly suggest the others have one
+    too; ``call_site`` already identifies which caller produced a row. Add a
+    nullable FK later if a real cross-referencing need shows up.
     """
 
     CALL_SITE_NEWSLETTER_PROSE = "newsletter_prose"
     CALL_SITE_DAILY_SUMMARY = "daily_summary"
     CALL_SITE_MONTHLY_NEWSLETTER = "monthly_newsletter"
+    CALL_SITE_FREETEXT_SUMMARY = "freetext_summary"
+    CALL_SITE_EMPTY_COLUMNS_FLAG = "empty_columns_flag"
     CALL_SITE_CHOICES = [
         (
             CALL_SITE_NEWSLETTER_PROSE,
@@ -775,6 +779,8 @@ class AiCallLog(models.Model):
         ),
         (CALL_SITE_DAILY_SUMMARY, "Daily report summary sentence"),
         (CALL_SITE_MONTHLY_NEWSLETTER, "Monthly newsletter drafting"),
+        (CALL_SITE_FREETEXT_SUMMARY, "Free-text summary (B8)"),
+        (CALL_SITE_EMPTY_COLUMNS_FLAG, "Empty-columns flag (B9)"),
     ]
 
     call_site = models.CharField(max_length=30, choices=CALL_SITE_CHOICES)
