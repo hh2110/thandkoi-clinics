@@ -677,7 +677,7 @@ def test_team_page_groups_members_and_shows_placeholder(client, home_page):
     TeamMemberFactory(page=team, name="Dr Doctor One", category=TeamMember.DOCTORS)
     TeamMemberFactory(page=team, name="Ataullah Khan", category=TeamMember.STAFF)
     content = client.get("/en/team/").content.decode()
-    assert "Doctors" in content
+    assert "Volunteers" in content  # the DOCTORS category's display label
     assert "Committee" in content  # the "Staff & Committee" group heading
     assert "Dr Doctor One" in content
     assert "Ataullah Khan" in content
