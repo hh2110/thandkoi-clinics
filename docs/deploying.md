@@ -58,12 +58,11 @@ inspectable script over an agent-driven one) does the whole runbook:
 5. Triggers the Deploy workflow for that tag and watches it to completion.
 6. Health-checks production (`/healthz`) with a few retries.
 
-Useful flags: `--dry-run` (run every check, print the plan, stop before
-tagging/deploying), `--yes` (skip the confirmation prompt), `--ref vYYYY.MM.DD`
-(deploy an existing tag as-is instead of cutting a new one — see Rollback
-below), `--skip-ci-check` (only for a verified false negative, e.g. a
-concurrency-group cancellation during a fast-merge burst — a real CI failure
-still blocks). Run `scripts/release.sh --help` for the full usage note.
+Only one flag: `--ref vYYYY.MM.DD` (deploy an existing tag as-is instead of
+cutting a new one — see Rollback below). There is no way to skip the
+confirmation prompt or the CI check — every release, including a rollback,
+requires a human to type `y` at the terminal. Run `scripts/release.sh --help`
+for the full usage note.
 
 Tags are **lightweight and date-based** (`v2026.07.20`), not semver — a CMS
 website has no API consumers for "breaking change" semantics to describe; a tag
