@@ -31,32 +31,40 @@
 
 .site-header__logo {
   /* Sized up from the old 2.5rem per maintainer feedback ("tiny"). Stays on
-     logo.svg (the full mark + wordmark lockup) rather than the icon-only
+     the full mark + wordmark lockup rather than the icon-only
      logo-mark.svg: docs/brand-guidelines.md explicitly reserves the
      icon-only mark for contexts too narrow for the full lockup (avatar/app
      icon) and specifies the full lockup for header/footer/print — dropping
      the wordmark here would also remove the only visible on-page text
-     naming the clinic for sighted visitors. logo.svg's intrinsic ratio is
-     768x575 (~1.336); at height:7rem (112px) the rendered width is ~150px,
-     clearing brand-guidelines.md's own "~140px wide... so the illustration
-     stays legible" floor for the full lockup -- a smaller height satisfies
-     "bigger than before" but not that legibility floor. .site-header__bar's
-     padding-block (--space-2, 1rem) grows the bar to accommodate rather
-     than the logo overflowing the bar's edges.
+     naming the clinic for sighted visitors. logo-light.svg's intrinsic
+     ratio (768x575, ~1.336, unchanged from logo.svg) at width:9.375rem
+     (150px) clears brand-guidelines.md's own "~140px wide... so the
+     illustration stays legible" floor for the full lockup.
+     .site-header__bar's padding-block (--space-2, 1rem) grows the bar to
+     accommodate rather than the logo overflowing the bar's edges.
 
      Plan 11 D11: logo.svg's wordmark is hard-coded dark-navy, so on the dark
      theme it sat dark-on-dark and was nearly invisible. header.html now
-     renders both this lockup (`--light`) and a reversed lockup
+     renders both a light-theme lockup (`--light`) and a reversed lockup
      `logo-reversed.png` (`--dark`; light wordmark, white ring, transparent
      background) as two always-in-DOM <img>s, and the rules below toggle
      which one is `display`ed via the same :root[data-theme] /
      prefers-color-scheme cascade the rest of the site uses for colour — no
-     JS, no FOUC. Sizing (height:7rem; width:auto) stays shared across both
-     lockups so the swap doesn't change the logo's height; each <img>'s own
-     width/height attributes carry its own natural pixel ratio so the
-     browser's auto aspect-ratio doesn't distort either image. */
-  height: 7rem;
-  width: auto;
+     JS, no FOUC. Each <img>'s own width/height attributes carry its own
+     natural pixel ratio so the browser's auto aspect-ratio doesn't distort
+     either image.
+
+     2026-07-23 re-scope: sizing switched from a shared height (7rem) to a
+     shared width (9.375rem / 150px), superseding D11's "same height" call.
+     logo-reversed.png's PNG export has a different intrinsic ratio (900x769,
+     ~1.170) than the SVG lockup (~1.336) — at a matched height the two
+     lockups rendered ~12% different in width, which read as "the dark logo
+     is bigger" (maintainer feedback). Matching width instead makes both
+     lockups occupy the same footprint; the PNG now renders visibly taller
+     (~128px vs the SVG's ~112px) rather than narrower, which
+     .site-header__bar's padding-block already absorbs. */
+  width: 9.375rem;
+  height: auto;
 }
 
 /* Default (light): show light lockup, hide reversed. */

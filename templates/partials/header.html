@@ -13,8 +13,15 @@ Header brand lockup with theme-aware logo (Plan 11 D11). logo.svg has a
 hard-coded dark wordmark, so on the dark theme "THE THANDKOI" sat
 near-invisible on the dark background. We now ship BOTH lockups and let CSS
 show the right one per theme:
-  - logo.svg          → light theme (dark wordmark on light bg)
+  - logo-light.svg    → light theme (deep-teal wordmark on light bg)
   - logo-reversed.png → dark theme  (light wordmark, white ring; transparent)
+
+2026-07-23 re-scope: logo.svg's wordmark colours (#426e7d main, #bcd8de
+subtitle) were themselves tuned for a dark ground, so on the light theme the
+"CLINICS" subtitle was nearly illegible (near-white-blue on white). Swapped
+the light lockup to logo-light.svg — same artwork, only the wordmark's two
+text fills changed to --color-teal-deep/--color-teal-brand for contrast on
+white; the illustration itself is untouched.
 
 Both <img>s are always in the DOM; components.css toggles their `display`
 off the :root[data-theme] / prefers-color-scheme cascade, so the swap is
@@ -22,8 +29,9 @@ instant with no JS and no FOUC. Only one is ever visible, so the alt text
 lives on whichever is shown (the hidden one is aria-hidden + alt="").
 width/height below are each image's own natural pixel size (not matched to
 each other) so the browser's auto aspect-ratio doesn't distort/reflow either
-lockup — actual on-page size is set by .site-header__logo's height:7rem in
-components.css.
+lockup — actual on-page size is set by .site-header__logo's width:9.375rem
+in components.css (see that rule's comment for why width, not height, is
+now the shared dimension).
 {% endcomment %}
 {% with lang=LANGUAGE_CODE|default:"en" %}
 {% with home_path="/"|add:lang|add:"/" %}
@@ -32,7 +40,7 @@ components.css.
     <a class="site-header__brand" href="{{ home_path }}" aria-label="{% translate 'The Thandkoi Clinics — home' %}">
       <img
         class="site-header__logo site-header__logo--light"
-        src="{% static 'images/logo.svg' %}"
+        src="{% static 'images/logo-light.svg' %}"
         alt="{% translate 'The Thandkoi Clinics' %}"
         width="192"
         height="144"
