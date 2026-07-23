@@ -98,7 +98,13 @@ rules are architectural constraints, not preferences — never weaken them:
   pass on a branch needs the whole diff; every loop iteration after a fix
   should scope the re-review to just the files that fix touched, not the
   full branch again, and a tiny or docs-only diff should get a single-pass
-  read instead of the full multi-agent workflow.
+  read instead of the full multi-agent workflow. **The multi-agent dynamic
+  Workflow review is opt-in, not automatic** (2026-07-23 — it burns too many
+  tokens to run by default). The mandatory pre-PR review default is a
+  careful single-pass manual read; only invoke the `Workflow`-tool-backed
+  multi-agent pass when the maintainer has explicitly asked for it earlier
+  in the current session. If a change looks risky enough to warrant the
+  heavier pass, ask first — never launch it unprompted.
 - **PR flow:** once review is clean, open a PR with `gh pr create` (draft —
   see the personal lifecycle doc's "drafts stay drafts until I sign off");
   keep PRs scoped to one plan/step. Merge once CI is green and the PR has been
