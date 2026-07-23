@@ -109,6 +109,11 @@ rules are architectural constraints, not preferences — never weaken them:
   see the personal lifecycle doc's "drafts stay drafts until I sign off");
   keep PRs scoped to one plan/step. Merge once CI is green and the PR has been
   taken out of draft.
+- **After every merge:** run the [`cleanup-worktrees`](.claude/skills/cleanup-worktrees/SKILL.md)
+  skill immediately (2026-07-23 — the trigger is "a PR just merged," not
+  "whenever the worktree pile-up gets noticed"), and flip that plan's row in
+  the [plans index](.claude/plans/README.md) to ✅ Done (or ⏸ Paused if only
+  part of the plan's scope landed and the rest has stalled) in the same pass.
 - **Secrets** live in environment variables / `.env` (gitignored) — never in the
   repo or in prompts.
 

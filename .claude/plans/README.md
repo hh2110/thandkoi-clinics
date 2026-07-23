@@ -45,7 +45,7 @@ plan from 03.5 onward carries three lifecycle sections:
 | 10 | [Media object storage](10-media-object-storage.md) — serve/persist Wagtail uploads from S3-compatible object storage (Cloudflare R2); prod media was 404ing on ephemeral disk | 🚧 In progress |
 | 11 | [Stakeholder feedback triage (July 2026)](11-stakeholder-feedback-2026-07.md) — backlog of report/admin/content/process items from the maintainer's review round, sorted into tracks and priorities, to be sliced into follow-up plans. Track E's options review: [E1/E2 research](11-e1-e2-research-2026-07.md) | 🚧 In progress |
 
-**Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ✅ Done
+**Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ⏸ Paused/parked (work stopped, not abandoned) · ✅ Done
 
 ## Out of scope (for now)
 
