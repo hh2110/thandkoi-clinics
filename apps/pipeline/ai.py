@@ -412,15 +412,29 @@ def draft_freetext_summary(
     )
 
 
+# Tightened 2026-07-23 (same Plan 11 Track B10 maintainer feedback as
+# `_FREETEXT_SUMMARY_SYSTEM_PROMPT` above — "no formatting at all" — but this
+# prompt itself was missed when B10 first landed): the template renders this
+# field as one raw string in a single `<p>`, so a model output like
+# "**Empty columns for 2026-07-20:** - Investigation - Plan" (markdown bold
+# heading + a bullet list) collapses to one unreadable run-on line — HTML
+# whitespace collapsing has no idea `**`/`- ` were meant to be structure.
+# Fixed by prompt only, matching B11's precedent of tightening wording rather
+# than changing what data reaches the model: explicitly ban markdown and
+# require one plain sentence, since this field is never meant to hold
+# multiple paragraphs the way `freetext_summary` is.
 _EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT = (
     "You write a short, plain-language note, for a clinic's public daily "
     "report page, listing which of that clinic's free-text record columns "
     "were left blank for the day. You are given, for each listed column, "
     "whether it was entirely empty across every visit that day — a "
     "true/false fact already determined for you; you must not recompute or "
-    "second-guess it. State only which columns are marked empty. Do not add "
-    "commentary on why, and if none are empty, say so in one short sentence "
-    "instead of listing every column as filled in."
+    "second-guess it. State only which columns are marked empty, as a "
+    "single plain sentence naming them, comma-separated. Do not use "
+    "headings, bullet points, bold text, or any other markup — plain prose "
+    "only, one sentence. Do not add commentary on why, and if none are "
+    "empty, say so in one short sentence instead of listing every column as "
+    "filled in."
 )
 
 
