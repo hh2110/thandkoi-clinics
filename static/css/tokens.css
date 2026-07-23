@@ -74,9 +74,16 @@
 
   /* Footer is always the dark teal ground, in both themes (brand-guidelines
      "Footer / deepest ground"), so it gets its own fixed tokens rather than
-     reading the page's light/dark tokens. */
+     reading the page's light/dark tokens. --color-footer-text is a literal,
+     not var(--color-paper): --color-paper itself flips to Teal Deep under
+     dark mode (below), and since custom properties resolve live against the
+     current cascade, referencing it here would silently drag that flip in
+     too - making footer text the same colour as its own background under
+     dark mode (all plain <p> text in the footer invisible; only links stayed
+     visible, via the separate --color-pale-aqua token - stakeholder report,
+     2026-07-23). */
   --color-footer-bg: var(--color-teal-deep);
-  --color-footer-text: var(--color-paper);
+  --color-footer-text: #f2f6f6;
   --color-footer-text-soft: #abb4b6;
   --color-footer-border: #195a67;
 
