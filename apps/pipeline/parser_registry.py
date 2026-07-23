@@ -192,17 +192,33 @@ class ParsedVisitRow:
     plan_notes: str = ""
 
     def _canonical_tuple(self) -> tuple:
-        # Deliberately excludes the seven Plan 11 Track B8/B9 free-text
-        # fields below (maintainer decision 2026-07-23, found by
-        # code-review-tc): this tuple feeds content_hash_for_rows(), and
-        # every IngestRun.content_hash already persisted in production was
-        # computed before these fields existed. Including them would change
-        # the hash for a byte-identical re-upload of an already-ingested
-        # date, misclassifying it as STATUS_REPLACED instead of
-        # STATUS_DUPLICATE and needlessly re-triggering all three AI calls.
-        # If free text ever needs to participate in dedup detection, that's
-        # a deliberate follow-up, not an incidental side effect of adding
-        # the fields.
+        # Includes the seven Plan 11 Track B8/B9 free-text fields below —
+        # this went back and forth during code-review-tc, so the reasoning
+        # is recorded here rather than left to be re-litigated:
+        #
+        # An earlier revision excluded these fields, reasoning that every
+        # IngestRun.content_hash already persisted in production was computed
+        # before they existed, so including them would make a byte-identical
+        # re-upload of an already-ingested date hash differently and get
+        # reclassified STATUS_REPLACED instead of STATUS_DUPLICATE. That's
+        # true, but a second review pass found the exclusion's real cost is
+        # worse and permanent: a staff member correcting only a free-text
+        # column (Doctor's Notes, Prescribed Medicine, etc.) on a genuine
+        # re-upload — the actual workflow B8/B9 exists to support — would
+        # forever hash identically to the uncorrected version and be
+        # silently skipped as a no-op duplicate, with the stale AI drafts
+        # never regenerated.
+        #
+        # Decision: include them. The one-time production transition this
+        # causes is not a misclassification — before this deploy, free text
+        # was never parsed or persisted at all, so an unchanged file's old
+        # hash correctly reflected "nothing new to extract"; after this
+        # deploy, that same file yields genuinely new persistable
+        # information (the free text), so the first re-upload of any
+        # already-ingested date correctly reclassifying as a replace (and
+        # backfilling that date's free-text data + drafts) is the desired
+        # behavior, not a bug. Every subsequent re-upload of that same file
+        # then hashes identically going forward, same as before.
         return (
             self.visit_date.isoformat(),
             self.department,
@@ -212,6 +228,13 @@ class ParsedVisitRow:
             self.diagnosis_category,
             self.is_new_patient,
             self.is_zakat_beneficiary,
+            self.presenting_complaints,
+            self.investigation,
+            self.provisional_diagnosis_text,
+            self.prescribed_medicine,
+            self.clinical_notes,
+            self.diet_and_drug_compliance,
+            self.plan_notes,
         )
 
 

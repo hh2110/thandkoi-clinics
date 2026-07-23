@@ -529,14 +529,13 @@ def test_content_hash_for_rows_is_order_independent_and_change_sensitive():
     )
 
 
-def test_content_hash_for_rows_is_unaffected_by_freetext_columns():
-    """Found by code-review-tc: the seven Plan 11 Track B8/B9 free-text
-    fields must stay out of ``content_hash_for_rows``'s fingerprint.
-    Every ``IngestRun.content_hash`` already persisted in production was
-    computed before these fields existed — including them would make a
-    byte-identical re-upload of an already-ingested date hash differently
-    after this deploy, misclassifying it as a replace instead of a
-    duplicate and needlessly re-triggering every AI call."""
+def test_content_hash_for_rows_changes_when_only_freetext_columns_change():
+    """A re-upload that corrects only a free-text column (Doctor's Notes,
+    Prescribed Medicine, etc.) — the actual workflow B8/B9 exists to support
+    — must hash differently, so it's picked up as a real change rather than
+    silently skipped as a no-op duplicate (see ``_canonical_tuple``'s
+    decision comment, resolved after code-review-tc flagged the opposite
+    choice's worse, permanent cost)."""
     from apps.pipeline.parser_registry import ParsedVisitRow
 
     base = ParsedVisitRow(
@@ -562,7 +561,7 @@ def test_content_hash_for_rows_is_unaffected_by_freetext_columns():
         clinical_notes="Doctor: Something else entirely",
     )
 
-    assert content_hash_for_rows([base]) == content_hash_for_rows([changed])
+    assert content_hash_for_rows([base]) != content_hash_for_rows([changed])
 
 
 def test_clinic_v1_parser_sniffs_its_own_required_columns():
@@ -1452,6 +1451,24 @@ def test_empty_columns_flag_payload_contains_only_booleans(
     # call, so its own quotes come through backslash-escaped.)
     assert "amlodipine" not in sent
     assert '\\"investigation\\": true' in sent
+
+
+def test_draft_freetext_summary_accepts_a_realistic_full_length_response(home_page):
+    """Found by code-review-tc: MAX_FREETEXT_SUMMARY_LENGTH used to be 800,
+    tighter than the call's own max_tokens=600 could actually produce (~4
+    chars/token) — a genuinely good, full-length summary on a busy day with
+    rich free-text content was silently rejected as if the call had failed."""
+    _ingest_tkc_daily_fixture()
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+    columns = freetext.collect_freetext_entries(visits)
+    long_text = ("Common themes across today's entries." + " ") * 40
+    long_text = long_text.strip()
+    assert 800 < len(long_text) < ai.MAX_FREETEXT_SUMMARY_LENGTH
+
+    client = _stub_client_with_text(long_text)
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, client)
+
+    assert summary == long_text
 
 
 def test_publish_daily_report_drafts_freetext_summary_but_does_not_auto_publish(

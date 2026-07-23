@@ -247,9 +247,15 @@ EMPTY_COLUMNS_FLAG_MODEL = "claude-haiku-4-5"
 # response over this length (or empty) is treated as a failed draft, not
 # published as-is. These calls are draft-only (never auto-published), so
 # there is no fallback-to-blank requirement driving the bound the way Plan
-# 08's exception does — it's purely a runaway-output guard.
-MAX_FREETEXT_SUMMARY_LENGTH = 800
-MAX_EMPTY_COLUMNS_FLAG_LENGTH = 400
+# 08's exception does — it's purely a runaway-output guard, not a length
+# target: it must sit comfortably above what the call's own max_tokens can
+# actually produce (~4 chars/token for English, plus margin), or a genuinely
+# good, full-length response on a busy day gets rejected as if it had failed
+# (found by code-review-tc: the previous bounds were tighter than their
+# calls' max_tokens could produce — a valid 600-token freetext summary could
+# run well past the old 800-char cap).
+MAX_FREETEXT_SUMMARY_LENGTH = 3000  # max_tokens=600 below
+MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 
 _FREETEXT_SUMMARY_SYSTEM_PROMPT = (
     "You are drafting an internal review summary (not yet published) of a "
