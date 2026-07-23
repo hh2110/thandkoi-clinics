@@ -207,8 +207,14 @@ class AboutPage(Page):
     """The clinic's story: welcome, vision / mission / objectives, care model.
 
     Plain ``RichTextField``s — an About page is predictable, so it doesn't need a
-    StreamField. The real copy (organisational profile PDF p.5–7, p.11–13) is
-    entered in the admin later; this ships the empty shape.
+    StreamField for its prose. The real copy (organisational profile PDF
+    p.5–7, p.11–13) is entered in the admin later; this ships the empty shape.
+
+    ``photos`` is the one StreamField on the page — patient-care and group/
+    community shots illustrating the story above, reusing ``ConsentedImageBlock``
+    (Plan 04) exactly as ``NewsletterPage.body`` does, rather than raw rich-text
+    image embeds (which would have neither the consent gate nor any matching
+    front-end styling).
     """
 
     intro = RichTextField(
@@ -223,6 +229,13 @@ class AboutPage(Page):
     founding_story = RichTextField(
         blank=True, help_text="Inauguration & first medical camp (PDF p.11–13)."
     )
+    photos = StreamField(
+        [("photo", core_blocks.ConsentedImageBlock())],
+        blank=True,
+        help_text="Patient-care and group/community photos illustrating the "
+        "clinic's story — each still requires consent to be ticked before it "
+        "can be saved (brand-guidelines.md §5).",
+    )
 
     content_panels = [
         *Page.content_panels,
@@ -232,6 +245,7 @@ class AboutPage(Page):
         FieldPanel("objectives"),
         FieldPanel("quality_of_care"),
         FieldPanel("founding_story"),
+        FieldPanel("photos"),
     ]
 
     max_count = 1

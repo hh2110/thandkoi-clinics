@@ -1060,6 +1060,60 @@ def test_newsletter_never_renders_an_unconsented_photo(client, home_page):
     assert "Unconsented photo" not in content
 
 
+def test_about_page_renders_consented_photos(client, home_page):
+    """AboutPage.photos mirrors NewsletterPage.body's photo handling exactly
+    — same ConsentedImageBlock, same render template, just a single-block-type
+    StreamField since About has no paragraph blocks to mix in."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Doctor and patient", file=get_test_image_file())
+    AboutPageFactory(
+        parent=home_page,
+        slug="about",
+        photos=[
+            (
+                "photo",
+                {
+                    "image": image,
+                    "alt_text": "",
+                    "caption": "Free consultations at the camp",
+                    "consent_confirmed": True,
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/about/").content.decode()
+    assert "Free consultations at the camp" in content
+    assert 'alt="Doctor and patient"' in content
+
+
+def test_about_page_never_renders_an_unconsented_photo(client, home_page):
+    """Mirrors ``test_newsletter_never_renders_an_unconsented_photo`` — the
+    render template's own consent check is what guarantees this, not just
+    the block's admin-form-only ``clean()``."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Unconsented photo", file=get_test_image_file())
+    AboutPageFactory(
+        parent=home_page,
+        slug="about",
+        photos=[
+            (
+                "photo",
+                {
+                    "image": image,
+                    "alt_text": "",
+                    "caption": "should never render",
+                    "consent_confirmed": False,
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/about/").content.decode()
+    assert "should never render" not in content
+    assert "Unconsented photo" not in content
+
+
 def test_camp_report_page_renders_under_its_index(client, home_page):
     """A camp report is independently linkable."""
     index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
