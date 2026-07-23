@@ -97,21 +97,19 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     never blocks this function from publishing the deterministic numbers.
 
     Plan 11 Track B8/B9: this also (re)generates the free-text summary and
-    empty-columns-flag *drafts* from this date's ``DeidentifiedVisit`` rows.
-    Unlike ``summary_sentence`` above, these two never get auto-approved for
-    the public page here — only their ``_draft`` field is written; the
-    corresponding ``_approved`` boolean is left exactly as it was (``False``
-    for a brand new page, whatever a person last set it to for an existing
-    one). See ``DailyReportPage``'s docstring/fields for the full review-gate
-    contract this is deliberately not widening past.
+    empty-columns-flag from this date's ``DeidentifiedVisit`` rows and
+    auto-publishes them alongside the numbers, same as ``summary_sentence``
+    above — CLAUDE.md invariant #4's exception, widened 2026-07-23
+    (maintainer decision) to cover these two as well.
 
-    If a re-ingest's draft call fails (transient API error/timeout), the
-    existing page's ``_draft`` field is left untouched rather than
-    overwritten with an empty string — otherwise a transient failure on a
-    later re-upload would silently blank an already-approved, already-public
-    summary/flag with no human action and no record anything changed (found
-    by code-review-tc). A brand new page has nothing to preserve, so it
-    falls back to ``""`` as before.
+    If a re-ingest's call fails (transient API error/timeout), the existing
+    page's field is left untouched rather than overwritten with an empty
+    string — otherwise a transient failure on a later re-upload would
+    silently blank an already-public summary/flag with no record anything
+    changed (found by code-review-tc, when this was still a review-gated
+    draft — the same protection matters even more now that these values
+    reach the public page directly). A brand new page has nothing to
+    preserve, so it falls back to ``""`` as before.
 
     The three drafting calls are independent of each other and run
     concurrently (found by code-review-tc: they used to run sequentially,
@@ -153,8 +151,8 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
             report_date=clinic_date,
             aggregate=aggregate,
             summary_sentence=summary_sentence,
-            freetext_summary_draft=new_freetext_summary or "",
-            empty_columns_flag_draft=new_empty_columns_flag or "",
+            freetext_summary=new_freetext_summary or "",
+            empty_columns_flag=new_empty_columns_flag or "",
             live=False,
         )
         index.add_child(instance=page)
@@ -162,9 +160,9 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
         page.aggregate = aggregate
         page.summary_sentence = summary_sentence
         if new_freetext_summary:
-            page.freetext_summary_draft = new_freetext_summary
+            page.freetext_summary = new_freetext_summary
         if new_empty_columns_flag:
-            page.empty_columns_flag_draft = new_empty_columns_flag
+            page.empty_columns_flag = new_empty_columns_flag
 
     revision = page.save_revision()
     revision.publish()

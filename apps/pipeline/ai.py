@@ -278,14 +278,12 @@ def draft_daily_summary_sentence(
 
 # --- Plan 11 Track B8/B9: free-text summary + empty-column flag ------------
 #
-# Unlike the daily-summary sentence above, these two calls do NOT get
-# CLAUDE.md invariant #4's Plan 08 exception — they are new AI-authored
-# content, so the *default* human-in-the-loop rule applies: a person must
-# review and explicitly approve before either is shown on a public page. See
-# ``apps.pipeline.report_publishing.publish_daily_report`` for where the
-# output of these two calls lands (a `_draft` field, never auto-approved) and
-# ``DailyReportPage.freetext_summary_approved``/``empty_columns_flag_approved``
-# for the review gate itself.
+# Same CLAUDE.md invariant #4 exception as the daily-summary sentence above
+# (Plan 08), widened 2026-07-23 (maintainer decision) to also cover these
+# two — auto-published alongside the numbers by
+# ``apps.pipeline.report_publishing.publish_daily_report``, no separate
+# review/approval step. See ``DailyReportPage.freetext_summary``/
+# ``empty_columns_flag`` for where the output lands.
 #
 # Both still follow invariant #3's shape ("numbers computed in Python, AI
 # writes prose only"): B8 is handed only the non-blank free-text entries
@@ -319,10 +317,10 @@ MAX_FREETEXT_SUMMARY_LENGTH = 3000  # max_tokens=600 below
 MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 
 _FREETEXT_SUMMARY_SYSTEM_PROMPT = (
-    "You are drafting an internal review summary (not yet published) of a "
-    "clinic's free-text clinical notes for one day. You are given, for each "
-    "listed column, every non-blank entry recorded that day. Write a short, "
-    "factual summary of common themes across entries. Do not invent, "
+    "You write a short summary, for a clinic's public daily report page, of "
+    "that clinic's free-text clinical notes for one day. You are given, for "
+    "each listed column, every non-blank entry recorded that day. Write a "
+    "short, factual summary of common themes across entries. Do not invent, "
     "estimate, or attribute anything to a specific patient — you are not "
     "given any patient identifier and must not imply one. If a column has no "
     "entries, say so plainly rather than guessing what it might have said."
@@ -371,13 +369,11 @@ def draft_freetext_summary(
 ) -> str | None:
     """Ask the model to summarise the day's free-text columns, or give up.
 
-    See :func:`_draft_short_text` for the failure contract. Unlike
-    :func:`draft_daily_summary_sentence`, a ``None`` (or a drafted string)
-    here is never auto-shown on the public page:
-    :func:`apps.pipeline.report_publishing.publish_daily_report` stores
-    whatever this returns (or ``""``) in ``freetext_summary_draft`` and a
-    person must separately approve it (CLAUDE.md invariant #4's default
-    rule, not Plan 08's narrow exception).
+    See :func:`_draft_short_text` for the failure contract. Same auto-publish
+    treatment as :func:`draft_daily_summary_sentence` (CLAUDE.md invariant
+    #4's exception, widened 2026-07-23 to cover this call too) — whatever
+    this returns (or ``""``) is stored directly onto the public page by
+    :func:`apps.pipeline.report_publishing.publish_daily_report`.
     """
     return _draft_short_text(
         lambda: build_freetext_summary_payload(clinic_date, columns),
@@ -387,14 +383,14 @@ def draft_freetext_summary(
 
 
 _EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT = (
-    "You write a short, plain-language internal note (not yet published) "
-    "listing which of a clinic's free-text record columns were left blank "
-    "for the day, so staff know what to fill in. You are given, for each "
-    "listed column, whether it was entirely empty across every visit that "
-    "day — a true/false fact already determined for you; you must not "
-    "recompute or second-guess it. State only which columns are marked "
-    "empty. Do not add commentary on why, and if none are empty, say so in "
-    "one short sentence instead of listing every column as filled in."
+    "You write a short, plain-language note, for a clinic's public daily "
+    "report page, listing which of that clinic's free-text record columns "
+    "were left blank for the day. You are given, for each listed column, "
+    "whether it was entirely empty across every visit that day — a "
+    "true/false fact already determined for you; you must not recompute or "
+    "second-guess it. State only which columns are marked empty. Do not add "
+    "commentary on why, and if none are empty, say so in one short sentence "
+    "instead of listing every column as filled in."
 )
 
 
@@ -437,8 +433,8 @@ def draft_empty_columns_flag(
 ) -> str | None:
     """Ask the model to phrase which columns are empty, or give up.
 
-    Same failure/review-gate contract as :func:`draft_freetext_summary` above
-    — see :func:`_draft_short_text`.
+    Same failure/auto-publish contract as :func:`draft_freetext_summary`
+    above — see :func:`_draft_short_text`.
     """
     return _draft_short_text(
         lambda: build_empty_columns_flag_payload(clinic_date, empty_columns),
