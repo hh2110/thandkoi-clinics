@@ -1,0 +1,18 @@
+{% extends "wagtailadmin/generic/index.html" %}
+{% load i18n %}
+{% comment %}
+Plan 11 C2 — adds one line above the AiCallLog snippet listing showing the
+running total of every logged AI call's cost, since Wagtail's generic
+listing template has no built-in aggregate-row concept. See
+apps.pipeline.wagtail_hooks.AiCallLogIndexView for where total_cost_usd
+comes from.
+{% endcomment %}
+
+{% block listing %}
+  <div class="nice-padding" style="padding-bottom: 0;">
+    <p>
+      {% blocktranslate with total=total_cost_usd|floatformat:4 %}Total AI spend logged: <strong>${{ total }}</strong>{% endblocktranslate %}
+    </p>
+  </div>
+  {{ block.super }}
+{% endblock %}

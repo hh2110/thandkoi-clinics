@@ -1,11 +1,15 @@
 """Project-wide pytest fixtures.
 
-The two things here that matter for Plan 02's testing philosophy:
+The three things here that matter for Plan 02's testing philosophy:
 
 * ``mock_anthropic_client`` — a canned-response stub with the same
   ``client.messages.create(...) -> response.content[0].text`` shape as the real
   Anthropic SDK. It records every payload it was called with so guardrail tests
   can inspect exactly what our code *sent* to a model.
+* Its response also carries a ``usage`` (``input_tokens``/``output_tokens``)
+  attribute, same shape as the real SDK, so Plan 11 C2's AI-call-cost logging
+  (``apps.pipeline.ai._log_ai_call``) has something to read in every test that
+  exercises a real call site — see ``FAKE_INPUT_TOKENS``/``FAKE_OUTPUT_TOKENS``.
 * ``_forbid_real_anthropic`` (autouse) — patches
   :func:`apps.pipeline.ai.get_anthropic_client` to raise. This makes it
   impossible for any test, anywhere in the suite, to construct a real client or
@@ -27,6 +31,12 @@ CANNED_PROSE = (
     "storyteller may exaggerate. The clinic buzzed with warmth and care."
 )
 
+# Fixed token counts every canned response reports on its `usage` attribute —
+# arbitrary but deterministic, so a test asserting on a logged AiCallLog row's
+# token counts (Plan 11 C2) has a fixed value to check against.
+FAKE_INPUT_TOKENS = 123
+FAKE_OUTPUT_TOKENS = 45
+
 
 class _RecordingMessages:
     """Stub of ``client.messages`` that records calls and returns canned text."""
@@ -37,7 +47,12 @@ class _RecordingMessages:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return SimpleNamespace(content=[SimpleNamespace(text=self._text)])
+        return SimpleNamespace(
+            content=[SimpleNamespace(text=self._text)],
+            usage=SimpleNamespace(
+                input_tokens=FAKE_INPUT_TOKENS, output_tokens=FAKE_OUTPUT_TOKENS
+            ),
+        )
 
 
 class _StubAnthropicClient:

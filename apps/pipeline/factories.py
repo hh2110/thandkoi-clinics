@@ -8,11 +8,13 @@ parent via ``add_child``, not plain ``.objects.create()``).
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 
 import factory
 from wagtail.models import Page
 
 from apps.pipeline.models import (
+    AiCallLog,
     CampUploadReportPage,
     DailyAggregate,
     DailyReportPage,
@@ -130,3 +132,14 @@ class NewsletterDraftRunFactory(factory.django.DjangoModelFactory):
 
     month = factory.LazyFunction(lambda: datetime.date.today().replace(day=1))
     status = NewsletterDraftRun.STATUS_SUCCEEDED
+
+
+class AiCallLogFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = AiCallLog
+
+    call_site = AiCallLog.CALL_SITE_DAILY_SUMMARY
+    model = "claude-haiku-4-5"
+    input_tokens = 100
+    output_tokens = 50
+    cost_usd = Decimal("0.00035")

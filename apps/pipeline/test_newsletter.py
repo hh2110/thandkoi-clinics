@@ -56,6 +56,14 @@ JULY = datetime.date(2026, 7, 1)
 JUNE = datetime.date(2026, 6, 1)
 
 
+# Fixed token counts every stub response below reports on its `usage`
+# attribute (Plan 11 C2's AI-call-cost logging reads this on every real call
+# site) — arbitrary but deterministic, distinct per turn so a test asserting
+# on logged rows can tell turns apart.
+_TOOL_USE_USAGE = SimpleNamespace(input_tokens=210, output_tokens=40)
+_END_TURN_USAGE = SimpleNamespace(input_tokens=180, output_tokens=95)
+
+
 class _ToolUseMessages:
     """Stub of ``client.messages`` scripting one tool-use round trip.
 
@@ -79,10 +87,13 @@ class _ToolUseMessages:
                 )
                 for i, (name, tool_input) in enumerate(self._tool_calls)
             ]
-            return SimpleNamespace(stop_reason="tool_use", content=content)
+            return SimpleNamespace(
+                stop_reason="tool_use", content=content, usage=_TOOL_USE_USAGE
+            )
         return SimpleNamespace(
             stop_reason="end_turn",
             content=[SimpleNamespace(type="text", text=self._final_text)],
+            usage=_END_TURN_USAGE,
         )
 
 
@@ -337,6 +348,7 @@ def test_draft_monthly_newsletter_body_returns_none_when_tool_loop_never_ends(db
                         input={"month": "2026-07"},
                     )
                 ],
+                usage=_TOOL_USE_USAGE,
             )
 
     client = SimpleNamespace(messages=_AlwaysToolUse())
@@ -353,6 +365,7 @@ def test_draft_monthly_newsletter_body_returns_none_on_a_non_end_turn_stop_reaso
             return SimpleNamespace(
                 stop_reason="max_tokens",
                 content=[SimpleNamespace(type="text", text="This month, the clinic")],
+                usage=_END_TURN_USAGE,
             )
 
     client = SimpleNamespace(messages=_TruncatedMessages())

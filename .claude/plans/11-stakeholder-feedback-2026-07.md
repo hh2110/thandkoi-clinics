@@ -75,9 +75,24 @@ the doc itself is not re-read going forward.
       **Done (2026-07-22, branch `chore/remove-provisional-schema-option`),**
       PR not yet opened. Kept the module (still used as test fixture data),
       just unregistered it from the dropdown.
-- [ ] **C2.** Surface Anthropic API cost in the admin panel (needs a metering
+- [x] **C2.** Surface Anthropic API cost in the admin panel (needs a metering
       approach — Anthropic's API doesn't return cost per call; likely
       token-count × published rate, tracked per `IngestRun`/AI call and summed).
+      **Done (2026-07-23, branch `feat/admin-ai-cost-metering`),** PR not yet
+      opened. New `AiCallLog` model (call site, model, input/output tokens,
+      computed cost, timestamp) logged once per real Anthropic call in
+      `apps.pipeline.ai` — including once per tool-use turn in the monthly
+      newsletter's multi-turn loop. Cost computed via a new
+      `apps.pipeline.ai_pricing` module holding Anthropic's published
+      per-model USD-per-million-token rates (fetched live from
+      platform.claude.com/docs/en/about-claude/pricing, 2026-07-23; Sonnet 5
+      is on introductory pricing through 2026-08-31 — the module's comment
+      flags the standard-rate update needed on that date). Registered as a
+      read-only Wagtail snippet mirroring `NewsletterDraftRunViewSet`, with a
+      running cost total shown above the listing. Deliberately no FK from
+      `AiCallLog` back to `IngestRun`/`NewsletterDraftRun`/`DailyAggregate` —
+      the three call sites have no common triggering record to hang one off
+      (see the model's docstring for the per-call-site reasoning).
 - [x] **C3.** Add a "camp report" upload type: same `.xls` format as the daily
       export, plus a camp-title field on upload. Merge the "Reports" and "Camp
       Reports" nav items into one "Reports" menu with two sections (daily
