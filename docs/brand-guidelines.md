@@ -1,6 +1,6 @@
 # Thandkoi Clinics — Brand Guidelines
 
-_Last updated: 2026-07-19 · Status: draft for sign-off_
+_Last updated: 2026-07-23 · Status: draft for sign-off_
 
 These guidelines define the visual identity for the website and all digital
 material. **The logo is the authority** — all colours below are sampled from the
@@ -24,16 +24,14 @@ swaddled child) with a red medical cross where the ring opens, above the wordmar
   <img alt="The Thandkoi Clinics logo" src="../brand/logo.svg" width="300">
 </picture>
 
-### Vector assets (primary — use these)
+### Vector assets
 
-The logo is now true vector (SVG), professionally traced, transparent
-background. Because the ring is an outline (not a solid disc) with enough
-contrast in its own right, **one asset works on both light and dark
-backgrounds** — no separate light/dark files needed.
+The logo is also available as true vector (SVG), traced from
+`brand/logo-primary.jpg`, transparent background.
 
 | File | Use |
 |---|---|
-| [`brand/logo.svg`](../brand/logo.svg) | Full lockup — mark + wordmark. Primary logo for header, footer, print. |
+| [`brand/logo.svg`](../brand/logo.svg) | Full lockup — mark + wordmark. Used for print and design-reference contexts. |
 | [`brand/logo-mark.svg`](../brand/logo-mark.svg) | Mark only, no wordmark. Square-ish crop, for contexts too narrow for the full lockup (social avatar, app icon). |
 | [`brand/favicon.svg`](../brand/favicon.svg) / `favicon-32.png` / `favicon-180.png` / `favicon-512.png` | Browser tab / bookmark / home-screen icons. |
 
@@ -47,13 +45,25 @@ backgrounds** — no separate light/dark files needed.
   a deliberately simplified icon (ring + cross only) would read better than
   shrinking the full mark further.
 
-### Legacy raster assets
+### Header lockups (primary — use these for the live site)
 
-[`brand/logo-primary.jpg`](../brand/logo-primary.jpg) and
-[`brand/logo-reversed.png`](../brand/logo-reversed.png) are the original raster
-files the vector assets above were traced from — kept for reference, superseded
-by the SVGs for all actual use. Other assets in [`brand/`](../brand/):
-`logo-variant-orange-cap.jpg` and product mockups.
+2026-07-23: `logo.svg` and `logo-reversed.png` turned out to be traced from
+two different source illustrations, not one recoloured from the other —
+they visibly differ in ring weight, colour saturation and proportions, so
+using `logo.svg` for the light theme and `logo-reversed.png` for the dark
+theme (the original plan) made the header logo look like two different
+logos across themes. The site header now uses two raster lockups traced
+from the **same** source (`logo-reversed.png`), pixel-identical apart from
+colour:
+
+| File | Use |
+|---|---|
+| [`brand/logo-reversed.png`](../brand/logo-reversed.png) | Dark theme. Light wordmark, white ring, transparent background. |
+| [`brand/logo-light.png`](../brand/logo-light.png) | Light theme. Generated from `logo-reversed.png`: near-white pixels are split by shape (morphological opening) into thin ring/wordmark strokes — recoloured to Teal Deep — versus the doctor's-coat fill, a large connected region recoloured to `#A1B7BE` (a muted on-light garment tone); the separately-coloured pale-aqua "CLINICS" subtitle recolours to Teal Brand. See `templates/partials/header.html`'s comment for the generation script. |
+
+`brand/logo.svg` and `brand/logo-mark.svg` remain the vector source for print
+and any future context that needs true vector (not raster) art — they are
+not currently used on the live site.
 
 ## 2. Colour palette
 
