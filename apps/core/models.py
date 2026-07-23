@@ -182,7 +182,7 @@ class AboutPage(Page):
 
 
 class TeamPage(Page):
-    """The team roster, grouped Doctors / Staff & Committee.
+    """The team roster, grouped Staff & Committee / Volunteers.
 
     Members are orderable child objects (not pages — they need no URL of their
     own); the template groups them by category and renders each through the
@@ -226,10 +226,12 @@ class TeamMember(Orderable):
     ``blocks.ConsentedImageBlock``, reused from Plan 06).
     """
 
+    # Stored value/identifier stays "doctors" (existing DB rows use it); only
+    # the display label changed to "Volunteers".
     DOCTORS = "doctors"
     STAFF = "staff"
     CATEGORY_CHOICES = [
-        (DOCTORS, "Doctors"),
+        (DOCTORS, "Volunteers"),
         (STAFF, "Staff & Committee"),
     ]
 
