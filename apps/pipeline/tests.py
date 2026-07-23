@@ -1751,6 +1751,32 @@ def test_home_page_get_latest_report_returns_latest_published_daily_report(db):
     assert home.get_latest_report().pk == latest.pk
 
 
+def test_home_page_report_teaser_shows_photo_only_once_curated(client, home_page):
+    """The 'Latest daily report' teaser shows the shared placeholder until an
+    admin sets ``HomePage.report_teaser_image`` by hand — that field is never
+    populated from the ``DailyReportPage`` itself, since those auto-publish
+    daily with no admin step of their own to attach a photo to."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    index = ReportIndexPageFactory(parent=home_page)
+    DailyReportPageFactory(
+        parent=index,
+        report_date=datetime.date(2026, 7, 10),
+        aggregate=DailyAggregateFactory(clinic_date=datetime.date(2026, 7, 10)),
+    )
+
+    content = client.get("/en/").content.decode()
+    assert "feature-split__image" not in content
+
+    home_page.report_teaser_image = Image.objects.create(
+        title="Camp photo", file=get_test_image_file()
+    )
+    home_page.save()
+
+    content = client.get("/en/").content.decode()
+    assert "feature-split__image" in content
+
+
 # --- Daily report page UX pass (Plan 08 follow-up) --------------------------
 
 

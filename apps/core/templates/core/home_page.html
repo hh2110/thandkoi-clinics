@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags i18n %}
+{% load wagtailcore_tags wagtailimages_tags i18n %}
 {% comment %}
 Home page — composed entirely from the Plan 03.5 layout kit. The StreamField
 body renders through the block templates (each of which includes a 03.5 section
@@ -23,7 +23,10 @@ headline as a smaller sub-line beneath it — see templates/blocks/hero_block.ht
   {% endfor %}
 
   {% if latest_report %}
-    {% include "partials/sections/feature_split.html" with eyebrow=_("Latest daily report") heading=latest_report.title body=latest_report.summary stats=latest_report.headline_stats cta_label=_("Read the full report →") cta_url=latest_report.url %}
+    {% if page.report_teaser_image %}
+      {% image page.report_teaser_image fill-1200x675 as report_teaser_rendition %}
+    {% endif %}
+    {% include "partials/sections/feature_split.html" with eyebrow=_("Latest daily report") heading=latest_report.title body=latest_report.summary stats=latest_report.headline_stats cta_label=_("Read the full report →") cta_url=latest_report.url media_image=report_teaser_rendition.url media_alt=page.report_teaser_image.title|default:_("Photo from a Thandkoi Clinics camp") %}
   {% endif %}
 
   {% if latest_newsletter %}
