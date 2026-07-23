@@ -430,6 +430,26 @@ answer directly, then decide whether the answer implies a task:
 
 ### F. Multi-day camp upload + live "impact so far" aggregation (2026-07-23)
 
+> **2026-07-23 correction (post-merge):** this entry pairs F1 and F2 against
+> a `report_kind`-discriminated `DailyAggregate` (daily vs. camp rows), but
+> PR #95 (merged 2026-07-23, "chore: remove camp-upload feature, simplify
+> CampReportPage") removed `DailyAggregate.report_kind` and the entire
+> camp-upload ingestion pipeline before either F-item was built. **F1 as
+> written is now moot** — there is no camp-upload path left to parse
+> multi-day files from; a camp/multi-day feature revisited later needs a
+> fresh Stage 2 design against whatever camp-data story exists at that
+> point, not a resurrection of this note. **F2 shipped** (PR #96, "feat(home):
+> live 'impact so far' home-page stats", merged 2026-07-23), but only the two
+> stats that still had a real data source after PR #95 — "Clinic patients
+> (all time)" and "Zakat beneficiaries (all time)" — dropping the
+> camp-patients dimension the note below describes, since `report_kind` no
+> longer exists to discriminate on. The "Stat scope" maintainer decision
+> below (keeping camp numbers distinguishable via `report_kind`) **no longer
+> reflects reality**. See `apps/pipeline/impact_stats.py`'s module docstring
+> and the dated correction note in
+> [11-f2-live-impact-stats-planning.md](11-f2-live-impact-stats-planning.md)
+> for the as-built account.
+
 Maintainer idea, captured raw, not yet slotted into a session:
 
 - **F1. Multi-day camp file upload.** A single camp-report upload may cover
