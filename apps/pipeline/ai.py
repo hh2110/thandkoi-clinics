@@ -316,14 +316,33 @@ EMPTY_COLUMNS_FLAG_MODEL = "claude-haiku-4-5"
 MAX_FREETEXT_SUMMARY_LENGTH = 3000  # max_tokens=600 below
 MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 
+# Tightened 2026-07-23 (Plan 11 Track B11, maintainer decision): the
+# maintainer flagged, citing HHS/HIPAA Safe Harbor guidance, that a narrative
+# combining a specific condition, an exact duration, and a specific
+# circumstance can make one visit recognisable even with no direct
+# identifier attached — the prior wording banned attributing to a *specific
+# patient* but said nothing about that combination. Fixed here by tightening
+# this prompt only (not by rebuilding as computed categorical aggregation,
+# which is parked — see the plan doc's "Parked, deliberately" section);
+# scoped to wording only, it does not change what data reaches the model.
 _FREETEXT_SUMMARY_SYSTEM_PROMPT = (
     "You write a short summary, for a clinic's public daily report page, of "
     "that clinic's free-text clinical notes for one day. You are given, for "
     "each listed column, every non-blank entry recorded that day. Write a "
-    "short, factual summary of common themes across entries. Do not invent, "
-    "estimate, or attribute anything to a specific patient — you are not "
-    "given any patient identifier and must not imply one. If a column has no "
-    "entries, say so plainly rather than guessing what it might have said."
+    "short, factual summary of common themes across entries, using "
+    "frequency or thematic language (for example 'several patients "
+    "presented with...' or 'a common theme was...') rather than narrative "
+    "sentences that read like a description of one visit. Never state an "
+    "exact duration (for example '5 days' or 'two weeks') — drop it or "
+    "generalize it (for example 'a recent onset' or 'an ongoing issue') "
+    "instead of quoting it. Never combine a specific condition, an exact "
+    "duration, and a specific circumstance in the same sentence — that "
+    "combination can make a single visit recognisable even with no direct "
+    "identifier attached, so it is forbidden even if every individual "
+    "detail seems harmless on its own. Do not invent, estimate, or attribute anything "
+    "to a specific patient — you are not given any patient identifier and "
+    "must not imply one. If a column has no entries, say so plainly rather "
+    "than guessing what it might have said."
 )
 
 

@@ -1444,6 +1444,55 @@ def test_freetext_summary_payload_sends_urdu_text_unescaped():
     assert "\\u" not in sent
 
 
+def test_freetext_summary_prompt_forbids_reidentifying_detail(
+    home_page, mock_anthropic_client
+):
+    """B11 (2026-07-23, round 2): the maintainer flagged that a summary
+    combining a specific condition, an exact duration, and a specific
+    circumstance can fingerprint a single patient even with no name attached
+    (citing HHS/HIPAA Safe Harbor guidance) — their example was a recent
+    miscarriage plus facial pustules for an exact number of days. Maintainer
+    decision: fix by tightening the prompt only, not by rebuilding as
+    computed categorical aggregation (see Plan 11 Track B11 grounding).
+
+    ``fingerprintable_entry`` below is a synthesized stand-in shaped the same
+    way — one specific condition, one exact duration, one specific
+    circumstance — invented rather than reusing the maintainer's own example
+    verbatim.
+
+    What this test can assert deterministically is only what our own code
+    *sends* to the model: the system prompt is a fixed Python string
+    (invariant #3), so checking it for the new constraints is fully
+    deterministic. Whether a real model call actually *obeys* the prompt and
+    avoids producing a fingerprintable sentence is not something this (or
+    any) test can assert deterministically — the response is model-generated
+    (the stub here just returns canned text unrelated to the input), so
+    obedience is a heuristic property of following instructions, not a
+    guarantee this test can check.
+    """
+    fingerprintable_entry = (
+        "Impetigo on the left forearm for 9 days, first noticed after "
+        "returning from a family wedding in Mardan"
+    )
+    columns = {"clinical_notes": [fingerprintable_entry]}
+
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, mock_anthropic_client)
+    assert summary  # the stub returned its canned (bounds-safe) text
+
+    assert len(mock_anthropic_client.calls) == 1
+    sent_system_prompt = mock_anthropic_client.calls[0]["system"]
+    assert sent_system_prompt == ai._FREETEXT_SUMMARY_SYSTEM_PROMPT
+    lowered = sent_system_prompt.lower()
+    assert "never state an exact duration" in lowered
+    assert (
+        "never combine a specific condition, an exact duration, and a "
+        "specific circumstance" in lowered
+    )
+    assert "frequency or thematic language" in lowered
+    # Existing safeguards must still be present, not replaced.
+    assert "do not invent, estimate, or attribute anything" in lowered
+
+
 def test_empty_columns_flag_payload_contains_only_booleans(
     home_page, mock_anthropic_client
 ):
