@@ -34,15 +34,21 @@ set -euo pipefail
 REPO="hh2110/thandkoi-clinics"
 HEALTH_URL="https://thandkoiclinics.com/healthz"
 
+log()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
+fail() { printf '\n\033[1;31mERROR:\033[0m %s\n' "$1" >&2; exit 1; }
+
 REF=""
 ASSUME_YES=0
 DRY_RUN=0
 SKIP_CI_CHECK=0
+REMOTE_MAIN=""  # only set on the "cut a new tag" path; kept defined (empty)
+                # here so the --ref path's later fallback echo can't trip
+                # `set -u`'s unbound-variable check
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ref)
-      [[ $# -ge 2 ]] || { echo "--ref requires a tag argument, e.g. --ref v2026.07.20" >&2; exit 1; }
+      [[ $# -ge 2 ]] || fail "--ref requires a tag argument, e.g. --ref v2026.07.20"
       REF="$2"
       shift 2
       ;;
@@ -66,14 +72,10 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "Unknown argument: $1" >&2
-      exit 1
+      fail "Unknown argument: $1"
       ;;
   esac
 done
-
-log()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
-fail() { printf '\n\033[1;31mERROR:\033[0m %s\n' "$1" >&2; exit 1; }
 
 command -v gh   >/dev/null || fail "gh CLI not found."
 command -v jq   >/dev/null || fail "jq not found."
@@ -114,8 +116,12 @@ if [[ -z "$REF" ]]; then
       # --skip-ci-check always prompts its own confirmation, even under --yes —
       # stacking two unattended bypasses (skip the CI gate AND skip confirming
       # it) is exactly the scenario this exists to prevent (found by
-      # code-review-tc).
-      read -r -p "Proceed anyway, treating this as a verified false negative? [y/N] " CI_CONFIRM
+      # code-review-tc). `read`'s own exit status (not just its output) gates
+      # the fail() call, so a closed/non-interactive stdin — which makes
+      # `read` fail outright — is treated as "not confirmed" and reaches the
+      # intended error message, instead of `set -e` killing the script first.
+      CI_CONFIRM=""
+      read -r -p "Proceed anyway, treating this as a verified false negative? [y/N] " CI_CONFIRM || true
       [[ "$CI_CONFIRM" =~ ^[Yy]$ ]] || fail "Aborted — CI did not pass and the cancellation was not confirmed as a false negative."
     else
       fail "CI for $REMOTE_MAIN did not pass (conclusion: $CONCLUSION). Do not release a red commit. If you've verified this is a false negative (e.g. a concurrency-group cancellation during a fast-merge burst, not a real failure), re-run with --skip-ci-check."
@@ -129,7 +135,12 @@ else
 fi
 
 log "Checking the deploy hook secret exists"
-if ! gh api "repos/$REPO/environments/production/secrets" --jq '.secrets[].name' 2>/dev/null | grep -qx "RENDER_DEPLOY_HOOK_URL"; then
+SECRETS_ERR="$(mktemp)"
+SECRET_NAMES="$(gh api "repos/$REPO/environments/production/secrets" --jq '.secrets[].name' 2>"$SECRETS_ERR")" || {
+  fail "Could not check the production environment's secrets (gh api call failed): $(cat "$SECRETS_ERR"). This is a permissions/network/auth problem, not necessarily a missing secret — check \`gh auth status\` before assuming First-time setup is incomplete."
+}
+rm -f "$SECRETS_ERR"
+if ! grep -qx "RENDER_DEPLOY_HOOK_URL" <<<"$SECRET_NAMES"; then
   fail "RENDER_DEPLOY_HOOK_URL is not set on the production environment. See docs/deploying.md's 'First-time setup' — this is a one-off, maintainer-only step."
 fi
 echo "OK — RENDER_DEPLOY_HOOK_URL is configured"
@@ -175,7 +186,11 @@ echo "Target: production (https://thandkoiclinics.com)"
 echo
 
 if [[ "$ASSUME_YES" -ne 1 ]]; then
-  read -r -p "Deploy $REF to production? [y/N] " CONFIRM
+  # `read`'s exit status (not just $CONFIRM) gates the abort message — a
+  # closed/non-interactive stdin makes `read` fail outright, which would
+  # otherwise let `set -e` kill the script before "Aborted..." ever prints.
+  CONFIRM=""
+  read -r -p "Deploy $REF to production? [y/N] " CONFIRM || true
   [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted — nothing was tagged or deployed."; exit 1; }
 fi
 
@@ -195,20 +210,32 @@ gh workflow run deploy.yml --repo "$REPO" -f ref="$REF"
 
 # Find the run this dispatch actually created — never assume it's whatever
 # `--limit 1` returns, which can be stale (deploy.yml's concurrency group is
-# cancel-in-progress: false, so a still-running prior deploy run can rank
-# above the new one) or simply not registered yet. Poll for a
-# workflow_dispatch run created at/after TRIGGERED_AT instead.
+# cancel-in-progress: false, so an older still-running/queued deploy run can
+# rank above the new one) or simply not registered yet. `gh run list --json`
+# has no field for a workflow_dispatch input's value, so createdAt alone
+# can't tell two candidate runs apart when more than one was dispatched in
+# the same window — positively confirm the match by grepping each
+# candidate's own log for deploy.yml's "Deploying tag $REF (...)" line
+# (from its "Verify the ref is a release tag" step) rather than trusting
+# timing alone.
 RUN_ID=""
-for _ in $(seq 1 12); do
-  RUN_ID=$(gh run list --repo "$REPO" --workflow deploy.yml --limit 10 \
+for _ in $(seq 1 24); do
+  CANDIDATES=$(gh run list --repo "$REPO" --workflow deploy.yml --limit 10 \
     --json databaseId,createdAt,event \
-    --jq --arg since "$TRIGGERED_AT" \
+    | jq -r --arg since "$TRIGGERED_AT" \
       '[.[] | select(.event == "workflow_dispatch" and .createdAt >= $since)]
-       | sort_by(.createdAt) | first | .databaseId // empty')
+       | sort_by(.createdAt) | .[].databaseId')
+  for candidate in $CANDIDATES; do
+    if gh run view "$candidate" --repo "$REPO" --log 2>/dev/null \
+        | grep -qF "Deploying tag ${REF} ("; then
+      RUN_ID="$candidate"
+      break
+    fi
+  done
   [[ -n "$RUN_ID" ]] && break
   sleep 5
 done
-[[ -n "$RUN_ID" ]] || fail "Could not find the workflow_dispatch run this triggered (none created at/after $TRIGGERED_AT after 60s). Check the Actions tab directly: https://github.com/$REPO/actions/workflows/deploy.yml"
+[[ -n "$RUN_ID" ]] || fail "Could not find the workflow_dispatch run for $REF (none created at/after $TRIGGERED_AT confirmed deploying it after 2 minutes). Check the Actions tab directly: https://github.com/$REPO/actions/workflows/deploy.yml"
 
 echo "Watching run $RUN_ID"
 gh run watch "$RUN_ID" --repo "$REPO" --exit-status
