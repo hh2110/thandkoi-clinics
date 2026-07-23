@@ -61,4 +61,17 @@ reads intentionally.
       </div>
     </section>
   {% endif %}
+
+  {% if page.photos %}
+    <section class="section">
+      <div class="wrapper prose">
+        <div class="section-header">
+          {% include "partials/sections/section_header.html" with eyebrow=_("In pictures") heading=_("Our community") %}
+        </div>
+        {% for block in page.photos %}
+          {% include_block block %}
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
 {% endblock %}
