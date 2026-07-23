@@ -317,6 +317,27 @@ def test_draft_monthly_newsletter_body_payload_never_carries_an_identifying_colu
         assert column not in sent
 
 
+def test_draft_monthly_newsletter_body_system_prompt_forbids_preamble_and_markdown(db):
+    """Found via bulk synthetic-data testing (2026-07-23): with `thinking`
+    disabled, the model wrote its own tone/approach reasoning as the
+    response's opening paragraph(s) and reached for Markdown (`**bold**`,
+    `---` dividers) — both published verbatim onto the live public page,
+    since `_build_newsletter_body` inserts the response as plain,
+    unprocessed `<p>` tags. This guards the explicit instruction against both
+    regressing silently."""
+    client = _ToolUseClient(
+        tool_calls=[("get_month_stats", {"month": "2026-07"})],
+        final_text="A good month for the clinic.",
+    )
+
+    ai.draft_monthly_newsletter_body(JULY, client=client)
+
+    system_prompt = client.calls[0]["system"]
+    assert "preamble" in system_prompt.lower()
+    assert "markdown" in system_prompt.lower()
+    assert "**bold**" in system_prompt
+
+
 def test_draft_monthly_newsletter_body_returns_none_when_client_raises(db):
     assert ai.draft_monthly_newsletter_body(JULY, client=_raising_client()) is None
 
