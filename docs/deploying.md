@@ -58,6 +58,18 @@ inspectable script over an agent-driven one) does the whole runbook:
 5. Triggers the Deploy workflow for that tag and watches it to completion.
 6. Health-checks production (`/healthz`) with a few retries.
 
+> **2026-07-23 observed gap:** `/healthz: 200` confirms *a* healthy instance
+> is responding, not that *every* access path is already on the new build.
+> After a real release (`v2026.07.23-4`, adding `CampReportPage.report_document`),
+> `scripts/release.sh` reported the health check passing and Render's own API
+> already showed the new deploy as `"live"` — but an SSH shell into the
+> instance (see [content-operations.md](content-operations.md)) still ran the
+> *previous* build for roughly a minute afterwards, raising a `TypeError` for
+> the field the new release had just added. If you're chaining an SSH
+> content-op onto a release you just ran, don't treat the script's success
+> output as proof that path is on the new code yet — re-check (e.g. retry, or
+> confirm the deployed git SHA over SSH) rather than assuming.
+
 Two flags: `--ref vYYYY.MM.DD` (deploy an existing tag as-is instead of
 cutting a new one — see Rollback below), and `--yes` (skip the interactive
 confirmation prompt — added 2026-07-23, maintainer decision, reversing the
