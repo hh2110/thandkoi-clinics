@@ -325,6 +325,12 @@ MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 # this prompt only (not by rebuilding as computed categorical aggregation,
 # which is parked — see the plan doc's "Parked, deliberately" section);
 # scoped to wording only, it does not change what data reaches the model.
+#
+# Also restructured 2026-07-23 (Plan 11 Track B10, merged on top of B11):
+# maintainer feedback that the rendered summary "has no formatting at all" —
+# the template now renders this via Django's `linebreaks` filter, so the
+# prompt asks for a few blank-line-separated thematic paragraphs instead of
+# one long paragraph, which get real `<p>` tags on render.
 _FREETEXT_SUMMARY_SYSTEM_PROMPT = (
     "You write a short summary, for a clinic's public daily report page, of "
     "that clinic's free-text clinical notes for one day. You are given, for "
@@ -339,7 +345,12 @@ _FREETEXT_SUMMARY_SYSTEM_PROMPT = (
     "duration, and a specific circumstance in the same sentence — that "
     "combination can make a single visit recognisable even with no direct "
     "identifier attached, so it is forbidden even if every individual "
-    "detail seems harmless on its own. Do not invent, estimate, or attribute anything "
+    "detail seems harmless on its own. Organize the summary into a few "
+    "short thematic paragraphs (for example: presenting complaints and "
+    "diagnoses, treatment and medicine, compliance and follow-up notes) "
+    "rather than one long paragraph, separating each paragraph with a "
+    "blank line. Do not use headings, bullet points, or any other markup — "
+    "plain paragraphs only. Do not invent, estimate, or attribute anything "
     "to a specific patient — you are not given any patient identifier and "
     "must not imply one. If a column has no entries, say so plainly rather "
     "than guessing what it might have said."

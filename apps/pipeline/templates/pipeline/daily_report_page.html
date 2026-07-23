@@ -49,11 +49,18 @@ shrinking `--space-8` itself, which other, longer pages still rely on.
     Auto-published alongside the numbers, same CLAUDE.md invariant #4
     exception as `summary_sentence` above (widened 2026-07-23, Plan 11
     Track B8, maintainer decision) — see DailyReportPage's docstring.
+
+    `linebreaks` (Plan 11 B10, maintainer feedback: raw string had no
+    formatting): the model is asked (see `_FREETEXT_SUMMARY_SYSTEM_PROMPT`)
+    to write a few blank-line-separated thematic paragraphs, so this wraps
+    each in a real `<p>` — matching the newsletter body's real-HTML-block
+    prose precedent, same `.prose` spacing as everywhere else on this page —
+    instead of dumping one unstructured string into a single `<p>`.
     {% endcomment %}
     <section class="section section--snug" data-role="freetext-summary">
       <div class="wrapper prose">
         <h2>{% translate "Today's notes, summarised" %}</h2>
-        <p>{{ page.freetext_summary }}</p>
+        {{ page.freetext_summary|linebreaks }}
       </div>
     </section>
   {% endif %}

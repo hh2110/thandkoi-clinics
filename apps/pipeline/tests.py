@@ -1912,6 +1912,38 @@ def test_daily_report_page_rendering_reflects_ux_pass_copy_and_card_changes(
     assert "By age band" in content
 
 
+def test_daily_report_page_renders_freetext_summary_as_real_paragraphs(
+    client, home_page
+):
+    """Plan 11 B10: maintainer feedback that the free-text summary "has no
+    formatting at all". A multi-paragraph AI draft (blank-line separated, per
+    `_FREETEXT_SUMMARY_SYSTEM_PROMPT`) must render as real `<p>` tags — via
+    the `linebreaks` filter — not as one raw string dumped into a single
+    `<p>`, matching the newsletter body's real-HTML-block prose precedent."""
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    report_date = datetime.date(2026, 7, 10)
+    DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=DailyAggregateFactory(clinic_date=report_date),
+        freetext_summary=(
+            "Most complaints were respiratory infections and fevers.\n\n"
+            "Medicines prescribed were mostly antibiotics and paracetamol."
+        ),
+    )
+
+    content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
+
+    assert "<p>Most complaints were respiratory infections and fevers.</p>" in content
+    assert (
+        "<p>Medicines prescribed were mostly antibiotics and paracetamol.</p>"
+        in content
+    )
+    # Not one raw string dumped into a single paragraph.
+    assert "fevers.\n\nMedicines" not in content
+
+
 def test_report_index_page_renders_intro_when_set(client, home_page):
     """Mirrors ``OurWorkPage``/``NewsletterIndexPage``'s optional-intro pattern
     (same ``{% if page.intro %}`` guard, same ``RichTextField``) — the archive
