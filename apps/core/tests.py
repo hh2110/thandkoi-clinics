@@ -1325,10 +1325,12 @@ def test_home_page_shows_a_visible_org_name(client, home_page):
 
     Small, scoped fix (Plan 11): the header logo is a wordless mark and the
     hero's eyebrow/headline are free text, so without this the org name never
-    appeared as visible text above the footer.
+    appeared as visible text above the footer. 2026-07: the name moved into
+    the hero itself as the large swaying wordmark title (`.hero__wordmark`),
+    replacing the old standalone `.home-wordmark` line above the hero.
     """
     content = client.get("/en/").content.decode()
-    assert '<p class="home-wordmark__text">The Thandkoi Clinics</p>' in content
+    assert '<p class="hero__wordmark">The Thandkoi Clinics</p>' in content
 
 
 def test_footer_urdu_tagline_no_longer_includes_chiragh_shafa(client, home_page):

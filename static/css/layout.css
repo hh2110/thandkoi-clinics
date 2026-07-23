@@ -87,25 +87,6 @@
   white-space: nowrap;
 }
 
-/* --- Home wordmark ----------------------------------------------------------
-   Small, scoped home-page-prominence fix (Plan 11): the org name is otherwise
-   never shown as visible text near the top of the home page (the header logo
-   is a wordless mark; the hero's eyebrow/headline are free text). Plain,
-   compact — no redesign, just a visible name above the hero. */
-.home-wordmark {
-  padding-block-start: var(--space-3);
-}
-
-.home-wordmark__text {
-  font-family: var(--font-heading);
-  font-weight: 800;
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--color-brand);
-  margin-block: 0;
-}
-
 /* --- Hero -----------------------------------------------------------------
    Single column by default (mobile-first); two columns from the primary-nav
    breakpoint up (56rem, matching components.css). */

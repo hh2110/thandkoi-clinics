@@ -1,0 +1,38 @@
+/*
+ * Hero wordmark lockup (2026-07) — the swaying org-name title.
+ * Reads semantic tokens only (tokens.css), so light + dark come for free.
+ * Load after layout.css.
+ */
+
+/* Wordmark (large) + headline sub-line (smaller), gently swaying together.
+   `title` stays the <h1>; the wordmark is a styled <p>, so document semantics
+   and SEO are unchanged — the name is only visually the largest. */
+.hero__lockup {
+  display: inline-block;
+  margin-block: 0 var(--space-2);
+  transform-origin: 0% 30%;
+  animation: tkcSway 5.5s ease-in-out infinite;
+}
+.hero__wordmark {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-2xl);
+  line-height: 1.02;
+  color: var(--color-text);
+  margin: 0;
+}
+.hero__title--sub {
+  font-size: var(--font-size-lg);
+  color: var(--color-brand-hover);
+  margin-block: var(--space-1) 0;
+}
+
+@keyframes tkcSway {
+  0%, 100% { transform: rotate(-1.1deg); }
+  50%      { transform: rotate(1.1deg); }
+}
+
+/* Respect motion preferences — hold the lockup still. */
+@media (prefers-reduced-motion: reduce) {
+  .hero__lockup { animation: none; }
+}

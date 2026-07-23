@@ -1,4 +1,4 @@
-{% load wagtailimages_tags %}
+{% load wagtailimages_tags i18n %}
 {% comment %}
 HeroBlock → the Plan 03.5 hero partial. This template authors no markup of its
 own; it only maps block fields onto hero.html's context.
@@ -10,8 +10,18 @@ Two guards on the primary CTA:
   * The amber donate button (button--donate) is Donate-only (brand-guidelines.md
     §7), so it applies only when the admin explicitly marks this CTA as the
     Zakat/Sadaqa ask; every other hero CTA uses the default button--primary.
+
+Wordmark (2026-07): the org name is passed as the hero `wordmark`, so it renders
+as the large swaying title with the headline as a smaller sub-line beneath it —
+replacing the old standalone `.home-wordmark` line in home_page.html. It is a
+translated literal here rather than a block field, matching how the old wordmark
+was authored (a fixed {% translate %} string, not editor copy). If you ever
+reuse HeroBlock on a non-home page and do NOT want the wordmark, gate this with
+a new `show_wordmark` BooleanBlock field on HeroBlock and only set `tkc_wordmark`
+when it's true.
 {% endcomment %}
 {% if value.image %}{% image value.image fill-760x950 as hero_img %}{% endif %}
 {% firstof value.primary_cta_donate|yesno:"button--donate," "button--primary" as hero_cta_class %}
 {% if value.primary_cta_page %}{% firstof value.primary_cta_label "" as hero_cta_label %}{% endif %}
-{% include "partials/sections/hero.html" with eyebrow=value.eyebrow title=value.headline intro=value.intro primary_cta_label=hero_cta_label primary_cta_url=value.primary_cta_page.url primary_cta_class=hero_cta_class secondary_cta_label=value.secondary_cta_label secondary_cta_url=value.secondary_cta_page.url tagline=value.tagline media_image=hero_img.url media_alt=value.image.title media_caption=value.media_caption stat_value=value.stat_value stat_label=value.stat_label %}
+{% translate "The Thandkoi Clinics" as tkc_wordmark %}
+{% include "partials/sections/hero.html" with wordmark=tkc_wordmark eyebrow=value.eyebrow title=value.headline intro=value.intro primary_cta_label=hero_cta_label primary_cta_url=value.primary_cta_page.url primary_cta_class=hero_cta_class secondary_cta_label=value.secondary_cta_label secondary_cta_url=value.secondary_cta_page.url tagline=value.tagline media_image=hero_img.url media_alt=value.image.title media_caption=value.media_caption stat_value=value.stat_value stat_label=value.stat_label %}
