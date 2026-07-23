@@ -81,9 +81,21 @@ class ImpactStatsBlock(blocks.StructBlock):
 
     With no figures entered the band shows its own "coming soon" empty state
     (stat_band.html), so a half-populated Home page never looks broken.
+
+    ``as_of`` is a manual "last updated" marker, not a live computation — the
+    stats above are still hand-typed (see ``ImpactStatBlock``'s docstring), so
+    when an admin updates one they should also bump this date. Plan 11 D2. Live
+    computation from ``DailyAggregate`` rows is a separate future idea (Plan 11
+    candidate Track F, not built here).
     """
 
     caption = blocks.CharBlock(required=False, max_length=140)
+    as_of = blocks.DateBlock(
+        required=False,
+        help_text='Optional "updated at" date, appended to the caption, e.g. '
+        '"Our impact so far (updated at 23 Jul 2026)". Set this whenever the '
+        "figures below are updated by hand.",
+    )
     stats = blocks.ListBlock(ImpactStatBlock())
 
     class Meta:

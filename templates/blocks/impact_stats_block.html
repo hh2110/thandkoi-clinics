@@ -1,6 +1,16 @@
+{% load i18n %}
 {% comment %}
 ImpactStatsBlock → the Plan 03.5 stat-band partial. `value.stats` is a list of
 {value, label} StructValues, which stat_band.html iterates directly. With no
 figures it shows its own "coming soon" empty state.
+
+`as_of` (Plan 11 D2) is a manual "last updated" date, appended to the caption
+as "(updated at <date>)" when set — never computed, see ImpactStatsBlock's
+docstring.
 {% endcomment %}
-{% include "partials/sections/stat_band.html" with stats=value.stats caption=value.caption %}
+{% if value.as_of %}
+  {% blocktranslate asvar impact_caption with caption=value.caption date=value.as_of|date:"d M Y" %}{{ caption }} (updated at {{ date }}){% endblocktranslate %}
+  {% include "partials/sections/stat_band.html" with stats=value.stats caption=impact_caption %}
+{% else %}
+  {% include "partials/sections/stat_band.html" with stats=value.stats caption=value.caption %}
+{% endif %}

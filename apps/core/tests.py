@@ -439,6 +439,58 @@ def test_circle_of_care_block_renders_stages_in_the_hub(db):
     assert 'data-coc-stage="5"' in html  # 6 stages, zero-indexed
 
 
+def test_impact_stats_block_appends_updated_at_when_as_of_set(db):
+    """Plan 11 D2: with ``as_of`` set, the caption gains "(updated at <date>)".
+
+    Mirrors ``test_circle_of_care_block_renders_stages_in_the_hub``'s pattern
+    for exercising a StreamField block's own render, not just its template.
+    """
+    from wagtail.blocks import StreamValue
+
+    from apps.core.models import HomePage as _HP
+
+    body = _HP().body.stream_block
+    value = StreamValue(
+        body,
+        [
+            (
+                "impact_stats",
+                {
+                    "caption": "Our impact so far",
+                    "as_of": datetime.date(2026, 7, 23),
+                    "stats": [{"value": "467+", "label": "children treated"}],
+                },
+            )
+        ],
+    )
+    html = value.render_as_block()
+    assert "Our impact so far (updated at 23 Jul 2026)" in html
+
+
+def test_impact_stats_block_caption_unchanged_when_as_of_unset(db):
+    """With no ``as_of``, the caption renders exactly as typed — no stray suffix."""
+    from wagtail.blocks import StreamValue
+
+    from apps.core.models import HomePage as _HP
+
+    body = _HP().body.stream_block
+    value = StreamValue(
+        body,
+        [
+            (
+                "impact_stats",
+                {
+                    "caption": "Our impact so far",
+                    "stats": [{"value": "467+", "label": "children treated"}],
+                },
+            )
+        ],
+    )
+    html = value.render_as_block()
+    assert "Our impact so far" in html
+    assert "updated at" not in html
+
+
 @pytest.mark.parametrize(
     ("url", "lang", "direction"),
     [("/en/", "en", "ltr"), ("/ur/", "ur", "rtl")],
@@ -1251,3 +1303,16 @@ def test_home_page_shows_a_visible_org_name(client, home_page):
     """
     content = client.get("/en/").content.decode()
     assert '<p class="home-wordmark__text">The Thandkoi Clinics</p>' in content
+
+
+def test_footer_urdu_tagline_no_longer_includes_chiragh_shafa(client, home_page):
+    """Plan 11 D4: "چراغ شفا" is retired from the site-wide footer.
+
+    Maintainer's explicit ask (2026-07-23) — "صحت سب کے لیے" stays, the
+    "چراغ شفا" half is removed. The footer renders on every page (it's the
+    site chrome, not home-page-specific content), so the home page is enough
+    to exercise it.
+    """
+    content = client.get("/en/").content.decode()
+    assert "صحت سب کے لیے" in content
+    assert "چراغ شفا" not in content
