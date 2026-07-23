@@ -71,6 +71,12 @@
     per-page block since no page-scoped CSS block exists yet in this base.
     {% endcomment %}
     <link rel="stylesheet" href="{% static 'css/daily-report.css' %}" />
+    {% comment %}
+    Hero wordmark lockup (2026-07) — the swaying org-name title on the home
+    hero. Sitewide like layout.css/daily-report.css rather than a per-page
+    block, since no page-scoped CSS block exists yet in this base.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/hero-lockup.css' %}" />
     {% block extra_head %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">

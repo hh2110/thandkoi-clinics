@@ -6,6 +6,12 @@ column below 56rem (layout.css).
 
 Context (all optional — a section renders whatever it's given):
   eyebrow              — uppercase label above the headline.
+  wordmark             — org-name lockup (NEW). When set, it renders as the
+                         large title and `title` drops to a smaller sub-line
+                         beneath it, the pair gently swaying (`.hero__lockup`).
+                         `title` stays the <h1> for semantics/SEO; the wordmark
+                         is a styled <p>. When `wordmark` is absent, behaviour
+                         is exactly as before (title is the large <h1>).
   title                — the <h1> headline.
   intro                — lead paragraph.
   primary_cta_label / primary_cta_url    — main call to action.
@@ -26,7 +32,14 @@ Numbers and copy are inputs only — nothing here is baked in.
   <div class="wrapper hero__inner">
     <div class="hero__content">
       {% if eyebrow %}<p class="eyebrow">{{ eyebrow }}</p>{% endif %}
-      {% if title %}<h1 class="hero__title">{{ title }}</h1>{% endif %}
+      {% if wordmark %}
+        <div class="hero__lockup">
+          <p class="hero__wordmark">{{ wordmark }}</p>
+          {% if title %}<h1 class="hero__title hero__title--sub">{{ title }}</h1>{% endif %}
+        </div>
+      {% elif title %}
+        <h1 class="hero__title">{{ title }}</h1>
+      {% endif %}
       {% if intro %}<p class="hero__intro">{{ intro }}</p>{% endif %}
       {% if primary_cta_label or secondary_cta_label %}
         <div class="hero__actions">

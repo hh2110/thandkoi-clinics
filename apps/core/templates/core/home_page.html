@@ -9,21 +9,15 @@ teaser degrades gracefully per content type, not all-or-nothing (Plan 06
 decision). Plan 06 wires the newsletter half; the report half stays hidden
 until Plan 08 supplies a report content type to query.
 
-Small, scoped addition (Plan 11, home-page prominence ask): "The Thandkoi
-Clinics" never appeared as visible text near the top of the home page —
-static/images/logo.svg is a wordless mark, and the hero's own eyebrow/headline
-are free-text fields the admin may set to anything (seeded copy today reads
-"Bringing healthcare to every doorstep", not the org name). The name showed up
-in <title>/meta tags and, small and only at the very bottom, the footer
-copyright — no visible instance up top. This wordmark line is the smallest
-fix: plain text, no layout/redesign risk, scoped to this one template rather
-than the shared header (which is out of scope here, per the task).
+2026-07 change: the standalone ".home-wordmark" line that sat above the hero
+(a small, stray uppercase label duplicating the logo) is REMOVED. The org name
+now lives inside the hero itself as the large swaying wordmark title, with the
+headline as a smaller sub-line beneath it — see templates/blocks/hero_block.html
+(passes `wordmark`) and templates/partials/sections/hero.html (renders the
+`.hero__lockup`). The old `.home-wordmark` rules are removed from layout.css too.
 {% endcomment %}
 
 {% block content %}
-  <div class="wrapper home-wordmark">
-    <p class="home-wordmark__text">{% translate "The Thandkoi Clinics" %}</p>
-  </div>
   {% for block in page.body %}
     {% include_block block %}
   {% endfor %}
