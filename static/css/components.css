@@ -30,28 +30,28 @@
 }
 
 .site-header__logo {
-  /* Sized up from the old 2.5rem per maintainer feedback ("tiny"). Stays on
-     the full mark + wordmark lockup rather than the icon-only
-     logo-mark.svg: docs/brand-guidelines.md explicitly reserves the
-     icon-only mark for contexts too narrow for the full lockup (avatar/app
-     icon) and specifies the full lockup for header/footer/print — dropping
-     the wordmark here would also remove the only visible on-page text
-     naming the clinic for sighted visitors. .site-header__bar's
-     padding-block (--space-2, 1rem) grows the bar to accommodate rather
-     than the logo overflowing the bar's edges.
+  /* Sized up from the old 2.5rem per maintainer feedback ("tiny").
+     .site-header__bar's padding-block (--space-2, 1rem) grows the bar to
+     accommodate rather than the logo overflowing the bar's edges.
 
      Plan 11 D11 / 2026-07-23 re-scope (see header.html's comment for the
-     full history): header.html renders both logo-light.png (`--light`) and
-     logo-reversed.png (`--dark`) as two always-in-DOM <img>s, and the rules
-     below toggle which one is `display`ed via the same :root[data-theme] /
-     prefers-color-scheme cascade the rest of the site uses for colour — no
-     JS, no FOUC. Both PNGs share the same 900x769 (~1.170) intrinsic ratio
-     — logo-light.png is generated from logo-reversed.png itself — so a
-     single width sizes both identically; at width:9.375rem (150px) the
-     rendered height is ~128px, clearing brand-guidelines.md's own "~140px
-     wide... so the illustration stays legible" floor for the full lockup.
-     height:auto lets each <img>'s width/height attributes drive the ratio
-     so the browser doesn't distort either image. */
+     full history, including why the header now uses a mark-only lockup —
+     no wordmark — rather than the full mark + wordmark lockup
+     docs/brand-guidelines.md originally specified for header/footer/print;
+     that doc has been updated to match): header.html renders both
+     logo-light.svg (`--light`) and logo-dark.png (`--dark`) as two
+     always-in-DOM <img>s, and the rules below toggle which one is
+     `display`ed via the same :root[data-theme] / prefers-color-scheme
+     cascade the rest of the site uses for colour — no JS, no FOUC.
+     The two lockups have different intrinsic ratios (logo-light.svg
+     ~1.07, logo-dark.png ~1.24 — see header.html's comment for why), so
+     sizing by a shared width rather than height is what keeps them the
+     same visual size. width:9.375rem (150px) clears brand-guidelines.md's
+     "~140px wide... so the illustration stays legible" floor directly
+     (the rendered heights differ — ~140px for the light lockup, ~121px
+     for the dark one — but the width both are judged legible at is the
+     same). height:auto lets each <img>'s width/height attributes drive
+     its own ratio so the browser doesn't distort either image. */
   width: 9.375rem;
   height: auto;
 }

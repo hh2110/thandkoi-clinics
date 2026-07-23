@@ -47,23 +47,34 @@ The logo is also available as true vector (SVG), traced from
 
 ### Header lockups (primary — use these for the live site)
 
-2026-07-23: `logo.svg` and `logo-reversed.png` turned out to be traced from
-two different source illustrations, not one recoloured from the other —
-they visibly differ in ring weight, colour saturation and proportions, so
-using `logo.svg` for the light theme and `logo-reversed.png` for the dark
-theme (the original plan) made the header logo look like two different
-logos across themes. The site header now uses two raster lockups traced
-from the **same** source (`logo-reversed.png`), pixel-identical apart from
-colour:
+2026-07-23: two rounds of trying to keep the full mark + wordmark lockup in
+the header (first a recoloured `logo.svg`, then a recoloured
+`logo-reversed.png`) both still read as two different logos across themes —
+`logo.svg` and `logo-reversed.png` are traced from two different source
+illustrations (different ring weight, colour saturation, proportions), and
+matching the wordmark's contrast per theme was a recurring problem on top
+of that. **Maintainer decision: drop the wordmark from the header and use
+the mark (ring + family + cross) only.** The clinic's name stays visible
+elsewhere on every page (site-footer's copyright line, and the page
+`<title>`/OG tags), so this doesn't remove the only on-page name text —
+it moves it out of the header specifically.
 
 | File | Use |
 |---|---|
-| [`brand/logo-reversed.png`](../brand/logo-reversed.png) | Dark theme. Light wordmark, white ring, transparent background. |
-| [`brand/logo-light.png`](../brand/logo-light.png) | Light theme. Generated from `logo-reversed.png`: near-white pixels are split by shape (morphological opening) into thin ring/wordmark strokes — recoloured to Teal Deep — versus the doctor's-coat fill, a large connected region recoloured to `#A1B7BE` (a muted on-light garment tone); the separately-coloured pale-aqua "CLINICS" subtitle recolours to Teal Brand. See `templates/partials/header.html`'s comment for the generation script. |
+| [`brand/logo-dark.png`](../brand/logo-dark.png) | Dark theme. A crop of `logo-reversed.png` with the wordmark rows removed — the same approved illustration, just less of the canvas. |
+| [`brand/logo-light.svg`](../brand/logo-light.svg) | Light theme. Commissioned from an external design pass as a mark-only vector (not derived from any asset already in this repo) once recolouring attempts on the existing assets kept losing to the "two different logos" problem above. |
 
-`brand/logo.svg` and `brand/logo-mark.svg` remain the vector source for print
-and any future context that needs true vector (not raster) art — they are
-not currently used on the live site.
+These two aren't pixel-derived from one another and have different
+intrinsic aspect ratios (`logo-dark.png` ~1.24, `logo-light.svg` ~1.07);
+`.site-header__logo` in `static/css/components.css` sizes both by a shared
+*width* rather than height so they read as the same size regardless.
+
+`brand/logo.svg` and `brand/logo-mark.svg` (an existing mark-only crop of
+the `logo.svg` family) remain the vector source for print and any future
+context that needs true vector (not raster) art — they are not currently
+used on the live site, and `logo-mark.svg` in particular was not reused for
+the header precisely because it inherits `logo.svg`'s "different
+illustration than logo-reversed.png" problem.
 
 ## 2. Colour palette
 
