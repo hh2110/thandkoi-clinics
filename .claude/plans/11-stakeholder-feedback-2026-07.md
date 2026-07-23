@@ -16,6 +16,17 @@ development lifecycle, so nothing is lost and nothing gets built on a guess.
 doc as a point-in-time capture — this plan is the durable, structured version;
 the doc itself is not re-read going forward.
 
+**Round 2 (2026-07-23 capture).** The same doc gained three more items after
+B8/B9 shipped and merged that same day: the free-text summary (B8) renders
+unstyled and is narratively too specific (a real re-identification risk, not
+just polish), and the "Donors & Partners" nav item (D6) should come off the
+main nav. Separately, the maintainer supplied a pre-built handoff bundle
+(`~/Downloads/logo-update.zip`) fixing a dark-theme contrast bug on the
+header logo (`logo.svg`'s dark wordmark goes near-invisible on the dark
+theme) — not from the doc, but scoped into this plan as the same kind of
+small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
+"point-in-time capture, not re-read" rule as round 1.
+
 ## Milestones by track
 
 ### Track A — Data pipeline integrity (highest priority)
@@ -74,6 +85,51 @@ the doc itself is not re-read going forward.
   only — it does not reopen invariant #2 generally, and any *new* free-text
   column added later needs the same question asked explicitly, not assumed.
 
+- [ ] **B10 (round 2, 2026-07-23).** Format B8's free-text summary to match
+      the site's prose conventions. Currently
+      `apps/pipeline/templates/pipeline/daily_report_page.html` dumps the
+      whole summary into one raw `<p>{{ page.freetext_summary }}</p>`
+      (line 56) — no headings, paragraphs, or lists, unlike the rest of the
+      page (the gender/zakat breakdowns use `<ul class="prose"><li>...`) or
+      the newsletter body (`apps/core/templates/core/newsletter_page.html`,
+      real block-level HTML inside `.prose`). Mirror that pattern instead of
+      the single-string dump.
+      **Priority: P2** — cosmetic, no privacy or correctness stakes.
+- [ ] **B11 (round 2, 2026-07-23).** Tighten B8's free-text summary so it
+      can't produce individually-identifying narrative combinations. The
+      maintainer's feedback (citing HHS/HIPAA Safe Harbor guidance) flags
+      that combining a specific condition with an exact duration and
+      circumstance — e.g. "recent miscarriage" + "pustules on the face for 5
+      days" — acts as a fingerprint even with no name attached, and asks for
+      aggregated/thematic phrasing instead (their example: "gastrointestinal
+      distress (45%), musculoskeletal pain (30%)...").
+      **Priority: P0** — real patient re-identification risk on a page that
+      auto-publishes with no human review (CLAUDE.md invariant #4's
+      exception).
+
+      **Grounding (Stage 3) — resolved, maintainer decision 2026-07-23.**
+      Confirmed against the code: `apps/pipeline/ai.py`'s
+      `_FREETEXT_SUMMARY_SYSTEM_PROMPT` (~lines 319–326) asks the model to
+      "summarize common themes" and forbids attributing anything to a
+      *specific patient*, but has no instruction against combining a
+      specific condition with an exact duration/circumstance into one
+      narrative sentence — exactly the gap the maintainer flagged. Two ways
+      to fix it were weighed: (a) tighten the prompt only — ban exact
+      durations, ban single-case detail combinations, require
+      frequency/thematic language; or (b) rebuild as computed categorical
+      aggregation (Python-side theme counts/percentages, comparable effort
+      to Plan 08's diagnosis-category mapping, closer to the doc's own
+      numeric example and to CLAUDE.md invariant #3's "numbers are
+      deterministic"). **Maintainer decision: (a), prompt-only** — smaller,
+      faster, and addresses the sharpest concern (the fingerprint
+      combination) without restructuring the pipeline. Categorical
+      aggregation is parked (see "Parked, deliberately") rather than
+      dropped. This change is scoped to *wording only* — it does not reopen
+      whether the seven columns' raw text may reach the model (still yes,
+      per the B8/B9 grounding above), and CLAUDE.md invariant #4's
+      auto-publish exception conditions (fixed template, tested payload,
+      non-blocking failure) still apply unchanged.
+
 ### Track C — Admin panel
 
 - [x] **C1.** Remove the now-unused "provisional schema" option from the upload
@@ -123,8 +179,19 @@ the doc itself is not re-read going forward.
 ### Track D — Content & site pages
 
 - [x] **D1.** Enlarge the top-left logo; consider icon-only (drop the wordmark).
-      **Done (2026-07-22, branch `feat/bigger-logo`),** PR not yet opened.
-      Swapped to the existing `logo-mark.svg` (icon-only), 2.5rem → 4rem.
+      **Done (2026-07-22, merged PR #51).** ~~Swapped to `logo-mark.svg`
+      (icon-only)~~ — that first pass was caught and reverted by code review
+      within the same PR: `docs/brand-guidelines.md` reserves the icon-only
+      mark for narrow contexts (avatar/app icon) and specifies the full
+      lockup for header/footer/print, and dropping the wordmark would have
+      removed the only visible on-page text naming the clinic for sighted
+      visitors. Landed state: stays on the full `logo.svg` lockup, sized to
+      `height:7rem` (~150px wide) to clear brand-guidelines.md's own ~140px
+      legibility floor for the full lockup — this is what D11 (round 2)
+      below builds on. **Correction (2026-07-23, this file):** this entry
+      previously said "icon-only," which described the PR's first commit,
+      not what actually merged — fixed as a stale-doc defect found while
+      researching D11.
 - [ ] ~~**D5.** Add a building photo to the home page.~~ **Dropped (maintainer
       decision 2026-07-23)** — not part of this plan's remaining scope.
 - [x] **D2.** Relabel "Our impact so far" → "Our impact so far (updated at
@@ -172,9 +239,43 @@ the doc itself is not re-read going forward.
       **Done (2026-07-22, branch `feat/gallery-lightbox-modal`),** PR not yet
       opened. Native `<dialog>`, no JS library, per the site's minimal-JS
       convention.
+- [ ] **D10 (round 2, 2026-07-23).** Remove the "Donors & Partners" nav item.
+      **Grounding — resolved, maintainer decision 2026-07-23.** The doc says
+      "delete them," which read ambiguous — nav link only, or the whole
+      page? Checked before deciding: `DonatePage.get_context()`
+      (`apps/core/models.py`) reads
+      `DonorsPartnersPage.objects.live().first()` live and feeds it to the
+      same `_partner_items()`/`_donor_items()` helpers D7's carousel uses —
+      deleting the page would silently empty that carousel, not just remove
+      a nav entry. **Maintainer decision: nav-only removal.** Remove the
+      link (and its stale D8 dropdown-groundwork comment) from
+      `templates/partials/nav.html`; the page, its content model, and the
+      donate-page carousel stay live and reachable by direct URL.
+      **Priority: P1.**
+- [ ] **D11 (round 2, 2026-07-23).** Fix the header logo's dark-theme
+      contrast bug: `logo.svg` has a hard-coded dark-navy wordmark, so on
+      the dark theme "THE THANDKOI" sits near-invisible on the dark
+      background. The maintainer supplied a ready-to-apply handoff bundle
+      (`~/Downloads/logo-update.zip` → `handoff/logo-dark-fix/`, see
+      `PROMPT.md` there) shipping both lockups and a CSS-only
+      `:root[data-theme]` / `prefers-color-scheme` swap — no JS, no FOUC.
+      Verified compatible with current `main` before accepting as-is: the
+      live `.site-header__logo` rule (`static/css/components.css`) uses the
+      full `logo.svg` lockup at `height:7rem; width:auto` — exactly what the
+      bundle's CSS and `header.html` assume (D1's icon-only-mark idea was
+      reconsidered and reverted per that file's own comment; the full
+      lockup stayed), so this is a straight merge: copy
+      `logo-reversed.png` into `static/images/`, apply the bundle's
+      `header.html`, merge `_site-header__logo.css` into the existing
+      `.site-header__logo` rule. The bundle's own notes flag a fully-vector
+      SVG reversed lockup as a possible longer-term follow-up (needs
+      re-tracing `logo.svg`, since it's a single merged auto-trace that
+      can't be recoloured) — parked, not requested yet.
+      **Priority: P1** — accessibility/legibility bug, dark theme is a
+      first-class supported mode on this site.
 
-  **Priority: P2** across the board — visible polish and content, not
-  functional bugs.
+  **Priority: P2** across the board for D1–D9 — visible polish and content,
+  not functional bugs. D10/D11 carry their own priorities above.
 
 ### Track E — Process & tooling
 
@@ -236,6 +337,20 @@ answer directly, then decide whether the answer implies a task:
   (maintainer decision 2026-07-23). Condition to bring back: revisit once nav
   complexity (more top-level items, or another grouped menu beyond C3's merged
   Reports menu) actually demands it — not speculatively.
+- **B11's categorical aggregation** (Python-computed theme counts/percentages
+  for the free-text summary, matching the doc's own "GI 45%, MSK 30%..."
+  example) — parked in favour of the prompt-only fix (maintainer decision
+  2026-07-23). Condition to revisit: the tightened prompt still produces
+  identifying-feeling output in practice, or the maintainer asks for the
+  doc's numeric-example style directly.
+- **D10's page/content deletion** — parked; nav-only removal for now
+  (maintainer decision 2026-07-23). Condition to revisit: the maintainer
+  explicitly asks to remove the page itself, at which point D7's carousel
+  needs its own data-source decision too.
+- **D11's reversed SVG wordmark** — parked; the handoff bundle's PNG lockup
+  ships as-is. Condition to revisit: the maintainer explicitly asks for a
+  fully-vector header (the handoff's own `PROMPT.md` notes this needs a
+  re-trace of `logo.svg`, not just a recolour).
 
 ## Candidates from notes (not yet milestones)
 
@@ -281,12 +396,16 @@ becoming a home-page performance concern as data grows.
 
 ## Reference material
 
-- Source feedback: maintainer's Google Doc, "Feedback" (2026-07-22 capture).
+- Source feedback: maintainer's Google Doc, "Feedback" (2026-07-22 capture;
+  round 2 items B10/B11/D10 from the same doc, 2026-07-23 capture).
+- Handoff bundle: `~/Downloads/logo-update.zip`
+  (`handoff/logo-dark-fix/PROMPT.md`), maintainer-supplied 2026-07-23,
+  source for D11.
 - [docs/architecture-and-ai-brief.md](../../docs/architecture-and-ai-brief.md) —
   overall design; Track B's AI items must be checked against this before
   slicing.
-- [CLAUDE.md](../../CLAUDE.md) — privacy invariants (Track B8/B9 gate) and the
-  Bilingual section (Track D4).
+- [CLAUDE.md](../../CLAUDE.md) — privacy invariants (Track B8/B9/B11 gate) and
+  the Bilingual section (Track D4).
 - [.claude/plans/08-data-pipeline.md](08-data-pipeline.md) — current
   de-identification scope, cited in the Track B grounding gap.
 - [fwdr.org.pk](https://fwdr.org.pk/) — style reference for Track D7.
@@ -352,3 +471,14 @@ invariant #4 is amended with the dated widening note.
 `fix(pipeline): drop Other/unknown and Unrecorded rows from report
 gender/zakat cards` — bundled into the same deploy as this plan's work
 simply because it merged to `main` first; not part of Plan 11's scope.
+
+**Round 2 (2026-07-23), triaged not yet built:** B10, B11, D10, D11 above —
+scoped, grounded, and decided (each has a maintainer decision recorded
+inline) but no branches opened yet. Expected as four independent
+branches/PRs, no cross-track dependency: `fix/freetext-summary-formatting`
+(B10), `fix/freetext-summary-privacy` (B11), `chore/remove-donors-nav`
+(D10), `fix/logo-dark-theme` (D11) — names indicative, confirm at
+branch-creation time. Each goes through `code-review-tc` before a draft PR,
+per CLAUDE.md's per-branch review rule; B11 is P0 (real re-identification
+risk on an auto-publishing page) and should be sequenced first among the
+four.
