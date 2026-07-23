@@ -14,6 +14,11 @@ Three things are covered:
   unmetered and fixed as a Plan 11 C2 follow-up.
 * The admin listing (registered in ``apps.pipeline.wagtail_hooks``) renders
   for an Administrator, including the summed running total.
+
+Every test below asserts on an exact ``AiCallLog`` row/count (``.get()``,
+``len(...)``, a running-total string), so this file needs a clean table at
+the start of each test — see ``_clean_ai_call_log`` below for why that isn't
+automatic.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ import datetime
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
 from django.contrib.auth.models import Group
 
 from apps.pipeline import ai
@@ -31,6 +37,29 @@ from apps.pipeline.factories import AiCallLogFactory, DailyAggregateFactory
 from apps.pipeline.models import AiCallLog
 
 JULY = datetime.date(2026, 7, 1)
+
+
+@pytest.fixture(autouse=True)
+def _clean_ai_call_log(db):
+    """Start every test in this file with an empty ``AiCallLog`` table.
+
+    ``apps.pipeline.report_publishing.publish_daily_report`` (exercised by
+    many tests elsewhere, e.g. ``apps/pipeline/tests.py``) runs its three AI
+    drafting calls concurrently via ``ThreadPoolExecutor``. Each thread gets
+    its own DB connection, so its ``AiCallLog.record(...)`` write is *not*
+    part of the calling test's transaction and is never rolled back by
+    pytest-django's ``db`` fixture — it lands in the real test database and
+    stays there for every test that runs afterward, in any file. This file's
+    tests assert on an exact row (``AiCallLog.objects.get()``) or an exact
+    running total, so a row leaked in from an unrelated earlier test
+    produces ``MultipleObjectsReturned`` or a wrong total — not a fault in
+    the assertion, just a dirty starting table. Clearing here, rather than
+    changing the (deliberately concurrent, see ``report_publishing.py``)
+    production code or converting every threaded test elsewhere to
+    ``transactional_db``, keeps the fix scoped to the tests that actually
+    depend on an exact count.
+    """
+    AiCallLog.objects.all().delete()
 
 
 def _stub_client(text: str, input_tokens: int, output_tokens: int):
