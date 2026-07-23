@@ -159,6 +159,41 @@ def test_draft_daily_summary_sentence_logs_nothing_when_the_client_raises(db):
     assert not AiCallLog.objects.exists()
 
 
+def test_draft_daily_summary_sentence_survives_a_logging_failure(db, monkeypatch):
+    """Found by code-review-tc: ``_log_ai_call`` used to run inside the same
+    ``except Exception`` that governs the whole Anthropic call, so a DB error
+    while writing the audit-log row silently discarded an already-successful,
+    already-billed sentence. A logging failure must never do that."""
+    aggregate = DailyAggregateFactory(clinic_date=JULY, total_visits=4)
+    client = _stub_client("Today the clinic saw 4 visits.", 150, 30)
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated DB failure")
+
+    monkeypatch.setattr(AiCallLog, "record", _raise)
+
+    sentence = ai.draft_daily_summary_sentence(aggregate, client)
+
+    assert sentence == "Today the clinic saw 4 visits."
+    assert not AiCallLog.objects.exists()
+
+
+def test_draft_monthly_newsletter_body_survives_a_logging_failure(db, monkeypatch):
+    """Same guarantee as the daily-summary case above, for the newsletter's
+    multi-turn tool loop."""
+    client = _stub_client("A wonderful month for the clinic.", 400, 120)
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated DB failure")
+
+    monkeypatch.setattr(AiCallLog, "record", _raise)
+
+    text = ai.draft_monthly_newsletter_body(JULY, client=client)
+
+    assert text == "A wonderful month for the clinic."
+    assert not AiCallLog.objects.exists()
+
+
 def test_draft_monthly_newsletter_body_logs_an_ai_call(db):
     client = _stub_client("A wonderful month for the clinic.", 400, 120)
 

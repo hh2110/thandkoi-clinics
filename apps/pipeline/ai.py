@@ -23,12 +23,15 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from collections.abc import Callable
 from typing import Any, Protocol
 
 from apps.pipeline.aggregation import ClinicAggregate
 from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
 from apps.pipeline.models import AiCallLog, DailyAggregate
+
+logger = logging.getLogger(__name__)
 
 # Direct identifiers that may appear as columns in a raw export. They are read
 # for tallying (see aggregation.py) but must NEVER appear in an AI payload. The
@@ -82,13 +85,24 @@ def _log_ai_call(call_site: str, model: str, response: Any) -> None:
     were spent whether or not the text that came back turns out to be usable;
     logging here means a run that fails the daily-summary length check, for
     instance, still shows up in the cost total instead of vanishing.
+
+    A failure here (e.g. a transient DB error writing the ``AiCallLog`` row)
+    must never discard an already-successful, already-billed AI response —
+    every caller sits inside a broad ``except Exception`` meant to catch API
+    failures, and that block can't tell a real API failure apart from a
+    logging failure. Found by code-review-tc: this used to raise straight
+    into that block, silently dropping a good draft whenever only the audit
+    write failed.
     """
-    AiCallLog.record(
-        call_site=call_site,
-        model=model,
-        input_tokens=response.usage.input_tokens,
-        output_tokens=response.usage.output_tokens,
-    )
+    try:
+        AiCallLog.record(
+            call_site=call_site,
+            model=model,
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+        )
+    except Exception:  # noqa: BLE001 - logging must never discard a good response
+        logger.warning("Failed to log AiCallLog for %s (%s)", call_site, model)
 
 
 def build_prompt_payload(aggregate: ClinicAggregate) -> dict[str, Any]:
