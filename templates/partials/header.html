@@ -8,6 +8,22 @@ of degrading gracefully, unlike `{{ var|default:… }}` output. That matters
 here because 500.html (which includes this partial via base.html) is
 rendered by Django's default error handler with NO context at all — not
 even `request` — so LANGUAGE_CODE may be entirely absent, not just falsy.
+
+Header brand lockup with theme-aware logo (Plan 11 D11). logo.svg has a
+hard-coded dark wordmark, so on the dark theme "THE THANDKOI" sat
+near-invisible on the dark background. We now ship BOTH lockups and let CSS
+show the right one per theme:
+  - logo.svg          → light theme (dark wordmark on light bg)
+  - logo-reversed.png → dark theme  (light wordmark, white ring; transparent)
+
+Both <img>s are always in the DOM; components.css toggles their `display`
+off the :root[data-theme] / prefers-color-scheme cascade, so the swap is
+instant with no JS and no FOUC. Only one is ever visible, so the alt text
+lives on whichever is shown (the hidden one is aria-hidden + alt="").
+width/height below are each image's own natural pixel size (not matched to
+each other) so the browser's auto aspect-ratio doesn't distort/reflow either
+lockup — actual on-page size is set by .site-header__logo's height:7rem in
+components.css.
 {% endcomment %}
 {% with lang=LANGUAGE_CODE|default:"en" %}
 {% with home_path="/"|add:lang|add:"/" %}
@@ -15,11 +31,19 @@ even `request` — so LANGUAGE_CODE may be entirely absent, not just falsy.
   <div class="wrapper site-header__bar">
     <a class="site-header__brand" href="{{ home_path }}" aria-label="{% translate 'The Thandkoi Clinics — home' %}">
       <img
-        class="site-header__logo"
+        class="site-header__logo site-header__logo--light"
         src="{% static 'images/logo.svg' %}"
         alt="{% translate 'The Thandkoi Clinics' %}"
         width="192"
         height="144"
+      />
+      <img
+        class="site-header__logo site-header__logo--dark"
+        src="{% static 'images/logo-reversed.png' %}"
+        alt=""
+        aria-hidden="true"
+        width="900"
+        height="769"
       />
     </a>
     <div class="site-header__controls">
