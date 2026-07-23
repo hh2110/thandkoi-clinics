@@ -1580,7 +1580,8 @@ def test_draft_freetext_summary_accepts_a_realistic_full_length_response(home_pa
     the call's own max_tokens could actually produce (~4 chars/token) — a
     genuinely good, full-length summary was silently rejected as if the call
     had failed. Re-sized the same day for the 50-word cap (max_tokens
-    600 -> 120, MAX_FREETEXT_SUMMARY_LENGTH 3000 -> 500) — this now checks a
+    600 -> 120, MAX_FREETEXT_SUMMARY_LENGTH 3000 -> 600, keeping the same
+    ~4-chars/token comfortable-margin ratio as before) — this now checks a
     ~50-word response, the longest this prompt actually asks for, still
     clears the bound."""
     _ingest_tkc_daily_fixture()

@@ -313,7 +313,7 @@ EMPTY_COLUMNS_FLAG_MODEL = "claude-haiku-4-5"
 # (found by code-review-tc: the previous bounds were tighter than their
 # calls' max_tokens could produce — a valid 600-token freetext summary could
 # run well past the old 800-char cap).
-MAX_FREETEXT_SUMMARY_LENGTH = 500  # max_tokens=120 below
+MAX_FREETEXT_SUMMARY_LENGTH = 600  # max_tokens=120 below
 MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 
 # Tightened 2026-07-23 (Plan 11 Track B11, maintainer decision): the
