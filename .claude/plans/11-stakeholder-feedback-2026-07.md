@@ -178,11 +178,20 @@ the doc itself is not re-read going forward.
 
 ### Track E — Process & tooling
 
-- [ ] **E1.** A repo skill that lets the maintainer request a website change and
+- [x] **E1.** A repo skill that lets the maintainer request a website change and
       have Claude route it correctly: a code change, a Wagtail draft page, or a
       publish — aiming for an AI-native update workflow. Candidate first step
       toward a future "send a WhatsApp message to a thandkoi-clinics-assistant"
       flow.
+      **Done (2026-07-23, branch `feat/route-change-request-skill`),** PR not
+      yet opened. `.claude/skills/route-change-request/SKILL.md` — a
+      classify-and-handoff skill, no new infrastructure per the research
+      doc's recommendation: gathers context (CLAUDE.md, open plan items, the
+      Wagtail page models), classifies into code change / Wagtail draft
+      (`save_revision()` only, never `.publish()`, mirroring
+      `newsletter_drafting.py`) / publish action, asks rather than guessing
+      on ambiguity, and documents six worked examples covering all three
+      routes plus a non-route (a question) and an ambiguity case.
 - [ ] **E2.** Evaluate ingesting feedback already sitting in a WhatsApp group —
       maintainer flagged [whatsapp-claude-plugin](https://github.com/rich627/whatsapp-claude-plugin)
       as a possible option; needs a short options review (that plugin vs. a
