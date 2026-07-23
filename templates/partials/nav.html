@@ -13,18 +13,36 @@ Nav merge (2026-07-22): "Reports" and "Camp Reports" used to be two separate
 links. They're now one "Reports" entry pointing at /reports/, whose page
 renders both a daily-reports section and a camp-reports section (linking out
 to the Camp Report archive, which keeps its own /camp-reports/ URL — only the
-nav entry is merged, not the archive itself). This avoids a dropdown-menu
-widget, which this repo doesn't have yet (backlog item D8) — see
-apps.pipeline.models.ReportIndexPage's docstring for the full decision.
+nav entry is merged, not the archive itself).
 
 Nav (2026-07-23, Plan 11 D10): the "Donors & Partners" nav link was removed
 per maintainer feedback. DonorsPartnersPage itself is unchanged and still
 live at /donors-partners/ — DonatePage.get_context() (apps/core/models.py)
 still reads it for the donate-page partner-logo carousel, so only this nav
 entry came out.
+
+"More" dropdown (2026-07-23, single-row header redesign — this is Plan 11
+D8's revisit: D8 ("nav dropdown submenus") was dropped earlier the same day
+"until nav complexity actually demands it"; the maintainer's design handoff
+for this single-row layout is that demand materialising). Team, Gallery and
+Contact move behind a nested <details>/<summary> flyout so the always-inline
+row stays to five items (Home, About, Our Work, Reports, Newsletters) plus
+Donate and the theme toggle. Built as plain HTML, no new JS: it's the same
+no-JS-disclosure convention as the outer mobile <details> here and the D9
+gallery modal (Plan 11), so Plan 03's "minimal JS" decision still holds — no
+second script gets added. Trade-off accepted: unlike a JS dropdown, this one
+does not close on an outside click (native <details> has no such event) —
+clicking its own summary again, or clicking a link inside (which navigates
+away), still closes it in practice.
+
+Single-row layout (2026-07-23): this whole <nav> now renders inside
+.site-header__bar (see header.html), pushed right via
+margin-inline-start:auto on .site-header__nav, rather than as its own
+full-width band under the logo. The theme toggle moves in here too, as the
+last item in the same row, per the handoff.
 {% endcomment %}
 {% with lang=LANGUAGE_CODE|default:"en" %}
-<nav aria-label="{% translate 'Primary' %}">
+<nav class="site-header__nav" aria-label="{% translate 'Primary' %}">
   <details class="primary-nav">
     <summary>{% translate "Menu" %}</summary>
     <ul class="primary-nav__list">
@@ -32,16 +50,29 @@ entry came out.
         <a href="/{{ lang }}/" {% if request.path == "/"|add:lang|add:"/" %}aria-current="page"{% endif %}>{% translate "Home" %}</a>
       </li>
       <li><a href="/{{ lang }}/about/">{% translate "About" %}</a></li>
-      <li><a href="/{{ lang }}/team/">{% translate "Team" %}</a></li>
       <li><a href="/{{ lang }}/our-work/">{% translate "Our Work" %}</a></li>
       <li><a href="/{{ lang }}/reports/">{% translate "Reports" %}</a></li>
       <li><a href="/{{ lang }}/newsletters/">{% translate "Newsletters" %}</a></li>
-      <li><a href="/{{ lang }}/gallery/">{% translate "Gallery" %}</a></li>
-      <li><a href="/{{ lang }}/contact/">{% translate "Contact" %}</a></li>
+      <li class="nav-dropdown">
+        <details class="nav-dropdown__details">
+          <summary class="nav-dropdown__trigger">
+            {% translate "More" %}
+            <span class="nav-dropdown__caret" aria-hidden="true">&#9662;</span>
+          </summary>
+          <ul class="nav-dropdown__menu">
+            <li><a href="/{{ lang }}/team/">{% translate "Team" %}</a></li>
+            <li><a href="/{{ lang }}/gallery/">{% translate "Gallery" %}</a></li>
+            <li><a href="/{{ lang }}/contact/">{% translate "Contact" %}</a></li>
+          </ul>
+        </details>
+      </li>
       <li>
         <a class="button button--donate" href="/{{ lang }}/donate/">{% translate "Donate" %}</a>
       </li>
     </ul>
   </details>
+  <div class="site-header__controls">
+    {% include "partials/theme_toggle.html" %}
+  </div>
 </nav>
 {% endwith %}

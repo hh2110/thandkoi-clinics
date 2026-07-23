@@ -44,6 +44,19 @@ either way, so the img alt text is belt-and-braces, not load-bearing.
 width/height below are each image's own natural pixel size so the
 browser's auto aspect-ratio doesn't distort/reflow either; actual on-page
 size is set by .site-header__logo's width:9.375rem in components.css.
+
+Single-row collapse (2026-07-23, design handoff): the header used to stack
+the brand row above a second full-width nav row. This flattens both into
+one flex row (nav.html now renders inline in .site-header__bar, pushed
+right via margin-inline-start on .site-header__nav) rather than as a
+sibling band below. The handoff's own wordmark lockup ("THE / THANDKOI /
+CLINICS" text stack) is deliberately NOT reinstated here — it's the exact
+lockup Plan 11 D11 dropped from the header hours earlier that same day,
+specifically because its hard-coded dark-navy text became near-invisible
+in dark mode, and the handoff's spec colours it the same near-navy
+(#123c46) with no dark-theme variant. Reintroducing it would reopen that
+already-fixed contrast bug. Only the layout/nav parts of the handoff are
+applied; the mark-only logo lockup stays as D11 left it.
 {% endcomment %}
 {% with lang=LANGUAGE_CODE|default:"en" %}
 {% with home_path="/"|add:lang|add:"/" %}
@@ -66,11 +79,8 @@ size is set by .site-header__logo's width:9.375rem in components.css.
         height="405"
       />
     </a>
-    <div class="site-header__controls">
-      {% include "partials/theme_toggle.html" %}
-    </div>
+    {% include "partials/nav.html" %}
   </div>
-  {% include "partials/nav.html" %}
 </header>
 {% endwith %}
 {% endwith %}
