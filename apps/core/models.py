@@ -50,7 +50,10 @@ class HomePage(Page):
     cta-band partials; a "latest daily report" teaser (feature split) renders
     conditionally beneath it once Plan 06 supplies a report content type
     (``get_latest_report`` returns ``None`` until then, so the section stays
-    hidden rather than broken).
+    hidden rather than broken). That teaser's photo is ``report_teaser_image``
+    below — a hand-curated illustrative photo, not sourced from any specific
+    ``DailyReportPage`` (those auto-publish daily with no admin step of their
+    own to attach a photo to).
     """
 
     # Legacy Plan 01 field, retained for data safety but no longer surfaced in
@@ -77,10 +80,23 @@ class HomePage(Page):
         blank=True,
         help_text="Compose the home page from the section kit.",
     )
+    report_teaser_image = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Illustrative photo for the 'Latest daily report' teaser "
+        "below the section kit — not tied to any specific report (those "
+        "auto-publish daily with no admin step of their own), so this is a "
+        "generic clinic/camp photo the admin curates by hand. Falls back to "
+        "the shared placeholder until set.",
+    )
 
     content_panels = [
         *Page.content_panels,
         FieldPanel("body"),
+        FieldPanel("report_teaser_image"),
     ]
 
     # Only one HomePage, sitting directly under the Wagtail root; the other core
