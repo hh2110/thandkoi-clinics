@@ -27,12 +27,30 @@ break parsing):
   never persisted. Empty on the whole first sample.
 * ``Status`` — the payment column: ``zakat`` / ``regular`` →
   ``is_zakat_beneficiary`` True / False; anything else unknown.
-* Never read: ``MR #``, ``Patient Name``, ``Father's / Husband's Name``,
-  ``Address``, all vitals (BP … Waist), all narrative columns (complaints,
-  investigations, prescriptions, notes, plan). No code path locates their
-  column positions except the three identifying headers used to *sniff*, plus
-  ``MR #`` itself, checked for blank/non-blank only (never its value — see the
-  phantom-row note below) as one more identifying header.
+* Never read: ``MR #`` (except to check blank/non-blank — see the
+  phantom-row note below), ``Patient Name``, ``Father's / Husband's Name``,
+  ``Address``, all vitals (BP … Waist). No code path locates their column
+  positions except the three identifying headers used to *sniff*, plus
+  ``MR #`` itself.
+* **The narrative columns are now read** (Plan 11 Track B8/B9, maintainer
+  decision 2026-07-23) — ``Presenting Complaints``, ``Investigation``,
+  ``Provisional Diagnosis`` (the raw text, kept alongside — not instead of —
+  the fixed ``diagnosis_category`` derived from the same column),
+  ``Prescribed Medicine``, ``Doctor's Notes`` / ``Nurse's Notes`` /
+  ``Dietitian's Notes`` (whichever are present, concatenated into one
+  ``clinical_notes`` value), ``Diet & Drug Compliance``, and ``Plan``. This
+  reverses the "never read" note this docstring previously carried for these
+  columns — see ``apps.pipeline.freetext``'s module docstring for why
+  reading raw text from *these specific columns* doesn't violate CLAUDE.md
+  invariant #2. **Caveat, flagged rather than silently assumed:** the exact
+  header text for ``Doctor's Notes``/``Nurse's Notes``/``Dietitian's Notes``,
+  ``Diet & Drug Compliance``, and ``Plan`` is inferred from the maintainer's
+  plan-doc wording, not yet confirmed against a real full-column sample (only
+  ``Presenting Complaints``/``Provisional Diagnosis`` are confirmed from the
+  2026-07-22 sample). ``header_index`` degrades harmlessly if a guessed name
+  is wrong — the field just stays blank, matching every other optional
+  column here — but this should be verified against the real export the next
+  time one is available.
 * No department / location / new-vs-follow-up signal exists in this format;
   those fields stay empty/unknown rather than being inferred.
 
@@ -183,12 +201,27 @@ class TkcDailyActivityV1Parser(BaseExportParser):
                 "date of birth",
                 "provisional diagnosis",
                 "status",
+                # Plan 11 Track B8/B9 free-text columns (2026-07-23) — see
+                # the module docstring's caveat on the exact header text for
+                # the ones not yet confirmed against a real sample.
+                "presenting complaints",
+                "investigation",
+                "prescribed medicine",
+                "doctor's notes",
+                "nurse's notes",
+                "dietitian's notes",
+                "diet & drug compliance",
+                "plan",
             )
         }
 
         def cell(row, name):
             index = col[name]
             return row[index] if index is not None and index < len(row) else None
+
+        def text_cell(row, name) -> str:
+            """``cell()``, coerced to a stripped string — "" if blank/missing."""
+            return str(cell(row, name) or "").strip()
 
         parsed_rows: list[ParsedVisitRow] = []
         for row in rows[header_at + 1 :]:
@@ -198,11 +231,25 @@ class TkcDailyActivityV1Parser(BaseExportParser):
             # continuation row (or other leftover blank row) never does — see
             # the module docstring's phantom-row note. This subsumes the old
             # all-cells-None check: a fully blank row also has a blank MR #.
+            # Note this also means a free-text value that wraps onto such a
+            # continuation row (the exact shape of that bug) is not stitched
+            # back on here — only the first line, captured on the genuine
+            # visit row itself, is kept.
             if _is_blank(cell(row, "mr #")):
                 continue
 
             dob = _as_dob(cell(row, "date of birth"))
             status = str(cell(row, "status") or "").strip().lower()
+
+            clinical_notes = "; ".join(
+                f"{role}: {text}"
+                for role, text in (
+                    ("Doctor", text_cell(row, "doctor's notes")),
+                    ("Nurse", text_cell(row, "nurse's notes")),
+                    ("Dietitian", text_cell(row, "dietitian's notes")),
+                )
+                if text
+            )
 
             parsed_rows.append(
                 ParsedVisitRow(
@@ -222,6 +269,13 @@ class TkcDailyActivityV1Parser(BaseExportParser):
                         if status == "regular"
                         else None
                     ),
+                    presenting_complaints=text_cell(row, "presenting complaints"),
+                    investigation=text_cell(row, "investigation"),
+                    provisional_diagnosis_text=text_cell(row, "provisional diagnosis"),
+                    prescribed_medicine=text_cell(row, "prescribed medicine"),
+                    clinical_notes=clinical_notes,
+                    diet_and_drug_compliance=text_cell(row, "diet & drug compliance"),
+                    plan_notes=text_cell(row, "plan"),
                 )
             )
         return ParsedExport(rows=parsed_rows)

@@ -44,6 +44,30 @@ shrinking `--space-8` itself, which other, longer pages still rely on.
     </section>
   {% endif %}
 
+  {% if page.freetext_summary %}
+    {% comment %}
+    `page.freetext_summary` (a property) only ever returns non-empty once a
+    person has checked `freetext_summary_approved` in the admin and
+    republished — see DailyReportPage's Plan 11 Track B8 docstring. This is
+    NOT the CLAUDE.md invariant #4 exception `summary_sentence` above gets;
+    it's the default human-reviewed-before-publish path.
+    {% endcomment %}
+    <section class="section section--snug" data-role="freetext-summary">
+      <div class="wrapper prose">
+        <h2>{% translate "Today's notes, summarised" %}</h2>
+        <p>{{ page.freetext_summary }}</p>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if page.empty_columns_flag %}
+    <section class="section section--snug" data-role="empty-columns-flag">
+      <div class="wrapper prose">
+        <p class="text-faint">{{ page.empty_columns_flag }}</p>
+      </div>
+    </section>
+  {% endif %}
+
   <section class="section section--snug">
     <div class="wrapper">
       <div class="card-grid card-grid--2">

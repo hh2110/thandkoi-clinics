@@ -197,6 +197,184 @@ def draft_daily_summary_sentence(
     return text
 
 
+# --- Plan 11 Track B8/B9: free-text summary + empty-column flag ------------
+#
+# Unlike the daily-summary sentence above, these two calls do NOT get
+# CLAUDE.md invariant #4's Plan 08 exception — they are new AI-authored
+# content, so the *default* human-in-the-loop rule applies: a person must
+# review and explicitly approve before either is shown on a public page. See
+# ``apps.pipeline.report_publishing.publish_daily_report`` for where the
+# output of these two calls lands (a `_draft` field, never auto-approved) and
+# ``DailyReportPage.freetext_summary_approved``/``empty_columns_flag_approved``
+# for the review gate itself.
+#
+# Both still follow invariant #3's shape ("numbers computed in Python, AI
+# writes prose only"): B8 is handed only the non-blank free-text entries
+# already collected by ``apps.pipeline.freetext.collect_freetext_entries``;
+# B9 is handed only the already-computed booleans from
+# ``apps.pipeline.freetext.compute_empty_columns`` and may only *phrase* that
+# fact, never decide it.
+#
+# Grounding note: sending the seven named free-text columns to a model is
+# authorised by the maintainer's 2026-07-23 decision (see
+# ``apps.pipeline.freetext``'s module docstring) — they are confirmed free of
+# patient identifiers by construction, not by any scrubbing this module does.
+
+# Short, fixed-template tasks restating/flagging already-computed input — the
+# same classification as DAILY_SUMMARY_MODEL above (CLAUDE.md → Stack).
+FREETEXT_SUMMARY_MODEL = "claude-haiku-4-5"
+EMPTY_COLUMNS_FLAG_MODEL = "claude-haiku-4-5"
+
+# Sanity-check upper bounds, same role as MAX_DAILY_SUMMARY_LENGTH above: a
+# response over this length (or empty) is treated as a failed draft, not
+# published as-is. These calls are draft-only (never auto-published), so
+# there is no fallback-to-blank requirement driving the bound the way Plan
+# 08's exception does — it's purely a runaway-output guard.
+MAX_FREETEXT_SUMMARY_LENGTH = 800
+MAX_EMPTY_COLUMNS_FLAG_LENGTH = 400
+
+_FREETEXT_SUMMARY_SYSTEM_PROMPT = (
+    "You are drafting an internal review summary (not yet published) of a "
+    "clinic's free-text clinical notes for one day. You are given, for each "
+    "listed column, every non-blank entry recorded that day. Write a short, "
+    "factual summary of common themes across entries. Do not invent, "
+    "estimate, or attribute anything to a specific patient — you are not "
+    "given any patient identifier and must not imply one. If a column has no "
+    "entries, say so plainly rather than guessing what it might have said."
+)
+
+
+def build_freetext_summary_payload(
+    clinic_date: datetime.date, columns: dict[str, list[str]]
+) -> dict[str, Any]:
+    """Build the exact payload for the B8 free-text-summary call.
+
+    ``columns`` is built by
+    :func:`apps.pipeline.freetext.collect_freetext_entries` from that date's
+    ``DeidentifiedVisit`` rows — every value is one of the seven named
+    free-text columns the maintainer confirmed (2026-07-23) are structurally
+    free of patient identifiers by construction. Nothing else about a visit —
+    no age band, sex, location, or any identifying field — is included.
+    """
+    from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
+
+    body = {FREETEXT_COLUMN_LABELS[name]: values for name, values in columns.items()}
+    return {
+        "model": FREETEXT_SUMMARY_MODEL,
+        "max_tokens": 600,
+        "system": _FREETEXT_SUMMARY_SYSTEM_PROMPT,
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    f"Summarise {clinic_date.isoformat()}'s free-text clinical "
+                    "columns, given as {column label: [every non-blank entry "
+                    "recorded that day]}:\n"
+                    + json.dumps(body, sort_keys=True, indent=2)
+                ),
+            }
+        ],
+    }
+
+
+def draft_freetext_summary(
+    clinic_date: datetime.date,
+    columns: dict[str, list[str]],
+    client: _AnthropicLike | None = None,
+) -> str | None:
+    """Ask the model to summarise the day's free-text columns, or give up.
+
+    Returns ``None`` — never raises — on any failure, mirroring
+    :func:`draft_daily_summary_sentence`'s broad ``except Exception``. Unlike
+    that function, a ``None`` (or a drafted string) here is never auto-shown
+    on the public page: :func:`apps.pipeline.report_publishing.publish_daily_report`
+    stores whatever this returns (or ``""``) in ``freetext_summary_draft`` and
+    a person must separately approve it (CLAUDE.md invariant #4's default
+    rule, not Plan 08's narrow exception).
+    """
+    try:
+        active_client = client or get_anthropic_client()
+        payload = build_freetext_summary_payload(clinic_date, columns)
+        response = active_client.messages.create(**payload)
+        text = response.content[0].text.strip()
+    except Exception:  # noqa: BLE001 - any failure means "no draft this run"
+        return None
+
+    if not text or len(text) > MAX_FREETEXT_SUMMARY_LENGTH:
+        return None
+    return text
+
+
+_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT = (
+    "You write a short, plain-language internal note (not yet published) "
+    "listing which of a clinic's free-text record columns were left blank "
+    "for the day, so staff know what to fill in. You are given, for each "
+    "listed column, whether it was entirely empty across every visit that "
+    "day — a true/false fact already determined for you; you must not "
+    "recompute or second-guess it. State only which columns are marked "
+    "empty. Do not add commentary on why, and if none are empty, say so in "
+    "one short sentence instead of listing every column as filled in."
+)
+
+
+def build_empty_columns_flag_payload(
+    clinic_date: datetime.date, empty_columns: dict[str, bool]
+) -> dict[str, Any]:
+    """Build the exact payload for the B9 empty-column-flag call.
+
+    ``empty_columns`` is built by
+    :func:`apps.pipeline.freetext.compute_empty_columns` — a dict of
+    already-computed booleans, one per free-text column, over the same
+    de-identified visits as :func:`build_freetext_summary_payload`. No visit
+    data itself crosses into this payload, only the derived booleans.
+    """
+    from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
+
+    body = {
+        FREETEXT_COLUMN_LABELS[name]: is_empty
+        for name, is_empty in empty_columns.items()
+    }
+    return {
+        "model": EMPTY_COLUMNS_FLAG_MODEL,
+        "max_tokens": 200,
+        "system": _EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT,
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    f"For {clinic_date.isoformat()}, here is whether each "
+                    "free-text column was entirely empty across today's "
+                    "visits:\n" + json.dumps(body, sort_keys=True, indent=2)
+                ),
+            }
+        ],
+    }
+
+
+def draft_empty_columns_flag(
+    clinic_date: datetime.date,
+    empty_columns: dict[str, bool],
+    client: _AnthropicLike | None = None,
+) -> str | None:
+    """Ask the model to phrase which columns are empty, or give up.
+
+    Same failure/review-gate contract as :func:`draft_freetext_summary` above
+    — returns ``None`` on any failure, never raises, and whatever it returns
+    is stored as a draft only; see that function's docstring.
+    """
+    try:
+        active_client = client or get_anthropic_client()
+        payload = build_empty_columns_flag_payload(clinic_date, empty_columns)
+        response = active_client.messages.create(**payload)
+        text = response.content[0].text.strip()
+    except Exception:  # noqa: BLE001 - any failure means "no draft this run"
+        return None
+
+    if not text or len(text) > MAX_EMPTY_COLUMNS_FLAG_LENGTH:
+        return None
+    return text
+
+
 # --- Plan 09: the monthly newsletter — one-shot prompt with tooling --------
 #
 # The "one-shot prompt with tooling" shape from architecture-and-ai-brief.md

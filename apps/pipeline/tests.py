@@ -43,7 +43,7 @@ from apps.core.factories import (
     HomePageFactory,
 )
 from apps.core.models import CampReportIndexPage
-from apps.pipeline import ai
+from apps.pipeline import ai, freetext
 from apps.pipeline.aggregation import aggregate_export
 from apps.pipeline.ai import PATIENT_IDENTIFYING_COLUMNS, draft_newsletter_prose
 from apps.pipeline.factories import (
@@ -721,6 +721,28 @@ def test_upload_view_rejects_ole2_xls_with_embedded_zip_gracefully(
     assert not DailyAggregate.objects.exists()
 
 
+# Free-text column values for the ``_build_tkc_daily_xls`` fixture (Plan 11
+# Track B8/B9). "Investigation" is deliberately blank on every row — this is
+# the fixture's one entirely-empty free-text column, so B9's empty-columns
+# flag has something real to detect. The other four narrative columns get a
+# mix of filled/blank per row so B8's summary has non-trivial content to
+# work from. None of this is real clinical content or a real identifier.
+TKC_FREETEXT_ROWS = [
+    # (prescribed_medicine, doctor's notes, nurse's notes, dietitian's notes,
+    #  diet & drug compliance, plan)
+    (
+        "Amlodipine",
+        "Recheck blood pressure in two weeks",
+        "",
+        "Reduce salt intake",
+        "Good",
+        "Follow-up in two weeks",
+    ),
+    ("Metformin", "", "Checked blood sugar", "", "", ""),
+    ("", "", "", "", "", ""),
+]
+
+
 def _build_tkc_daily_xls(
     *, period: str = "Period: 08 Jul 2026 to 08 Jul 2026"
 ) -> bytes:
@@ -730,6 +752,9 @@ def _build_tkc_daily_xls(
     row, header row, then data rows — with the same fake identifiers as
     ``EXPORT_ROWS`` so the ``RAW_IDENTIFIERS`` guard applies. Built with
     xlwt (dev dependency) because openpyxl cannot write BIFF.
+
+    Extended (Plan 11 Track B8/B9, 2026-07-23) with the seven free-text
+    columns via ``TKC_FREETEXT_ROWS`` above.
     """
     book = xlwt.Workbook(encoding="utf-8")
     sheet = book.add_sheet("Patient Report")
@@ -746,6 +771,13 @@ def _build_tkc_daily_xls(
         "Status",
         "Presenting Complaints",
         "Provisional Diagnosis",
+        "Investigation",
+        "Prescribed Medicine",
+        "Doctor's Notes",
+        "Nurse's Notes",
+        "Dietitian's Notes",
+        "Diet & Drug Compliance",
+        "Plan",
     ]
     for column, name in enumerate(header):
         sheet.write(3, column, name)
@@ -756,6 +788,14 @@ def _build_tkc_daily_xls(
         ("MRN-003", "Zainab Ali", "20-Dec-2015", "Female", "", "Hypertension"),
     ]
     for offset, (mrn, name, dob, sex, status, diagnosis) in enumerate(data):
+        (
+            prescribed_medicine,
+            doctors_notes,
+            nurses_notes,
+            dietitians_notes,
+            diet_compliance,
+            plan,
+        ) = TKC_FREETEXT_ROWS[offset]
         row = 4 + offset
         sheet.write(row, 0, offset + 1)
         sheet.write(row, 1, mrn)
@@ -767,6 +807,13 @@ def _build_tkc_daily_xls(
         sheet.write(row, 7, status)
         sheet.write(row, 8, "Headache")
         sheet.write(row, 9, diagnosis)
+        sheet.write(row, 10, "")  # Investigation — always blank, see above
+        sheet.write(row, 11, prescribed_medicine)
+        sheet.write(row, 12, doctors_notes)
+        sheet.write(row, 13, nurses_notes)
+        sheet.write(row, 14, dietitians_notes)
+        sheet.write(row, 15, diet_compliance)
+        sheet.write(row, 16, plan)
     buffer = io.BytesIO()
     book.save(buffer)
     return buffer.getvalue()
@@ -1229,6 +1276,230 @@ def test_ingest_export_auto_publishes_the_daily_report_page(home_page):
     page = DailyReportPage.objects.get(report_date=CLINIC_V1_VISIT_DATE)
     assert page.live is True
     assert page.aggregate.total_visits == EXPECTED_TOTAL_VISITS
+
+
+# --- Plan 11 Track B8/B9: free-text summary + empty-columns flag -----------
+#
+# Uses the tkc_daily_activity_v1 fixture (not clinic_v1) because only that
+# fixture (_build_tkc_daily_xls, extended above) carries real free-text
+# column content; clinic_v1's ParsedVisitRow rows leave every Plan 11 field
+# at its "" default.
+
+
+def _ingest_tkc_daily_fixture(**xls_kwargs):
+    """Parse + persist ``_build_tkc_daily_xls()`` directly (bypassing the
+    upload view), the same "direct persist_parsed_export" idiom as
+    ``_ingest_clinic_v1`` above. ``_build_tkc_daily_xls`` writes legacy
+    ``.xls`` (BIFF, via xlwt); openpyxl only reads ``.xlsx``, so this goes
+    through the same in-memory ``convert_xls_to_xlsx`` step the real upload
+    view applies before parsing."""
+    xlsx_buffer = convert_xls_to_xlsx(io.BytesIO(_build_tkc_daily_xls(**xls_kwargs)))
+    parsed = TkcDailyActivityV1Parser().parse(xlsx_buffer)
+    return persist_parsed_export(
+        parsed, parser_key="tkc_daily_activity_v1", uploaded_by=None
+    )
+
+
+def _stub_client_with_text(text):
+    """A minimal recording stub, same shape as conftest's `_StubAnthropicClient`
+    but with caller-chosen canned text — used where a test needs two
+    *different* draft texts across two calls (conftest's fixture is one
+    fixed text per instance)."""
+    calls: list[dict] = []
+
+    def _create(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(content=[SimpleNamespace(text=text)])
+
+    return SimpleNamespace(messages=SimpleNamespace(create=_create))
+
+
+def test_parser_captures_freetext_columns_onto_deidentified_visit(home_page):
+    """The seven Plan 11 Track B8/B9 columns are captured per-visit onto
+    ``DeidentifiedVisit`` — the parser's new extension point (2026-07-23),
+    reversing this format's previous "never read" note for these columns."""
+    _ingest_tkc_daily_fixture()
+
+    visits = list(
+        DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE).order_by("pk")
+    )
+    assert len(visits) == 3
+    assert all(v.presenting_complaints == "Headache" for v in visits)
+    # "Investigation" is deliberately blank on every fixture row (see
+    # TKC_FREETEXT_ROWS) — the one column B9's flag should catch.
+    assert all(v.investigation == "" for v in visits)
+    assert visits[0].prescribed_medicine == "Amlodipine"
+    assert visits[0].clinical_notes == (
+        "Doctor: Recheck blood pressure in two weeks; Dietitian: Reduce salt intake"
+    )
+    assert visits[1].clinical_notes == "Nurse: Checked blood sugar"
+    assert visits[2].clinical_notes == ""
+    assert visits[0].diet_and_drug_compliance == "Good"
+    assert visits[0].plan_notes == "Follow-up in two weeks"
+    assert visits[0].provisional_diagnosis_text == "Hypertension"
+
+
+def test_collect_freetext_entries_and_compute_empty_columns(home_page):
+    """``apps.pipeline.freetext``'s two pure functions — the deterministic
+    "numbers" behind B8/B9 (invariant #3), exercised over a real ingest."""
+    _ingest_tkc_daily_fixture()
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+
+    entries = freetext.collect_freetext_entries(visits)
+    assert entries["investigation"] == []
+    assert entries["prescribed_medicine"] == ["Amlodipine", "Metformin"]
+    assert entries["presenting_complaints"] == ["Headache", "Headache", "Headache"]
+
+    empty = freetext.compute_empty_columns(visits)
+    assert empty["investigation"] is True
+    assert empty["prescribed_medicine"] is False
+    assert empty["presenting_complaints"] is False
+
+
+def test_compute_empty_columns_with_no_visits_flags_everything_empty():
+    """A date with no visits has nothing to have filled in — every column
+    counts as empty, rather than raising over an empty queryset."""
+    empty = freetext.compute_empty_columns([])
+    assert set(empty) == {name for name, _label in freetext.FREETEXT_COLUMNS}
+    assert all(empty.values())
+
+
+def test_freetext_summary_payload_contains_only_freetext_columns(
+    home_page, mock_anthropic_client
+):
+    """Invariant #2 for the B8 call: only the seven confirmed-PII-free
+    free-text columns cross into the payload — no identifying column name or
+    value, and none of ``DailyAggregate``'s own figures either."""
+    _ingest_tkc_daily_fixture()
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+    columns = freetext.collect_freetext_entries(visits)
+
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, mock_anthropic_client)
+    assert summary  # the stub returned its canned (bounds-safe) text
+
+    assert len(mock_anthropic_client.calls) == 1
+    sent = json.dumps(mock_anthropic_client.calls[0]).lower()
+    for identifier in (i for i in RAW_IDENTIFIERS if len(i) > 4):
+        assert identifier not in sent
+    for column in PATIENT_IDENTIFYING_COLUMNS:
+        assert column not in sent
+    assert "total_visits" not in sent
+
+    assert "amlodipine" in sent
+    assert "prescribed medicine" in sent
+
+
+def test_empty_columns_flag_payload_contains_only_booleans(
+    home_page, mock_anthropic_client
+):
+    """Invariant #2/#3 for the B9 call: the payload is the already-computed
+    booleans only — no raw free text and no identifying data cross the wire,
+    only the fact of whether each column was left blank."""
+    _ingest_tkc_daily_fixture()
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+    empty_columns = freetext.compute_empty_columns(visits)
+
+    flag = ai.draft_empty_columns_flag(
+        TKC_VISIT_DATE, empty_columns, mock_anthropic_client
+    )
+    assert flag
+
+    assert len(mock_anthropic_client.calls) == 1
+    sent = json.dumps(mock_anthropic_client.calls[0]).lower()
+    for identifier in (i for i in RAW_IDENTIFIERS if len(i) > 4):
+        assert identifier not in sent
+    for column in PATIENT_IDENTIFYING_COLUMNS:
+        assert column not in sent
+    # No raw free text crossed — only the boolean fact about each column.
+    # (The JSON body is itself embedded as a string value in the recorded
+    # call, so its own quotes come through backslash-escaped.)
+    assert "amlodipine" not in sent
+    assert '\\"investigation\\": true' in sent
+
+
+def test_publish_daily_report_drafts_freetext_summary_but_does_not_auto_publish(
+    home_page, mock_anthropic_client
+):
+    """The CLAUDE.md invariant #4 *default* gate, not Plan 08's narrow
+    exception: B8/B9 output lands in the page's draft fields, but neither is
+    approved and neither is exposed via the `freetext_summary`/
+    `empty_columns_flag` properties the template reads — even though the
+    page itself (numbers + summary_sentence) is live regardless, per PR #15's
+    no-draft-step decision for the deterministic content."""
+    _ingest_tkc_daily_fixture()
+
+    page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
+
+    assert page.live is True
+    assert page.freetext_summary_draft  # a draft was generated
+    assert page.empty_columns_flag_draft
+    assert page.freetext_summary_approved is False
+    assert page.empty_columns_flag_approved is False
+    # The template-facing properties stay blank until a person approves.
+    assert page.freetext_summary == ""
+    assert page.empty_columns_flag == ""
+
+
+def test_freetext_summary_becomes_visible_once_approved(
+    home_page, mock_anthropic_client
+):
+    """Once a person checks the approved flag (the admin action this review
+    gate relies on) and the page is re-saved, the reviewed text is what the
+    properties — and therefore the template — expose."""
+    _ingest_tkc_daily_fixture()
+    page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
+    draft_text = page.freetext_summary_draft
+
+    page.freetext_summary_approved = True
+    page.save_revision().publish()
+    page.refresh_from_db()
+
+    assert page.freetext_summary == draft_text
+    # B9's flag is untouched by approving B8's summary — the two gates are
+    # independent of each other.
+    assert page.empty_columns_flag == ""
+
+
+def test_daily_report_page_publishes_numbers_even_when_freetext_ai_calls_fail(
+    home_page,
+):
+    """Same guarantee as the summary-sentence call: a client whose call
+    raises still results in a published page, with both B8/B9 drafts left
+    blank rather than blocking anything."""
+    _ingest_tkc_daily_fixture()
+
+    def _raise(**kwargs):
+        raise TimeoutError("simulated AI timeout")
+
+    raising_client = SimpleNamespace(messages=SimpleNamespace(create=_raise))
+    page = publish_daily_report(TKC_VISIT_DATE, client=raising_client)
+
+    assert page.live is True
+    assert page.freetext_summary_draft == ""
+    assert page.empty_columns_flag_draft == ""
+
+
+def test_republish_refreshes_freetext_draft_but_leaves_a_prior_approval_untouched(
+    home_page, mock_anthropic_client
+):
+    """Documents a deliberate trade-off (see `DailyReportPage`'s docstring): a
+    corrected re-upload (modelled here the same way
+    `test_daily_report_page_publishes_numbers_even_when_ai_client_fails`
+    models a republish — calling `publish_daily_report` again directly)
+    regenerates the draft from the latest data, but does not reset a
+    previously-set approval flag. A person must notice and re-review it."""
+    _ingest_tkc_daily_fixture()
+    page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
+    page.freetext_summary_approved = True
+    page.save_revision().publish()
+
+    page = publish_daily_report(
+        TKC_VISIT_DATE, client=_stub_client_with_text("A different draft.")
+    )
+
+    assert page.freetext_summary_draft == "A different draft."
+    assert page.freetext_summary_approved is True  # untouched — now stale
+    assert page.freetext_summary == "A different draft."
 
 
 # --- Camp-upload flow (2026-07-22) ------------------------------------------

@@ -20,11 +20,12 @@ from __future__ import annotations
 from datetime import date
 
 from apps.core.models import CampReportIndexPage, HomePage
-from apps.pipeline import ai
+from apps.pipeline import ai, freetext
 from apps.pipeline.models import (
     CampUploadReportPage,
     DailyAggregate,
     DailyReportPage,
+    DeidentifiedVisit,
     IngestRun,
     ReportIndexPage,
 )
@@ -93,11 +94,34 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     :func:`apps.pipeline.ai.draft_daily_summary_sentence`), an explicit mock
     in tests. Whatever ``client`` returns (including nothing, on failure)
     never blocks this function from publishing the deterministic numbers.
+
+    Plan 11 Track B8/B9: this also (re)generates the free-text summary and
+    empty-columns-flag *drafts* from this date's ``DeidentifiedVisit`` rows.
+    Unlike ``summary_sentence`` above, these two never get auto-approved for
+    the public page here — only their ``_draft`` field is written; the
+    corresponding ``_approved`` boolean is left exactly as it was (``False``
+    for a brand new page, whatever a person last set it to for an existing
+    one). See ``DailyReportPage``'s docstring/fields for the full review-gate
+    contract this is deliberately not widening past.
     """
     aggregate = DailyAggregate.objects.get(
         clinic_date=clinic_date, report_kind=IngestRun.KIND_DAILY
     )
     summary_sentence = ai.draft_daily_summary_sentence(aggregate, client) or ""
+
+    visits = list(
+        DeidentifiedVisit.objects.filter(
+            visit_date=clinic_date, ingest_run__report_kind=IngestRun.KIND_DAILY
+        )
+    )
+    freetext_columns = freetext.collect_freetext_entries(visits)
+    empty_columns = freetext.compute_empty_columns(visits)
+    freetext_summary_draft = (
+        ai.draft_freetext_summary(clinic_date, freetext_columns, client) or ""
+    )
+    empty_columns_flag_draft = (
+        ai.draft_empty_columns_flag(clinic_date, empty_columns, client) or ""
+    )
 
     index = _get_or_create_report_index()
     page = DailyReportPage.objects.filter(report_date=clinic_date).first()
@@ -108,12 +132,16 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
             report_date=clinic_date,
             aggregate=aggregate,
             summary_sentence=summary_sentence,
+            freetext_summary_draft=freetext_summary_draft,
+            empty_columns_flag_draft=empty_columns_flag_draft,
             live=False,
         )
         index.add_child(instance=page)
     else:
         page.aggregate = aggregate
         page.summary_sentence = summary_sentence
+        page.freetext_summary_draft = freetext_summary_draft
+        page.empty_columns_flag_draft = empty_columns_flag_draft
 
     revision = page.save_revision()
     revision.publish()

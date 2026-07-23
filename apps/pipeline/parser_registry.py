@@ -162,6 +162,17 @@ class ParsedVisitRow:
 
     Every field is already de-identified/coarsened by the parser that built
     it; there is no field here that could carry a direct identifier.
+
+    The seven free-text fields below (default ``""``, so an existing parser
+    that doesn't populate them — ``parser_clinic_v1`` — needs no change) are a
+    later, narrower addition (Plan 11 Track B8/B9, maintainer decision
+    2026-07-23): unlike everything above, which is a fixed category or a
+    coarsened value, these carry the *raw* free text from the source export.
+    That's only safe because the maintainer confirmed the clinic software's
+    data-entry UI structurally cannot accept a patient identifier in these
+    specific columns — see ``apps.pipeline.freetext``'s module docstring for
+    the full grounding note. A new free-text column added later needs that
+    same question asked explicitly, not assumed by analogy.
     """
 
     visit_date: date
@@ -172,6 +183,13 @@ class ParsedVisitRow:
     diagnosis_category: str
     is_new_patient: bool | None
     is_zakat_beneficiary: bool | None
+    presenting_complaints: str = ""
+    investigation: str = ""
+    provisional_diagnosis_text: str = ""
+    prescribed_medicine: str = ""
+    clinical_notes: str = ""
+    diet_and_drug_compliance: str = ""
+    plan_notes: str = ""
 
     def _canonical_tuple(self) -> tuple:
         return (
@@ -183,6 +201,13 @@ class ParsedVisitRow:
             self.diagnosis_category,
             self.is_new_patient,
             self.is_zakat_beneficiary,
+            self.presenting_complaints,
+            self.investigation,
+            self.provisional_diagnosis_text,
+            self.prescribed_medicine,
+            self.clinical_notes,
+            self.diet_and_drug_compliance,
+            self.plan_notes,
         )
 
 
