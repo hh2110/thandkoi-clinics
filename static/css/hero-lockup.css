@@ -24,7 +24,7 @@
 .hero__title--sub {
   font-size: var(--font-size-lg);
   color: var(--color-brand-hover);
-  margin-block: 0.45rem 0;
+  margin-block: var(--space-1) 0;
 }
 
 @keyframes tkcSway {
