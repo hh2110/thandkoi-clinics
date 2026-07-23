@@ -383,6 +383,81 @@ def test_home_page_composes_layout_kit_sections(client, home_page):
     assert "Triage" in content  # a supplied care-stage label renders verbatim
 
 
+# --- Plan 11 Track F2: live "impact so far" home-page stats -----------------
+
+
+def test_home_page_get_live_impact_stats_sums_dailyaggregate_rows(db):
+    """Mirrors ``DailyReportPage.headline_stats``'s ``{value, label}`` shape,
+    read live from ``DailyAggregate`` (not the hand-typed ``ImpactStatsBlock``
+    already covered by ``test_home_page_composes_layout_kit_sections`` above).
+    """
+    from apps.pipeline.factories import DailyAggregateFactory
+
+    home = HomePageFactory()
+    DailyAggregateFactory(
+        clinic_date=datetime.date(2026, 7, 1),
+        total_visits=10,
+        zakat_beneficiary_patients=6,
+    )
+    DailyAggregateFactory(
+        clinic_date=datetime.date(2026, 7, 2),
+        total_visits=5,
+        zakat_beneficiary_patients=3,
+    )
+
+    stats = home.get_live_impact_stats()
+
+    assert stats == [
+        {"value": "15", "label": "Clinic patients (all time)"},
+        {"value": "9", "label": "Zakat beneficiaries (all time)"},
+    ]
+
+
+def test_home_page_get_context_includes_live_impact_stats(db):
+    from django.test import RequestFactory
+
+    home = HomePageFactory()
+    request = RequestFactory().get("/")
+
+    context = home.get_context(request)
+
+    assert context["live_impact_stats"] == home.get_live_impact_stats()
+
+
+def test_home_page_renders_live_impact_stats_band(client, home_page):
+    """The real page shows the live band, separate from the StreamField
+    ``ImpactStatsBlock`` band already asserted by
+    ``test_home_page_composes_layout_kit_sections`` (that one shows "467+";
+    this one shows a real ``DailyAggregate``-derived figure)."""
+    from apps.pipeline.factories import DailyAggregateFactory
+
+    DailyAggregateFactory(
+        clinic_date=datetime.date(2026, 7, 1),
+        total_visits=42,
+        zakat_beneficiary_patients=17,
+    )
+
+    content = client.get("/en/").content.decode()
+
+    assert "Our impact so far" in content
+    assert "Clinic patients (all time)" in content
+    assert "Zakat beneficiaries (all time)" in content
+    assert "42" in content
+    assert "17" in content
+
+
+def test_home_page_renders_live_impact_stats_empty_state_with_no_data(
+    client, home_page
+):
+    """With no ``DailyAggregate`` rows yet, the band still renders (zeroes,
+    not a crash) — ``stat_band.html`` never sees an empty ``stats`` list here
+    since ``get_live_impact_stats`` always returns two entries."""
+    content = client.get("/en/").content.decode()
+
+    assert "Our impact so far" in content
+    assert "Figures coming soon." not in content
+
+
 def test_circle_of_care_block_requires_exactly_six_stages():
     """The wheel's geometry is fixed for 6 stages — any other count is refused.
 

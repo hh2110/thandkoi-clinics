@@ -29,4 +29,6 @@ headline as a smaller sub-line beneath it — see templates/blocks/hero_block.ht
   {% if latest_newsletter %}
     {% include "partials/sections/feature_split.html" with eyebrow=_("Latest newsletter") heading=latest_newsletter.title body=latest_newsletter.summary cta_label=_("Read the newsletter →") cta_url=latest_newsletter.url %}
   {% endif %}
+
+  {% include "partials/sections/stat_band.html" with stats=live_impact_stats caption=_("Our impact so far") %}
 {% endblock %}

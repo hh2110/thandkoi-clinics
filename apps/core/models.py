@@ -29,6 +29,7 @@ lives in PostgreSQL, entered through the admin — never committed to this repo
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
+from django.utils.translation import gettext as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail import blocks
@@ -132,10 +133,35 @@ class HomePage(Page):
             .first()
         )
 
+    def get_live_impact_stats(self) -> list[dict[str, str]]:
+        """All-time impact figures for the "Our impact so far" band.
+
+        Mirrors ``DailyReportPage.headline_stats``'s exact shape and
+        stringification convention — read live from ``DailyAggregate`` on
+        every request, never cached onto this page. See
+        ``apps.pipeline.impact_stats.compute_alltime_impact_stats`` for why
+        this is only two figures, not the three the Track F2 planning doc
+        originally proposed.
+        """
+        from apps.pipeline.impact_stats import compute_alltime_impact_stats
+
+        stats = compute_alltime_impact_stats()
+        return [
+            {
+                "value": str(stats.total_visits),
+                "label": _("Clinic patients (all time)"),
+            },
+            {
+                "value": str(stats.zakat_beneficiary_patients),
+                "label": _("Zakat beneficiaries (all time)"),
+            },
+        ]
+
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         context["latest_report"] = self.get_latest_report()
         context["latest_newsletter"] = self.get_latest_newsletter()
+        context["live_impact_stats"] = self.get_live_impact_stats()
         return context
 
     class Meta:

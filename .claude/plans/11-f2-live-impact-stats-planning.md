@@ -5,6 +5,21 @@ the approach before any code is written. Not a task file; F2 still needs Stage 6
 slicing into a real numbered plan once this is read and confirmed. No code
 changed, no migration written, in this doc.
 
+> **2026-07-23 correction (implementation time):** this doc was drafted
+> against `DailyAggregate.report_kind` and camp-kind rows, but PR #95 (merged
+> 21:59, four minutes before this doc merged at 22:03) removed
+> `report_kind` and the whole camp-upload pipeline — there is no camp
+> `DailyAggregate` data left, and `CampReportPage` no longer stores any
+> patient count. Sections 1 and 4a below (the `report_kind`-grouped query
+> and the `CAMP_PATIENTS_PRE_PIPELINE_OFFSET = 187` offset) are therefore
+> **not buildable as written** and were not built. Maintainer decision on
+> discovering this at implementation time: ship only the two stats that
+> still have a real data source — "Clinic patients (all time)" and "Zakat
+> beneficiaries (all time)" — and drop "Camp patients (all time)" and the
+> 187 offset entirely, rather than inventing a new camp data source or a
+> hardcoded stand-in. See `apps/pipeline/impact_stats.py`'s module
+> docstring for the as-built version of this decision.
+
 Answers Track F2's own "Follow-up action" note in
 [11-stakeholder-feedback-2026-07.md](11-stakeholder-feedback-2026-07.md) (lines
 456-461): does a per-row date column already exist to group on, and how should
