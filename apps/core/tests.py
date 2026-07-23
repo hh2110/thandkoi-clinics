@@ -383,6 +383,107 @@ def test_home_page_composes_layout_kit_sections(client, home_page):
     assert "Triage" in content  # a supplied care-stage label renders verbatim
 
 
+# --- Plan 11 Track F2: live "impact so far" home-page stats -----------------
+
+
+def test_home_page_get_live_impact_stats_sums_dailyaggregate_rows(db):
+    """Mirrors ``DailyReportPage.headline_stats``'s ``{value, label}`` shape,
+    read live from ``DailyAggregate`` (not the hand-typed ``ImpactStatsBlock``
+    already covered by ``test_home_page_composes_layout_kit_sections`` above).
+    """
+    from apps.pipeline.factories import DailyAggregateFactory
+
+    home = HomePageFactory()
+    DailyAggregateFactory(
+        clinic_date=datetime.date(2026, 7, 1),
+        total_visits=10,
+        zakat_beneficiary_patients=6,
+    )
+    DailyAggregateFactory(
+        clinic_date=datetime.date(2026, 7, 2),
+        total_visits=5,
+        zakat_beneficiary_patients=3,
+    )
+
+    stats = home.get_live_impact_stats()
+
+    assert stats == [
+        {"value": "15", "label": "Clinic patients (all time)"},
+        {"value": "9", "label": "Zakat beneficiaries (all time)"},
+    ]
+
+
+def test_home_page_get_context_includes_live_impact_stats(db):
+    from django.test import RequestFactory
+
+    home = HomePageFactory()
+    request = RequestFactory().get("/")
+
+    context = home.get_context(request)
+
+    assert context["live_impact_stats"] == home.get_live_impact_stats()
+    assert context["live_impact_stats_as_of"] == home.get_live_impact_stats_as_of()
+
+
+def test_home_page_get_live_impact_stats_as_of_is_the_latest_clinic_date(db):
+    """Mirrors ``ImpactStatsBlock``'s ``as_of`` convention (Plan 11 D2), but
+    computed from the latest ``DailyAggregate.clinic_date`` rather than
+    hand-typed by an admin."""
+    from apps.pipeline.factories import DailyAggregateFactory
+
+    home = HomePageFactory()
+    DailyAggregateFactory(clinic_date=datetime.date(2026, 7, 1))
+    DailyAggregateFactory(clinic_date=datetime.date(2026, 7, 15))
+
+    assert home.get_live_impact_stats_as_of() == datetime.date(2026, 7, 15)
+
+
+def test_home_page_get_live_impact_stats_as_of_is_none_with_no_data(db):
+    home = HomePageFactory()
+
+    assert home.get_live_impact_stats_as_of() is None
+
+
+def test_home_page_renders_live_impact_stats_band(client, home_page):
+    """The real page shows the live band, separate from the StreamField
+    ``ImpactStatsBlock`` band already asserted by
+    ``test_home_page_composes_layout_kit_sections`` (that one shows "467+";
+    this one shows a real ``DailyAggregate``-derived figure). Asserts on the
+    exact ``<p class="stat__value">…</p>`` markup, not a bare substring — a
+    bare "42" would also match the "426" welfare-patients figure the
+    ImpactStatsBlock teaser already renders on this same page."""
+    from apps.pipeline.factories import DailyAggregateFactory
+
+    DailyAggregateFactory(
+        clinic_date=datetime.date(2026, 7, 1),
+        total_visits=1234,
+        zakat_beneficiary_patients=987,
+    )
+
+    content = client.get("/en/").content.decode()
+
+    assert "Clinic patients (all time)" in content
+    assert "Zakat beneficiaries (all time)" in content
+    assert '<p class="stat__value">1234</p>' in content
+    assert '<p class="stat__value">987</p>' in content
+    assert "Our impact so far (updated at 01 Jul 2026)" in content
+
+
+def test_home_page_renders_live_impact_stats_empty_state_with_no_data(
+    client, home_page
+):
+    """With no ``DailyAggregate`` rows yet, the band still renders (zeroes,
+    not a crash) — ``stat_band.html`` never sees an empty ``stats`` list here
+    since ``get_live_impact_stats`` always returns two entries. No date
+    suffix either, mirroring ``ImpactStatsBlock``'s own as_of-unset caption
+    behaviour (``test_impact_stats_block_caption_unchanged_when_as_of_unset``)."""
+    content = client.get("/en/").content.decode()
+
+    assert "Our impact so far" in content
+    assert "(updated at" not in content
+    assert "Figures coming soon." not in content
+
+
 def test_circle_of_care_block_requires_exactly_six_stages():
     """The wheel's geometry is fixed for 6 stages — any other count is refused.
 

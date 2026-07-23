@@ -26,9 +26,12 @@ lives in PostgreSQL, entered through the admin — never committed to this repo
 (architecture brief: "configured in the running application").
 """
 
+import datetime
+
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import models
+from django.utils.translation import gettext as _
 from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 from wagtail import blocks
@@ -132,10 +135,52 @@ class HomePage(Page):
             .first()
         )
 
+    def get_live_impact_stats(self) -> list[dict[str, str]]:
+        """All-time impact figures for the "Our impact so far" band.
+
+        Mirrors ``DailyReportPage.headline_stats``'s exact shape and
+        stringification convention — read live from ``DailyAggregate`` on
+        every request, never cached onto this page. See
+        ``apps.pipeline.impact_stats.compute_alltime_impact_stats`` for why
+        this is only two figures, not the three the Track F2 planning doc
+        originally proposed.
+        """
+        from apps.pipeline.impact_stats import compute_alltime_impact_stats
+
+        stats = compute_alltime_impact_stats()
+        return [
+            {
+                "value": str(stats.total_visits),
+                "label": _("Clinic patients (all time)"),
+            },
+            {
+                "value": str(stats.zakat_beneficiary_patients),
+                "label": _("Zakat beneficiaries (all time)"),
+            },
+        ]
+
+    def get_live_impact_stats_as_of(self) -> datetime.date | None:
+        """The most recent clinic-date behind :meth:`get_live_impact_stats`.
+
+        A second call to ``compute_alltime_impact_stats`` (a second trivial
+        aggregate query, per the planning doc's own "no caching needed at
+        this scale" call) — kept as its own method, mirroring
+        ``get_latest_report``/``get_latest_newsletter``'s pattern of one
+        independent query per teaser, rather than threading a combined
+        result through ``get_context``. ``None`` until any ``DailyAggregate``
+        row exists, in which case the template shows the caption with no
+        date suffix.
+        """
+        from apps.pipeline.impact_stats import compute_alltime_impact_stats
+
+        return compute_alltime_impact_stats().as_of
+
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         context["latest_report"] = self.get_latest_report()
         context["latest_newsletter"] = self.get_latest_newsletter()
+        context["live_impact_stats"] = self.get_live_impact_stats()
+        context["live_impact_stats_as_of"] = self.get_live_impact_stats_as_of()
         return context
 
     class Meta:
