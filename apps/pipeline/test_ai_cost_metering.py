@@ -62,7 +62,9 @@ def _clean_ai_call_log(db):
     AiCallLog.objects.all().delete()
 
 
-def _stub_client(text: str, input_tokens: int, output_tokens: int):
+def _stub_client(
+    text: str, input_tokens: int, output_tokens: int, *, stop_reason: str = "end_turn"
+):
     """A minimal Anthropic-client stand-in shared by every test below.
 
     Shaped to satisfy all three real call sites: ``draft_newsletter_prose``
@@ -70,11 +72,14 @@ def _stub_client(text: str, input_tokens: int, output_tokens: int):
     (per Plan 11 C2) ``.usage``; ``draft_monthly_newsletter_body`` also reads
     ``.stop_reason``, so this returns an immediate ``end_turn`` — a one-turn
     conversation with no tool calls, sufficient to exercise its success path.
+    ``stop_reason`` is overridable so a test can simulate a ``max_tokens``
+    truncation on the short-drafting calls too (see
+    ``_draft_short_text``'s stop-reason check).
     """
 
     def _create(**kwargs):
         return SimpleNamespace(
-            stop_reason="end_turn",
+            stop_reason=stop_reason,
             content=[SimpleNamespace(type="text", text=text)],
             usage=SimpleNamespace(
                 input_tokens=input_tokens, output_tokens=output_tokens
@@ -209,6 +214,31 @@ def test_draft_daily_summary_sentence_still_logs_when_the_text_fails_sanity_chec
     log = AiCallLog.objects.get()
     assert log.input_tokens == 200
     assert log.output_tokens == 500
+
+
+def test_draft_daily_summary_sentence_discards_a_max_tokens_truncated_response(db):
+    """A response cut off by hitting ``max_tokens`` mid-sentence
+    (``stop_reason != "end_turn"``) must not be published, even when the
+    truncated text happens to be short enough to pass the length check —
+    found via bulk synthetic-data testing (2026-07-23): a busy day's
+    free-text summary hit its ``max_tokens`` cap, and the incomplete text
+    (well under ``max_length``) sailed through onto the live page. The call
+    still burned tokens, so it's still logged (same contract as the
+    sanity-check-failure case above)."""
+    aggregate = DailyAggregateFactory(clinic_date=JULY, total_visits=4)
+    client = _stub_client(
+        "Today the clinic saw 4 visits and the doctor noted",
+        200,
+        120,
+        stop_reason="max_tokens",
+    )
+
+    sentence = ai.draft_daily_summary_sentence(aggregate, client)
+
+    assert sentence is None
+    log = AiCallLog.objects.get()
+    assert log.input_tokens == 200
+    assert log.output_tokens == 120
 
 
 def test_draft_daily_summary_sentence_logs_nothing_when_the_client_raises(db):

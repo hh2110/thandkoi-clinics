@@ -116,6 +116,12 @@ rules are architectural constraints, not preferences — never weaken them:
   part of the plan's scope landed and the rest has stalled) in the same pass.
 - **Secrets** live in environment variables / `.env` (gitignored) — never in the
   repo or in prompts.
+- **Content changes (Wagtail pages/documents) are not code changes.** They
+  don't need a branch, plan, or PR. See
+  [docs/content-operations.md](docs/content-operations.md) for the two
+  ways content gets published: by hand in the Wagtail admin, or
+  agent-driven via SSH into the production Render instance running
+  Wagtail's own Python API.
 
 ## Bilingual
 

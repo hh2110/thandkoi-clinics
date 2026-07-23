@@ -589,6 +589,40 @@ def test_content_hash_for_rows_changes_when_only_freetext_columns_change():
     assert content_hash_for_rows([base]) != content_hash_for_rows([changed])
 
 
+def test_content_hash_for_rows_handles_mixed_none_and_bool_zakat_status():
+    """A normal day mixing Zakat/Regular/blank ``Status`` values yields rows
+    whose ``is_zakat_beneficiary`` is a mix of ``True``/``False``/``None`` —
+    previously crashed with ``TypeError: '<' not supported between instances
+    of 'NoneType' and 'bool'`` because ``content_hash_for_rows`` sorted raw
+    ``_canonical_tuple()`` tuples directly, and plain Python can't order
+    ``None`` against a ``bool``. Found via bulk synthetic-data testing across
+    ~80 days, where this was common rather than a contrived edge case."""
+    from apps.pipeline.parser_registry import ParsedVisitRow
+
+    def visit(is_zakat_beneficiary):
+        return ParsedVisitRow(
+            visit_date=datetime.date(2026, 7, 8),
+            department="",
+            age_band=DeidentifiedVisit.AGE_BAND_19_55,
+            sex=DeidentifiedVisit.SEX_MALE,
+            location="",
+            diagnosis_category=DeidentifiedVisit.DIAGNOSIS_OTHER,
+            is_new_patient=None,
+            is_zakat_beneficiary=is_zakat_beneficiary,
+            presenting_complaints="",
+            investigation="",
+            provisional_diagnosis_text="",
+            prescribed_medicine="",
+            clinical_notes="",
+            diet_and_drug_compliance="",
+            plan_notes="",
+        )
+
+    rows = [visit(True), visit(False), visit(None)]
+    content_hash_for_rows(rows)  # must not raise
+    assert content_hash_for_rows(rows) == content_hash_for_rows(list(reversed(rows)))
+
+
 def test_clinic_v1_parser_sniffs_its_own_required_columns():
     workbook = Workbook()
     workbook.active.append(CLINIC_V1_HEADER)

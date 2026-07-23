@@ -128,6 +128,11 @@ So the two gates are orthogonal:
 - **Wagtail draft workflow** (in-app) — "is this AI content good enough to
   publish?"
 
+For how content itself gets created or edited on production — by hand in the
+Wagtail admin, or agent-driven via SSH into the Render instance — see
+[content-operations.md](content-operations.md). Either way it's a content
+change, not a deploy, so nothing here applies to it.
+
 ## Testing keeps AI out of the loop
 
 CI runs `ruff` + `pytest` with **zero** real Anthropic API calls — the client is

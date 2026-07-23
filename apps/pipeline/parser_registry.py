@@ -252,6 +252,19 @@ class ParsedExport:
     rows: list[ParsedVisitRow]
 
 
+def _sort_key(tup: tuple) -> tuple:
+    """Order-safe key for a ``_canonical_tuple()``.
+
+    ``is_new_patient``/``is_zakat_beneficiary`` are ``bool | None`` — plain
+    Python can't compare ``None`` against ``True``/``False`` (``TypeError``),
+    so a real day mixing Zakat/Regular/blank ``Status`` values (an entirely
+    normal day, not an edge case) crashed here on upload. Each element is
+    wrapped as ``(0, "")`` for ``None`` or ``(1, value)`` otherwise, so same-
+    position values are only ever compared within one type.
+    """
+    return tuple((0, "") if value is None else (1, value) for value in tup)
+
+
 def content_hash_for_rows(rows: list[ParsedVisitRow]) -> str:
     """A deterministic fingerprint of a set of de-identified rows.
 
@@ -261,7 +274,7 @@ def content_hash_for_rows(rows: list[ParsedVisitRow]) -> str:
     diff. This hashes the *de-identified* rows, never raw bytes: it is a
     semantic fingerprint of the parsed content, not a checksum of the file.
     """
-    canonical = sorted(row._canonical_tuple() for row in rows)
+    canonical = sorted((row._canonical_tuple() for row in rows), key=_sort_key)
     payload = json.dumps(canonical, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
