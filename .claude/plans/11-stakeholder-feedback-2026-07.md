@@ -104,19 +104,33 @@ the doc itself is not re-read going forward.
 - [x] **D1.** Enlarge the top-left logo; consider icon-only (drop the wordmark).
       **Done (2026-07-22, branch `feat/bigger-logo`),** PR not yet opened.
       Swapped to the existing `logo-mark.svg` (icon-only), 2.5rem → 4rem.
-- [ ] **D2.** Relabel "Our impact so far" → "Our impact so far (updated at
+- [ ] ~~**D5.** Add a building photo to the home page.~~ **Dropped (maintainer
+      decision 2026-07-23)** — not part of this plan's remaining scope.
+- [x] **D2.** Relabel "Our impact so far" → "Our impact so far (updated at
       <date>)"; document/confirm how the figure is calculated (see open
       questions).
-- [ ] **D3.** Implement "circle of care" on the home page (redesign, same
-      underlying information — needs a design pass before implementation - i can do this with claude design).
-- [ ] **D4.** Newsletter branding: the clay-lamp ("chiragh") image/motif; remove
-      "چراغ شفا" from the Urdu home page per the maintainer's explicit ask (note:
-      CLAUDE.md's project tagline currently includes "چراغ شفا" — this is a
-      deliberate content change, not a doc contradiction; update CLAUDE.md's
-      Bilingual section in the same change per the Stage 4 "docs are living" rule
-      if the tagline is genuinely retired, or confirm it's page-scoped only).
-- [ ] **D5.** Add a building photo to the home page — maintainer wants a few
-      placement options proposed (e.g. hero background) before committing.
+      **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),** PR
+      not yet opened. The figure was never computed — `ImpactStatBlock` is a
+      hand-typed admin field; this adds an optional `as_of` date the admin
+      sets manually alongside it. Documented in
+      [docs/architecture-and-ai-brief.md](../../docs/architecture-and-ai-brief.md),
+      with live computation deferred to the new Track F candidate below.
+- [x] **D3.** Implement "circle of care" on the home page (redesign, same
+      underlying information).
+      **Done (2026-07-23, branch via PR #56),** merged to `main`. Six-wedge
+      `CircleOfCareBlock` on `HomePage.body`, CMS-editable, capped at one per
+      page.
+- [x] **D4.** Newsletter branding: the clay-lamp ("chiragh") image/motif; remove
+      "چراغ شفا" from the Urdu home page per the maintainer's explicit ask.
+      **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),** PR
+      not yet opened. Removed from two live occurrences — the site-wide
+      footer (renders on every page, not Home alone) and the Home page's
+      hero tagline — plus matching seed/fixture data, and updated CLAUDE.md's
+      Bilingual section. **Scope confirmed with the maintainer (2026-07-23):**
+      the site-wide footer removal was intended, not Home-page-only — no
+      further scope change needed. No chiragh asset exists yet, so a
+      placeholder (mirroring the Donors & Partners page's pattern) was added
+      to the newsletter archive page pending a real asset.
 - [x] **D6.** New "Donors & Partners" page/menu item: organizational partners
       (Sugar Hospital, District Health Office) and named individual/in-kind
       donors (e.g. Basit — X-ray plant; one family — water coolers).
@@ -129,6 +143,9 @@ the doc itself is not re-read going forward.
       Office logo files** — no image needed for named donors, by design.
 - [ ] **D8.** Main nav items should support dropdown submenus (groundwork for D6
       and the merged Reports menu in C3).
+      **Dropped for future implementation (maintainer decision 2026-07-23)** —
+      not part of this round's remaining-work sessions; revisit as its own
+      plan/task when nav complexity actually demands it.
 - [x] **D9.** Gallery: clicking a cropped thumbnail should open a full-size
       modal.
       **Done (2026-07-22, branch `feat/gallery-lightbox-modal`),** PR not yet
@@ -136,8 +153,7 @@ the doc itself is not re-read going forward.
       convention.
 
   **Priority: P2** across the board — visible polish and content, not
-  functional bugs. D3 and D5 need a short design/options pass before a task
-  file is written (mirrors Stage 2 "design before building").
+  functional bugs.
 
 ### Track E — Process & tooling
 
@@ -154,14 +170,24 @@ the doc itself is not re-read going forward.
   **Priority: P2.** E1 has real leverage (every future small site edit gets
   cheaper) but is itself a small design exercise before it's a task file.
 
+  **Options review done (2026-07-23):** see
+  [11-e1-e2-research-2026-07.md](11-e1-e2-research-2026-07.md) — recommends
+  building E1 now (a `route-change-request` skill, no new infra needed) and
+  confirms E2's defer with a refinement (the flagged `whatsapp-claude-plugin`
+  doesn't actually solve "import existing history"; manual copy-paste
+  remains the durable zero-build answer unless this becomes a recurring
+  pain point).
+
 ## Open questions (answer, not build)
 
 These are the maintainer asking the team something, not requesting a feature —
 answer directly, then decide whether the answer implies a task:
 
-1. **"How is impact so far calculated?"** — trace and document the current
-   calculation (likely in `apps/core/models.py` or a template tag); becomes D2
-   if the answer needs restating on-page.
+1. ~~**"How is impact so far calculated?"**~~ **Answered, via D2
+   (2026-07-23):** it isn't — `ImpactStatBlock` is a hand-typed admin field,
+   not a computation. Documented in
+   [docs/architecture-and-ai-brief.md](../../docs/architecture-and-ai-brief.md),
+   with live computation deferred to the new Track F candidate below.
 2. **"Does the home-page 'latest daily report' link expect a picture?"** —
    check the current template/content model for that link and confirm.
 3. **"How do I upload a newsletter?"** (example file: "May June TTC Newsletter"
@@ -182,6 +208,55 @@ answer directly, then decide whether the answer implies a task:
 - **Bilingual generation of any new content** (D4's Urdu tagline change is a
   removal, not generation, so it's unaffected) — already parked repo-wide per
   the Plans README "Out of scope" section; nothing here reopens it.
+- **D5 (home-page building photo)** — dropped (maintainer decision
+  2026-07-23), not just deferred; no condition noted for revisiting, so treat
+  as fully out of scope unless the maintainer raises it again.
+- **D8 (nav dropdown submenus)** — dropped for future implementation
+  (maintainer decision 2026-07-23). Condition to bring back: revisit once nav
+  complexity (more top-level items, or another grouped menu beyond C3's merged
+  Reports menu) actually demands it — not speculatively.
+
+## Candidates from notes (not yet milestones)
+
+### F. Multi-day camp upload + live "impact so far" aggregation (2026-07-23)
+
+Maintainer idea, captured raw, not yet slotted into a session:
+
+- **F1. Multi-day camp file upload.** A single camp-report upload may cover
+  several calendar days of data (currently C3's camp upload assumes one file
+  = one date + one camp title). Instead: parse the file, group rows by date,
+  and auto-generate one daily-report page per distinct date found in the
+  file, each carrying its own `DailyAggregate`.
+- **F2. Live "impact so far" home-page stats.** Currently `ImpactStatBlock`
+  (`apps/core/blocks.py:19-35`) is a hand-typed `CharBlock` — its own docstring
+  already anticipates this: "Real figures are entered by hand for now; Plan
+  08's pipeline supplies computed ones later." F2 is that later: replace (or
+  supplement) the hand-typed stat values with a live aggregation across
+  `DailyAggregate` rows (sum of visits/patients etc., across daily + camp
+  reports), so the home page reflects real cumulative totals rather than a
+  manually maintained string. This is the natural pairing with F1: more
+  camp-day reports flowing in only matters to "impact so far" if that number
+  is actually computed from them.
+
+**Maintainer decisions (2026-07-23), resolving the open questions:**
+
+- **Upload scope:** both upload types — generalize the date-grouping/split
+  logic so a daily-clinic export *or* a camp upload may contain multiple
+  dates in one file, each producing its own report page.
+- **Stat scope:** keep camp-sourced numbers distinguishable from regular
+  clinic numbers in the live aggregate (e.g. "X clinic patients + Y camp
+  patients"), not folded into one combined total — `report_kind` (from C3)
+  is the natural discriminator to aggregate on separately.
+- **Time window:** all-time since first upload — sum every `DailyAggregate`
+  row ever ingested, matching the current hand-typed framing ("467+ children
+  treated to date").
+
+**Follow-up action:** still needs its own short Stage 2 planning pass before
+it's sliced into tasks — specifically: does the parser already carry a
+per-row date column to group on for both upload formats, or does that need
+confirming per format first; and how `DailyAggregate` should be queried
+per-`report_kind` for the live stat without a per-request full-table scan
+becoming a home-page performance concern as data grows.
 
 ## Reference material
 
@@ -197,19 +272,44 @@ answer directly, then decide whether the answer implies a task:
 - [whatsapp-claude-plugin](https://github.com/rich627/whatsapp-claude-plugin) —
   candidate for Track E2.
 
-## Status (2026-07-22)
+## Status (2026-07-23)
 
-A1, B1–B7, C1, C3, C4, D1, D6, D7, D9 are **merged to `main`**: 8 PRs (#47–#54),
-each reviewed (code-review-tc or a manual pass), fixed up, CI-green, and
-squash-merged. The two flagged merge-order dependencies (the migration-number
-collision between `feat/daily-report-ux-pass` and `feat/camp-report-upload-type`,
-and the "department always empty" assumption needing
-`chore/remove-provisional-schema-option` merged first) were both handled during
-the merge sequence — `camp-report-upload-type` was rebased onto `main` after
-the other two landed, its migration renumbered to `0005`, and its tests fixed
-up where they still referenced the now-unregistered `clinic_daily_export_v1`
-format.
+A1, B1–B7, C1, C3, C4, D1, D3, D6, D7, D9 are **merged to `main`**: 9 PRs
+(#47–#54, #56), each reviewed (code-review-tc or a manual pass), fixed up,
+CI-green, and squash-merged. The two flagged merge-order dependencies (the
+migration-number collision between `feat/daily-report-ux-pass` and
+`feat/camp-report-upload-type`, and the "department always empty" assumption
+needing `chore/remove-provisional-schema-option` merged first) were both
+handled during the merge sequence — `camp-report-upload-type` was rebased onto
+`main` after the other two landed, its migration renumbered to `0005`, and its
+tests fixed up where they still referenced the now-unregistered
+`clinic_daily_export_v1` format. D3 landed later as PR #56, migration
+renumbered to `0007` for the same reason.
 
-Remaining, not yet ready to slice: B8/B9 (unblocked, not yet built this
-round), C2, D2–D5, D8, E1, E2 — each still needs the design pass or
-maintainer decision noted against it above.
+**Dropped, not slotted into any session:** D5 (building photo — no condition
+to revisit), D8 (nav dropdown submenus — parked until nav complexity actually
+demands it, see "Parked, deliberately").
+
+**Four sessions run in parallel (maintainer decision 2026-07-23), each its
+own branch — status of each as of this write-up:**
+
+1. **B8 + B9** — `feat/daily-report-freetext-summary`. Implemented, tested,
+   through two rounds of code-review-tc fixes (a re-ingest-time draft
+   blanking bug, a content-hash dedup decision reversed after a second review
+   pass — see `ParsedVisitRow._canonical_tuple`'s comment — sanity-check
+   bounds too tight for their own `max_tokens`, and cleanup). Re-review in
+   progress; PR not yet opened.
+2. **C2** — `feat/admin-ai-cost-metering`. Implemented, tested, through two
+   rounds of code-review-tc fixes (a logging-failure-discards-a-good-response
+   bug, a `cost_usd` precision bug that truncated small calls to $0.00).
+   Re-review in progress; PR not yet opened.
+3. **Track D remainder (D2 + D4)** — `feat/impact-label-chiragh-branding`.
+   Implemented, tested, through code-review-tc fixes (a bare-caption
+   rendering bug) plus a maintainer scope confirmation on D4 (site-wide
+   footer removal was intended). Marked done above; PR not yet opened.
+4. **E1 + E2 research** — done, no build. See
+   [11-e1-e2-research-2026-07.md](11-e1-e2-research-2026-07.md).
+
+None of the three code branches are merged yet — each still needs its
+review loop to land clean, then a draft PR, then CI, before merge and
+deploy.
