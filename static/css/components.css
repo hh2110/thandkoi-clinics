@@ -287,7 +287,13 @@
     opacity: 0;
     transform: translateY(-0.375rem);
     pointer-events: none;
-    transition: opacity 0.18s ease, transform 0.18s ease;
+    /* visibility, not just opacity, gates this: forcing content-visibility
+       above keeps the closed menu in the render tree (needed for the fade to
+       play at all), which would otherwise leave its links keyboard-focusable
+       even while invisible. visibility:hidden removes that focusability;
+       delaying it until the fade-out finishes (below) keeps the animation. */
+    visibility: hidden;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
   }
 
   .nav-dropdown__menu a {
@@ -305,6 +311,8 @@
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
+    visibility: visible;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0s;
   }
 }
 
