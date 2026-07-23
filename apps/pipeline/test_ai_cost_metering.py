@@ -56,6 +56,20 @@ def _stub_client(text: str, input_tokens: int, output_tokens: int):
 # --- Cost calculation math ---------------------------------------------------
 
 
+def test_every_live_model_constant_has_a_pricing_entry():
+    """Found by code-review-tc: compute_cost_usd silently returns $0 for an
+    unrecognized model (by design, so an unrecognized model never crashes the
+    call it's logging) — but nothing previously caught a live model constant
+    drifting out of sync with PRICING_PER_MILLION_TOKENS, which would zero
+    out AI spend logging with no test or runtime signal. This guards it."""
+    live_models = {
+        ai.DRAFTING_MODEL,
+        ai.DAILY_SUMMARY_MODEL,
+        ai.MONTHLY_NEWSLETTER_MODEL,
+    }
+    assert live_models <= PRICING_PER_MILLION_TOKENS.keys()
+
+
 def test_compute_cost_usd_matches_published_per_million_token_rates():
     """1,000,000 input + 1,000,000 output tokens must cost exactly the
     published per-model rate — the simplest possible cross-check of the
