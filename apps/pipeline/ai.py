@@ -222,13 +222,13 @@ def _draft_short_text(
     """Shared shape behind every short, fixed-template drafting call below.
 
     Returns ``None`` — never raises — on any failure: client construction,
-    payload building, the API call itself, or a response that fails the
-    basic sanity check (empty, or over ``max_length``). ``build_payload`` is
-    called *inside* the try so a payload-building error degrades the same
-    way an API error does — none of these calls may ever bubble up and block
-    their caller. Extracted (found by code-review-tc) so a future change to
-    this shape only has one place to land, instead of three near-identical
-    copies drifting apart.
+    payload building, the API call itself, a non-``end_turn`` stop reason, or
+    a response that fails the basic sanity check (empty, or over
+    ``max_length``). ``build_payload`` is called *inside* the try so a
+    payload-building error degrades the same way an API error does — none of
+    these calls may ever bubble up and block their caller. Extracted (found
+    by code-review-tc) so a future change to this shape only has one place to
+    land, instead of three near-identical copies drifting apart.
 
     ``on_response`` (Plan 11 C2), if given, runs right after a response comes
     back — before the length sanity check — so a caller can log AI-call
@@ -238,6 +238,16 @@ def _draft_short_text(
     missed when cost logging first landed (each shipped in its own
     out-of-scope branch) and stayed unmetered until this was found and
     fixed.
+
+    The ``stop_reason`` check (found via bulk synthetic-data testing,
+    2026-07-23) mirrors the same rule already applied to the monthly
+    newsletter's tool-turn loop below: only ``"end_turn"`` is a clean
+    completion. Before this, a busy day's free-text summary could hit its
+    ``max_tokens`` cap mid-sentence — the old length check only rejected text
+    *longer* than ``max_length``, so a truncated-but-short response (e.g.
+    "...Prescribed medications reflected the") sailed through and
+    auto-published on the live page, per CLAUDE.md invariant #4's no-review
+    exception for these calls.
     """
     try:
         active_client = client or get_anthropic_client()
@@ -245,6 +255,8 @@ def _draft_short_text(
         response = active_client.messages.create(**payload)
         if on_response is not None:
             on_response(response)
+        if response.stop_reason != "end_turn":
+            return None
         text = response.content[0].text.strip()
     except Exception:  # noqa: BLE001 - any failure means "no text this run"
         return None
