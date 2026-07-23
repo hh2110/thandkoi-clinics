@@ -25,6 +25,7 @@ from wagtail.fields import RichTextField
 from wagtail.models import Page
 
 from apps.core.models import CampReportIndexPage, paginate_archive
+from apps.pipeline.ai_pricing import compute_cost_usd
 
 
 class IngestRun(models.Model):
@@ -706,3 +707,78 @@ class NewsletterDraftRun(models.Model):
 
     def __str__(self):
         return f"Newsletter draft run for {self.month:%Y-%m} ({self.status})"
+
+
+class AiCallLog(models.Model):
+    """Cost + usage record for one Anthropic API call (Plan 11 C2).
+
+    Anthropic's API never returns a cost figure — only token counts. This
+    model is that gap filled in: one row per real ``client.messages.create``
+    call in ``apps.pipeline.ai``, recording which call site it was, the
+    model, the token counts the response reported, and the computed cost
+    (token counts x published per-model rate — see
+    ``apps.pipeline.ai_pricing``), so total AI spend is visible in admin
+    without cross-referencing Anthropic's own billing console.
+
+    Deliberately no FK back to ``IngestRun``/``NewsletterDraftRun``/
+    ``DailyAggregate``, unlike those audit models. The three current call
+    sites in ``apps.pipeline.ai`` have no *common* triggering record to hang
+    one off: ``draft_daily_summary_sentence`` has a ``DailyAggregate``,
+    ``draft_monthly_newsletter_body`` runs before its caller's
+    ``NewsletterDraftRun`` row even exists, and ``draft_newsletter_prose``
+    (presently unused in production — see its call site's comment) takes an
+    in-memory ``ClinicAggregate`` that isn't a persisted row at all. Adding a
+    FK to only one of the three would misleadingly suggest the others have
+    one too; ``call_site`` already identifies which caller produced a row.
+    Add a nullable FK later if a real cross-referencing need shows up.
+    """
+
+    CALL_SITE_NEWSLETTER_PROSE = "newsletter_prose"
+    CALL_SITE_DAILY_SUMMARY = "daily_summary"
+    CALL_SITE_MONTHLY_NEWSLETTER = "monthly_newsletter"
+    CALL_SITE_CHOICES = [
+        (
+            CALL_SITE_NEWSLETTER_PROSE,
+            "Newsletter prose (draft_newsletter_prose — currently unused)",
+        ),
+        (CALL_SITE_DAILY_SUMMARY, "Daily report summary sentence"),
+        (CALL_SITE_MONTHLY_NEWSLETTER, "Monthly newsletter drafting"),
+    ]
+
+    call_site = models.CharField(max_length=30, choices=CALL_SITE_CHOICES)
+    model = models.CharField(
+        max_length=60, help_text="Anthropic model id, e.g. claude-sonnet-5."
+    )
+    input_tokens = models.PositiveIntegerField()
+    output_tokens = models.PositiveIntegerField()
+    cost_usd = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        help_text="input_tokens/output_tokens x the published per-model rate "
+        "at call time — see apps.pipeline.ai_pricing.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_call_site_display()} ({self.model}): ${self.cost_usd}"
+
+    @classmethod
+    def record(
+        cls, *, call_site: str, model: str, input_tokens: int, output_tokens: int
+    ) -> AiCallLog:
+        """Compute cost from the published per-token rates and log one call.
+
+        The single entry point every call site in ``apps.pipeline.ai`` uses —
+        keeps the cost computation (``apps.pipeline.ai_pricing``) out of the
+        call sites themselves.
+        """
+        return cls.objects.create(
+            call_site=call_site,
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_usd=compute_cost_usd(model, input_tokens, output_tokens),
+        )

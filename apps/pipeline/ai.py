@@ -28,7 +28,7 @@ from typing import Any, Protocol
 
 from apps.pipeline.aggregation import ClinicAggregate
 from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
-from apps.pipeline.models import DailyAggregate
+from apps.pipeline.models import AiCallLog, DailyAggregate
 
 # Direct identifiers that may appear as columns in a raw export. They are read
 # for tallying (see aggregation.py) but must NEVER appear in an AI payload. The
@@ -72,6 +72,25 @@ class _AnthropicLike(Protocol):
     messages: Any
 
 
+def _log_ai_call(call_site: str, model: str, response: Any) -> None:
+    """Record one Anthropic call's token usage + computed cost (Plan 11 C2).
+
+    Reads ``response.usage`` — the SDK always populates this on a response
+    object that was actually returned (never on a raised exception), so every
+    call site logs immediately after its own ``client.messages.create(...)``
+    succeeds, before any downstream sanity check on the *content*. Tokens
+    were spent whether or not the text that came back turns out to be usable;
+    logging here means a run that fails the daily-summary length check, for
+    instance, still shows up in the cost total instead of vanishing.
+    """
+    AiCallLog.record(
+        call_site=call_site,
+        model=model,
+        input_tokens=response.usage.input_tokens,
+        output_tokens=response.usage.output_tokens,
+    )
+
+
 def build_prompt_payload(aggregate: ClinicAggregate) -> dict[str, Any]:
     """Build the exact payload handed to the model — aggregates only.
 
@@ -108,9 +127,17 @@ def draft_newsletter_prose(aggregate: ClinicAggregate, client: _AnthropicLike) -
     Returns the model's text only. The numbers a reader ultimately sees are
     rendered from ``aggregate`` in :mod:`apps.pipeline.rendering`; this prose is
     treated as narrative, never as a source of figures.
+
+    Not currently called from any production code path — Plan 09 replaced
+    this one-shot-prompt shape with :func:`draft_monthly_newsletter_body`'s
+    "one-shot prompt with tooling" design for the live newsletter-drafting
+    flow (see :mod:`apps.pipeline.newsletter_drafting`). Kept (and still
+    AI-call-logged, per Plan 11 C2) because nothing has removed it and its
+    guardrail tests in ``tests.py`` still exercise it directly.
     """
     payload = build_prompt_payload(aggregate)
     response = client.messages.create(**payload)
+    _log_ai_call(AiCallLog.CALL_SITE_NEWSLETTER_PROSE, DRAFTING_MODEL, response)
     return response.content[0].text
 
 
@@ -175,6 +202,8 @@ def _draft_short_text(
     build_payload: Callable[[], dict[str, Any]],
     client: _AnthropicLike | None,
     max_length: int,
+    *,
+    on_response: Callable[[Any], None] | None = None,
 ) -> str | None:
     """Shared shape behind every short, fixed-template drafting call below.
 
@@ -186,11 +215,21 @@ def _draft_short_text(
     their caller. Extracted (found by code-review-tc) so a future change to
     this shape only has one place to land, instead of three near-identical
     copies drifting apart.
+
+    ``on_response`` (Plan 11 C2), if given, runs right after a response comes
+    back — before the length sanity check — so a caller can log AI-call
+    usage/cost even for a response that ends up failing that check (the call
+    was billed for its tokens either way). Only the daily-summary call passes
+    one; the newer freetext-summary/empty-columns-flag calls below were never
+    wired into cost logging (out of scope for both the branch that added them
+    and the branch that added logging).
     """
     try:
         active_client = client or get_anthropic_client()
         payload = build_payload()
         response = active_client.messages.create(**payload)
+        if on_response is not None:
+            on_response(response)
         text = response.content[0].text.strip()
     except Exception:  # noqa: BLE001 - any failure means "no text this run"
         return None
@@ -208,10 +247,18 @@ def draft_daily_summary_sentence(
     See :func:`_draft_short_text` for the failure contract. The caller always
     has a safe value to fall back to, which is exactly what lets the daily
     report page auto-publish unconditionally (see this module's Plan 08
-    section above).
+    section above). The AI-call log (Plan 11 C2) is written via
+    ``on_response`` as soon as a response comes back, before the length
+    sanity check — the call was billed for its tokens regardless of whether
+    the resulting text turns out to be usable.
     """
     return _draft_short_text(
-        lambda: build_daily_summary_payload(aggregate), client, MAX_DAILY_SUMMARY_LENGTH
+        lambda: build_daily_summary_payload(aggregate),
+        client,
+        MAX_DAILY_SUMMARY_LENGTH,
+        on_response=lambda response: _log_ai_call(
+            AiCallLog.CALL_SITE_DAILY_SUMMARY, DAILY_SUMMARY_MODEL, response
+        ),
     )
 
 
@@ -549,6 +596,14 @@ def draft_monthly_newsletter_body(
     opposite of Plan 08's daily page). The broad ``except Exception`` here is
     deliberate for the same reason as the daily summary sentence: any failure
     mode of an external API call must degrade to "no draft", never raise.
+
+    AI-call logging (Plan 11 C2) happens once per loop iteration, right after
+    each ``messages.create`` call returns — every turn is a real, separately
+    billed Anthropic call (tool-result turns included), so each gets its own
+    row, whether that turn ends up being the final ``end_turn`` answer, a
+    ``tool_use`` turn, or a turn this function ultimately discards (e.g. a
+    truncated/refused non-``end_turn`` stop reason). Only a turn that never
+    got a response (the request itself raised) has nothing to log.
     """
     try:
         active_client = client or get_anthropic_client()
@@ -578,6 +633,11 @@ def draft_monthly_newsletter_body(
                 system=_MONTHLY_NEWSLETTER_SYSTEM_PROMPT,
                 tools=MONTHLY_NEWSLETTER_TOOLS,
                 messages=messages,
+            )
+            _log_ai_call(
+                AiCallLog.CALL_SITE_MONTHLY_NEWSLETTER,
+                MONTHLY_NEWSLETTER_MODEL,
+                response,
             )
             if response.stop_reason == "end_turn":
                 text = "".join(

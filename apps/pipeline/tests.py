@@ -156,8 +156,12 @@ def test_upload_never_persists_raw_phi(
         assert column not in serialised
 
 
-def test_ai_payload_contains_only_aggregates(mock_anthropic_client):
-    """Invariant #2: the payload sent to the model holds only aggregate counts."""
+def test_ai_payload_contains_only_aggregates(db, mock_anthropic_client):
+    """Invariant #2: the payload sent to the model holds only aggregate counts.
+
+    ``db`` is required here (Plan 11 C2): ``draft_newsletter_prose`` now
+    writes an ``AiCallLog`` row after every call.
+    """
     aggregate = aggregate_export(io.BytesIO(_build_export_xlsx()))
 
     prose = draft_newsletter_prose(aggregate, mock_anthropic_client)
@@ -179,8 +183,12 @@ def test_ai_payload_contains_only_aggregates(mock_anthropic_client):
     assert "by_gender" in sent
 
 
-def test_published_report_numbers_are_deterministic(mock_anthropic_client):
-    """Invariant #3: published figures come from Python, not the model's prose."""
+def test_published_report_numbers_are_deterministic(db, mock_anthropic_client):
+    """Invariant #3: published figures come from Python, not the model's prose.
+
+    ``db`` is required here (Plan 11 C2): ``draft_newsletter_prose`` now
+    writes an ``AiCallLog`` row after every call.
+    """
     aggregate = aggregate_export(io.BytesIO(_build_export_xlsx()))
 
     # The stub prose deliberately contains a bogus number ("9999").
@@ -208,13 +216,16 @@ def test_published_report_numbers_are_deterministic(mock_anthropic_client):
     assert aggregate.by_diagnosis == EXPECTED_BY_DIAGNOSIS
 
 
-def test_template_comment_does_not_leak_into_output(mock_anthropic_client):
+def test_template_comment_does_not_leak_into_output(db, mock_anthropic_client):
     """The template's documentation comment must not render as visible text.
 
     Django's ``{# ... #}`` hash-comment syntax is single-line only (its lexer
     regex is not DOTALL), so a multi-line hash comment leaks into the HTML as
     literal text. The template uses a ``{% comment %}`` block instead; this
     guards against a regression back to the leaking form.
+
+    ``db`` is required here (Plan 11 C2): ``draft_newsletter_prose`` now
+    writes an ``AiCallLog`` row after every call.
     """
     aggregate = aggregate_export(io.BytesIO(_build_export_xlsx()))
     prose = draft_newsletter_prose(aggregate, mock_anthropic_client)
