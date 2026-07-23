@@ -9,6 +9,13 @@ teaser degrades gracefully per content type, not all-or-nothing (Plan 06
 decision). Plan 06 wires the newsletter half; the report half stays hidden
 until Plan 08 supplies a report content type to query.
 
+2026-07-23: the live "Our impact so far" band (Plan 11 Track F2) is not part
+of the StreamField body, so it can't be reordered by dragging blocks in the
+admin. Per maintainer request, ``body`` is split in
+``HomePage.get_body_split_on_circle_of_care`` so the band always renders
+directly above the Quality of Care circle wherever an editor has placed it,
+instead of unconditionally at the very end of the page.
+
 2026-07 change: the standalone ".home-wordmark" line that sat above the hero
 (a small, stray uppercase label duplicating the logo) is REMOVED. The org name
 now lives inside the hero itself as the large swaying wordmark title, with the
@@ -18,7 +25,18 @@ headline as a smaller sub-line beneath it — see templates/blocks/hero_block.ht
 {% endcomment %}
 
 {% block content %}
-  {% for block in page.body %}
+  {% for block in body_before_circle_of_care %}
+    {% include_block block %}
+  {% endfor %}
+
+  {% if live_impact_stats_as_of %}
+    {% blocktranslate asvar live_impact_caption with date=live_impact_stats_as_of|date:"d M Y" %}Our impact so far (updated at {{ date }}){% endblocktranslate %}
+  {% else %}
+    {% translate "Our impact so far" as live_impact_caption %}
+  {% endif %}
+  {% include "partials/sections/stat_band.html" with stats=live_impact_stats caption=live_impact_caption %}
+
+  {% for block in body_from_circle_of_care %}
     {% include_block block %}
   {% endfor %}
 
@@ -32,11 +50,4 @@ headline as a smaller sub-line beneath it — see templates/blocks/hero_block.ht
   {% if latest_newsletter %}
     {% include "partials/sections/feature_split.html" with eyebrow=_("Latest newsletter") heading=latest_newsletter.title body=latest_newsletter.summary cta_label=_("Read the newsletter →") cta_url=latest_newsletter.url %}
   {% endif %}
-
-  {% if live_impact_stats_as_of %}
-    {% blocktranslate asvar live_impact_caption with date=live_impact_stats_as_of|date:"d M Y" %}Our impact so far (updated at {{ date }}){% endblocktranslate %}
-  {% else %}
-    {% translate "Our impact so far" as live_impact_caption %}
-  {% endif %}
-  {% include "partials/sections/stat_band.html" with stats=live_impact_stats caption=live_impact_caption %}
 {% endblock %}
