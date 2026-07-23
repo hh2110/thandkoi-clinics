@@ -483,9 +483,11 @@ class DailyReportPage(Page):
         # line in production. `category_counts["by_department"]` is still
         # computed at the model layer (harmless, and a future parser may
         # populate it) — this page just stops rendering it.
-        context["by_diagnosis_category"] = sorted(
-            self.aggregate.category_counts.get("by_diagnosis_category", {}).items()
-        )
+        #
+        # "By diagnosis category" was dropped from this page too (maintainer
+        # decision, 2026-07-23) — `category_counts["by_diagnosis_category"]`
+        # is still computed at the model layer, this page just stops
+        # rendering it.
         context["by_age_band"] = sorted(
             self.aggregate.category_counts.get("by_age_band", {}).items()
         )

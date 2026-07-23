@@ -313,7 +313,7 @@ EMPTY_COLUMNS_FLAG_MODEL = "claude-haiku-4-5"
 # (found by code-review-tc: the previous bounds were tighter than their
 # calls' max_tokens could produce — a valid 600-token freetext summary could
 # run well past the old 800-char cap).
-MAX_FREETEXT_SUMMARY_LENGTH = 3000  # max_tokens=600 below
+MAX_FREETEXT_SUMMARY_LENGTH = 600  # max_tokens=120 below
 MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 
 # Tightened 2026-07-23 (Plan 11 Track B11, maintainer decision): the
@@ -326,34 +326,41 @@ MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 # which is parked — see the plan doc's "Parked, deliberately" section);
 # scoped to wording only, it does not change what data reaches the model.
 #
-# Also restructured 2026-07-23 (Plan 11 Track B10, merged on top of B11):
+# Restructured 2026-07-23 (Plan 11 Track B10, merged on top of B11):
 # maintainer feedback that the rendered summary "has no formatting at all" —
-# the template now renders this via Django's `linebreaks` filter, so the
-# prompt asks for a few blank-line-separated thematic paragraphs instead of
-# one long paragraph, which get real `<p>` tags on render.
+# the template renders this via Django's `linebreaks` filter, so multiple
+# `<p>` tags are supported on render if the model writes blank-line-separated
+# paragraphs.
+#
+# Capped to 50 words 2026-07-23 (maintainer decision, later same day): a
+# 50-word budget leaves no room for B10's "a few short thematic paragraphs"
+# structure, so that instruction is replaced with "one short paragraph"
+# here — `linebreaks` above still applies harmlessly if the model ever
+# returns a blank line, it just has nothing to split in practice now. Also
+# drops B8's original "if a column has no entries, say so plainly" — that's
+# now the empty-columns-flag call's (B9's) job alone
+# (`_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT` below), and repeating it here would
+# spend a meaningful fraction of a 50-word budget on information the page
+# already states in its own section.
 _FREETEXT_SUMMARY_SYSTEM_PROMPT = (
     "You write a short summary, for a clinic's public daily report page, of "
     "that clinic's free-text clinical notes for one day. You are given, for "
     "each listed column, every non-blank entry recorded that day. Write a "
-    "short, factual summary of common themes across entries, using "
-    "frequency or thematic language (for example 'several patients "
-    "presented with...' or 'a common theme was...') rather than narrative "
-    "sentences that read like a description of one visit. Never state an "
-    "exact duration (for example '5 days' or 'two weeks') — drop it or "
-    "generalize it (for example 'a recent onset' or 'an ongoing issue') "
-    "instead of quoting it. Never combine a specific condition, an exact "
-    "duration, and a specific circumstance in the same sentence — that "
-    "combination can make a single visit recognisable even with no direct "
-    "identifier attached, so it is forbidden even if every individual "
-    "detail seems harmless on its own. Organize the summary into a few "
-    "short thematic paragraphs (for example: presenting complaints and "
-    "diagnoses, treatment and medicine, compliance and follow-up notes) "
-    "rather than one long paragraph, separating each paragraph with a "
-    "blank line. Do not use headings, bullet points, or any other markup — "
-    "plain paragraphs only. Do not invent, estimate, or attribute anything "
-    "to a specific patient — you are not given any patient identifier and "
-    "must not imply one. If a column has no entries, say so plainly rather "
-    "than guessing what it might have said."
+    "single short paragraph, no more than 50 words, giving a factual "
+    "summary of common themes across entries, using frequency or thematic "
+    "language (for example 'several patients presented with...' or 'a "
+    "common theme was...') rather than narrative sentences that read like a "
+    "description of one visit. Never state an exact duration (for example "
+    "'5 days' or 'two weeks') — drop it or generalize it (for example 'a "
+    "recent onset' or 'an ongoing issue') instead of quoting it. Never "
+    "combine a specific condition, an exact duration, and a specific "
+    "circumstance in the same sentence — that combination can make a "
+    "single visit recognisable even with no direct identifier attached, so "
+    "it is forbidden even if every individual detail seems harmless on its "
+    "own. Do not use headings, bullet points, or any other markup — plain "
+    "prose only. Do not invent, estimate, or attribute anything to a "
+    "specific patient — you are not given any patient identifier and must "
+    "not imply one."
 )
 
 
@@ -372,7 +379,7 @@ def build_freetext_summary_payload(
     body = {FREETEXT_COLUMN_LABELS[name]: values for name, values in columns.items()}
     return {
         "model": FREETEXT_SUMMARY_MODEL,
-        "max_tokens": 600,
+        "max_tokens": 120,
         "system": _FREETEXT_SUMMARY_SYSTEM_PROMPT,
         "messages": [
             {
@@ -412,15 +419,29 @@ def draft_freetext_summary(
     )
 
 
+# Tightened 2026-07-23 (same Plan 11 Track B10 maintainer feedback as
+# `_FREETEXT_SUMMARY_SYSTEM_PROMPT` above — "no formatting at all" — but this
+# prompt itself was missed when B10 first landed): the template renders this
+# field as one raw string in a single `<p>`, so a model output like
+# "**Empty columns for 2026-07-20:** - Investigation - Plan" (markdown bold
+# heading + a bullet list) collapses to one unreadable run-on line — HTML
+# whitespace collapsing has no idea `**`/`- ` were meant to be structure.
+# Fixed by prompt only, matching B11's precedent of tightening wording rather
+# than changing what data reaches the model: explicitly ban markdown and
+# require one plain sentence, since this field is never meant to hold
+# multiple paragraphs the way `freetext_summary` is.
 _EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT = (
     "You write a short, plain-language note, for a clinic's public daily "
     "report page, listing which of that clinic's free-text record columns "
     "were left blank for the day. You are given, for each listed column, "
     "whether it was entirely empty across every visit that day — a "
     "true/false fact already determined for you; you must not recompute or "
-    "second-guess it. State only which columns are marked empty. Do not add "
-    "commentary on why, and if none are empty, say so in one short sentence "
-    "instead of listing every column as filled in."
+    "second-guess it. State only which columns are marked empty, as a "
+    "single plain sentence naming them, comma-separated. Do not use "
+    "headings, bullet points, bold text, or any other markup — plain prose "
+    "only, one sentence. Do not add commentary on why, and if none are "
+    "empty, say so in one short sentence instead of listing every column as "
+    "filled in."
 )
 
 

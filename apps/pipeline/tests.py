@@ -1493,6 +1493,30 @@ def test_freetext_summary_prompt_forbids_reidentifying_detail(
     assert "do not invent, estimate, or attribute anything" in lowered
 
 
+def test_freetext_summary_prompt_caps_at_fifty_words(home_page, mock_anthropic_client):
+    """Maintainer decision, 2026-07-23: cap the freetext summary at 50 words.
+    Replaces B10's "a few short thematic paragraphs" instruction (no room
+    for multiple paragraphs in a 50-word budget) and drops B8's original
+    "say so if a column has no entries" instruction — that's the
+    empty-columns-flag call's (B9's) job alone now, not worth spending part
+    of the word budget repeating."""
+    _ingest_tkc_daily_fixture()
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+    columns = freetext.collect_freetext_entries(visits)
+
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, mock_anthropic_client)
+    assert summary
+
+    assert len(mock_anthropic_client.calls) == 1
+    sent_system_prompt = mock_anthropic_client.calls[0]["system"]
+    assert sent_system_prompt == ai._FREETEXT_SUMMARY_SYSTEM_PROMPT
+    lowered = sent_system_prompt.lower()
+    assert "no more than 50 words" in lowered
+    assert "single short paragraph" in lowered
+    assert "thematic paragraphs" not in lowered
+    assert "say so plainly" not in lowered
+
+
 def test_empty_columns_flag_payload_contains_only_booleans(
     home_page, mock_anthropic_client
 ):
@@ -1521,17 +1545,51 @@ def test_empty_columns_flag_payload_contains_only_booleans(
     assert '\\"investigation\\": true' in sent
 
 
+def test_empty_columns_flag_prompt_forbids_markdown_formatting(
+    home_page, mock_anthropic_client
+):
+    """The template renders `empty_columns_flag` as one raw string in a
+    single `<p>` (unlike `freetext_summary`, which gets the `linebreaks`
+    filter — see the daily report template). A model output using markdown
+    (a bold heading, a bullet list) collapses to one unreadable run-on line,
+    since HTML whitespace collapsing has no idea `**`/`- ` were meant to be
+    structure. Fixed by tightening this prompt (it was missed when B10 first
+    tightened the sibling `_FREETEXT_SUMMARY_SYSTEM_PROMPT`)."""
+    _ingest_tkc_daily_fixture()
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+    empty_columns = freetext.compute_empty_columns(visits)
+
+    flag = ai.draft_empty_columns_flag(
+        TKC_VISIT_DATE, empty_columns, mock_anthropic_client
+    )
+    assert flag
+
+    assert len(mock_anthropic_client.calls) == 1
+    sent_system_prompt = mock_anthropic_client.calls[0]["system"]
+    assert sent_system_prompt == ai._EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT
+    lowered = sent_system_prompt.lower()
+    assert "do not use headings, bullet points, bold text" in lowered
+    assert "single plain sentence" in lowered
+    # Existing safeguards must still be present, not replaced.
+    assert "must not recompute or second-guess it" in lowered
+
+
 def test_draft_freetext_summary_accepts_a_realistic_full_length_response(home_page):
-    """Found by code-review-tc: MAX_FREETEXT_SUMMARY_LENGTH used to be 800,
-    tighter than the call's own max_tokens=600 could actually produce (~4
-    chars/token) — a genuinely good, full-length summary on a busy day with
-    rich free-text content was silently rejected as if the call had failed."""
+    """Found by code-review-tc (original 2026-07-23 version, before the
+    50-word cap below): MAX_FREETEXT_SUMMARY_LENGTH used to be tighter than
+    the call's own max_tokens could actually produce (~4 chars/token) — a
+    genuinely good, full-length summary was silently rejected as if the call
+    had failed. Re-sized the same day for the 50-word cap (max_tokens
+    600 -> 120, MAX_FREETEXT_SUMMARY_LENGTH 3000 -> 600, keeping the same
+    ~4-chars/token comfortable-margin ratio as before) — this now checks a
+    ~50-word response, the longest this prompt actually asks for, still
+    clears the bound."""
     _ingest_tkc_daily_fixture()
     visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
     columns = freetext.collect_freetext_entries(visits)
-    long_text = ("Common themes across today's entries." + " ") * 40
+    long_text = ("Common themes across today's entries." + " ") * 9
     long_text = long_text.strip()
-    assert 800 < len(long_text) < ai.MAX_FREETEXT_SUMMARY_LENGTH
+    assert 300 < len(long_text) < ai.MAX_FREETEXT_SUMMARY_LENGTH
 
     client = _StubAnthropicClient(text=long_text)
     summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, client)
@@ -1849,13 +1907,14 @@ def test_home_page_get_latest_report_returns_latest_published_daily_report(db):
 # --- Daily report page UX pass (Plan 08 follow-up) --------------------------
 
 
-def test_daily_report_page_context_omits_by_department_keeps_other_breakdowns(
+def test_daily_report_page_context_omits_by_department_and_diagnosis_keeps_age_band(
     home_page,
 ):
     """`by_department` is never in the template context — the real TKC parser
     never populates `department` (parser_tkc_daily_v1's own docstring), so
-    rendering it would always show one dead "Unknown: N" line. The other two
-    breakdowns are untouched."""
+    rendering it would always show one dead "Unknown: N" line.
+    `by_diagnosis_category` was also dropped (maintainer decision,
+    2026-07-23). `by_age_band` is untouched."""
     report_date = datetime.date(2026, 7, 10)
     aggregate = DailyAggregateFactory(
         clinic_date=report_date,
@@ -1875,7 +1934,7 @@ def test_daily_report_page_context_omits_by_department_keeps_other_breakdowns(
     context = page.get_context(request)
 
     assert "by_department" not in context
-    assert context["by_diagnosis_category"] == [("hypertension", 2)]
+    assert "by_diagnosis_category" not in context
     assert context["by_age_band"] == [("18-40", 3)]
 
 
@@ -1883,8 +1942,9 @@ def test_daily_report_page_rendering_reflects_ux_pass_copy_and_card_changes(
     client, home_page
 ):
     """UX-pass copy/structure fixes: "By sex" -> "By gender"; the always-empty
-    "New vs. follow-up" card and the "By department" section no longer render,
-    while the still-wanted breakdown sections are unaffected."""
+    "New vs. follow-up" card and the "By department" section no longer
+    render, "By diagnosis category" was dropped (maintainer decision,
+    2026-07-23), while the still-wanted breakdown sections are unaffected."""
     index = ReportIndexPageFactory(parent=home_page, slug="reports")
     report_date = datetime.date(2026, 7, 10)
     aggregate = DailyAggregateFactory(
@@ -1908,7 +1968,7 @@ def test_daily_report_page_rendering_reflects_ux_pass_copy_and_card_changes(
     assert "By sex" not in content
     assert "New vs. follow-up" not in content
     assert "By department" not in content
-    assert "By diagnosis category" in content
+    assert "By diagnosis category" not in content
     assert "By age band" in content
 
 

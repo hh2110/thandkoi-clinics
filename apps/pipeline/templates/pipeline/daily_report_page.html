@@ -94,19 +94,6 @@ shrinking `--space-8` itself, which other, longer pages still rely on.
     </div>
   </section>
 
-  {% if by_diagnosis_category %}
-    <section class="section section--snug">
-      <div class="wrapper prose">
-        <h2>{% translate "By diagnosis category" %}</h2>
-        <ul>
-          {% for label, count in by_diagnosis_category %}
-            <li>{{ label }}: <strong>{{ count }}</strong></li>
-          {% endfor %}
-        </ul>
-      </div>
-    </section>
-  {% endif %}
-
   {% if by_age_band %}
     <section class="section section--snug">
       <div class="wrapper prose">
