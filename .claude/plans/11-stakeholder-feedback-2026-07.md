@@ -104,19 +104,22 @@ the doc itself is not re-read going forward.
 - [x] **D1.** Enlarge the top-left logo; consider icon-only (drop the wordmark).
       **Done (2026-07-22, branch `feat/bigger-logo`),** PR not yet opened.
       Swapped to the existing `logo-mark.svg` (icon-only), 2.5rem → 4rem.
+- ~~**D5.** Add a building photo to the home page.~~ **Dropped (maintainer
+  decision 2026-07-23)** — not part of this plan's remaining scope.
 - [ ] **D2.** Relabel "Our impact so far" → "Our impact so far (updated at
       <date>)"; document/confirm how the figure is calculated (see open
       questions).
-- [ ] **D3.** Implement "circle of care" on the home page (redesign, same
-      underlying information — needs a design pass before implementation - i can do this with claude design).
+- [x] **D3.** Implement "circle of care" on the home page (redesign, same
+      underlying information).
+      **Done (2026-07-23, branch via PR #56),** merged to `main`. Six-wedge
+      `CircleOfCareBlock` on `HomePage.body`, CMS-editable, capped at one per
+      page.
 - [ ] **D4.** Newsletter branding: the clay-lamp ("chiragh") image/motif; remove
       "چراغ شفا" from the Urdu home page per the maintainer's explicit ask (note:
       CLAUDE.md's project tagline currently includes "چراغ شفا" — this is a
       deliberate content change, not a doc contradiction; update CLAUDE.md's
       Bilingual section in the same change per the Stage 4 "docs are living" rule
       if the tagline is genuinely retired, or confirm it's page-scoped only).
-- [ ] **D5.** Add a building photo to the home page — maintainer wants a few
-      placement options proposed (e.g. hero background) before committing.
 - [x] **D6.** New "Donors & Partners" page/menu item: organizational partners
       (Sugar Hospital, District Health Office) and named individual/in-kind
       donors (e.g. Basit — X-ray plant; one family — water coolers).
@@ -129,6 +132,9 @@ the doc itself is not re-read going forward.
       Office logo files** — no image needed for named donors, by design.
 - [ ] **D8.** Main nav items should support dropdown submenus (groundwork for D6
       and the merged Reports menu in C3).
+      **Dropped for future implementation (maintainer decision 2026-07-23)** —
+      not part of this round's remaining-work sessions; revisit as its own
+      plan/task when nav complexity actually demands it.
 - [x] **D9.** Gallery: clicking a cropped thumbnail should open a full-size
       modal.
       **Done (2026-07-22, branch `feat/gallery-lightbox-modal`),** PR not yet
@@ -136,8 +142,7 @@ the doc itself is not re-read going forward.
       convention.
 
   **Priority: P2** across the board — visible polish and content, not
-  functional bugs. D3 and D5 need a short design/options pass before a task
-  file is written (mirrors Stage 2 "design before building").
+  functional bugs.
 
 ### Track E — Process & tooling
 
@@ -182,6 +187,55 @@ answer directly, then decide whether the answer implies a task:
 - **Bilingual generation of any new content** (D4's Urdu tagline change is a
   removal, not generation, so it's unaffected) — already parked repo-wide per
   the Plans README "Out of scope" section; nothing here reopens it.
+- **D5 (home-page building photo)** — dropped (maintainer decision
+  2026-07-23), not just deferred; no condition noted for revisiting, so treat
+  as fully out of scope unless the maintainer raises it again.
+- **D8 (nav dropdown submenus)** — dropped for future implementation
+  (maintainer decision 2026-07-23). Condition to bring back: revisit once nav
+  complexity (more top-level items, or another grouped menu beyond C3's merged
+  Reports menu) actually demands it — not speculatively.
+
+## Candidates from notes (not yet milestones)
+
+### F. Multi-day camp upload + live "impact so far" aggregation (2026-07-23)
+
+Maintainer idea, captured raw, not yet slotted into a session:
+
+- **F1. Multi-day camp file upload.** A single camp-report upload may cover
+  several calendar days of data (currently C3's camp upload assumes one file
+  = one date + one camp title). Instead: parse the file, group rows by date,
+  and auto-generate one daily-report page per distinct date found in the
+  file, each carrying its own `DailyAggregate`.
+- **F2. Live "impact so far" home-page stats.** Currently `ImpactStatBlock`
+  (`apps/core/blocks.py:19-35`) is a hand-typed `CharBlock` — its own docstring
+  already anticipates this: "Real figures are entered by hand for now; Plan
+  08's pipeline supplies computed ones later." F2 is that later: replace (or
+  supplement) the hand-typed stat values with a live aggregation across
+  `DailyAggregate` rows (sum of visits/patients etc., across daily + camp
+  reports), so the home page reflects real cumulative totals rather than a
+  manually maintained string. This is the natural pairing with F1: more
+  camp-day reports flowing in only matters to "impact so far" if that number
+  is actually computed from them.
+
+**Maintainer decisions (2026-07-23), resolving the open questions:**
+
+- **Upload scope:** both upload types — generalize the date-grouping/split
+  logic so a daily-clinic export *or* a camp upload may contain multiple
+  dates in one file, each producing its own report page.
+- **Stat scope:** keep camp-sourced numbers distinguishable from regular
+  clinic numbers in the live aggregate (e.g. "X clinic patients + Y camp
+  patients"), not folded into one combined total — `report_kind` (from C3)
+  is the natural discriminator to aggregate on separately.
+- **Time window:** all-time since first upload — sum every `DailyAggregate`
+  row ever ingested, matching the current hand-typed framing ("467+ children
+  treated to date").
+
+**Follow-up action:** still needs its own short Stage 2 planning pass before
+it's sliced into tasks — specifically: does the parser already carry a
+per-row date column to group on for both upload formats, or does that need
+confirming per format first; and how `DailyAggregate` should be queried
+per-`report_kind` for the live stat without a per-request full-table scan
+becoming a home-page performance concern as data grows.
 
 ## Reference material
 
@@ -197,19 +251,43 @@ answer directly, then decide whether the answer implies a task:
 - [whatsapp-claude-plugin](https://github.com/rich627/whatsapp-claude-plugin) —
   candidate for Track E2.
 
-## Status (2026-07-22)
+## Status (2026-07-23)
 
-A1, B1–B7, C1, C3, C4, D1, D6, D7, D9 are **merged to `main`**: 8 PRs (#47–#54),
-each reviewed (code-review-tc or a manual pass), fixed up, CI-green, and
-squash-merged. The two flagged merge-order dependencies (the migration-number
-collision between `feat/daily-report-ux-pass` and `feat/camp-report-upload-type`,
-and the "department always empty" assumption needing
-`chore/remove-provisional-schema-option` merged first) were both handled during
-the merge sequence — `camp-report-upload-type` was rebased onto `main` after
-the other two landed, its migration renumbered to `0005`, and its tests fixed
-up where they still referenced the now-unregistered `clinic_daily_export_v1`
-format.
+A1, B1–B7, C1, C3, C4, D1, D3, D6, D7, D9 are **merged to `main`**: 9 PRs
+(#47–#54, #56), each reviewed (code-review-tc or a manual pass), fixed up,
+CI-green, and squash-merged. The two flagged merge-order dependencies (the
+migration-number collision between `feat/daily-report-ux-pass` and
+`feat/camp-report-upload-type`, and the "department always empty" assumption
+needing `chore/remove-provisional-schema-option` merged first) were both
+handled during the merge sequence — `camp-report-upload-type` was rebased onto
+`main` after the other two landed, its migration renumbered to `0005`, and its
+tests fixed up where they still referenced the now-unregistered
+`clinic_daily_export_v1` format. D3 landed later as PR #56, migration
+renumbered to `0007` for the same reason.
 
-Remaining, not yet ready to slice: B8/B9 (unblocked, not yet built this
-round), C2, D2–D5, D8, E1, E2 — each still needs the design pass or
-maintainer decision noted against it above.
+**Dropped, not slotted into any session:** D5 (building photo — no condition
+to revisit), D8 (nav dropdown submenus — parked until nav complexity actually
+demands it, see "Parked, deliberately").
+
+**Remaining work, grouped into sessions (maintainer decision 2026-07-23) —
+one session/branch per group below, not one task file per item:**
+
+1. **B8 + B9** (one branch/session) — Claude-generated free-text summary and
+   the companion empty-column flag, built together since they share the same
+   input columns and the same grounding resolution (Track B note above).
+2. **C2** (one branch/session) — Anthropic API cost surfaced in the admin
+   panel; still needs the metering approach (token-count × published rate)
+   decided before slicing into a task file.
+3. **Track D remainder** (one branch/session) — D2 (impact-so-far date label
+   + calculation doc) and D4 (chiragh branding + Urdu tagline removal) only,
+   now that D3 is done and D5/D8 are dropped.
+4. **E1 + E2 research** (one session, research only — no build) — a short
+   options review for both: E1's update-routing skill design, and E2's
+   WhatsApp-ingestion options (including the `whatsapp-claude-plugin`
+   candidate) per the existing Parked note tying E2 to E1's outcome. This
+   session produces a decision/design write-up, not a task file yet.
+
+Each of the four sessions above still needs its own Stage 2 planning /
+Stage 3 grounding pass and Stage 6 task slicing before implementation begins,
+per the lifecycle doc — this status note records the grouping, not a
+shortcut around that.
