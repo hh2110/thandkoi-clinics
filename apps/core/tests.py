@@ -491,6 +491,32 @@ def test_impact_stats_block_caption_unchanged_when_as_of_unset(db):
     assert "updated at" not in html
 
 
+def test_impact_stats_block_as_of_without_caption_has_no_stray_prefix(db):
+    """``as_of`` with no ``caption`` set renders "Updated at <date>", not a
+    bare " (updated at <date>)" with no preceding text (both fields are
+    independently optional on ImpactStatsBlock)."""
+    from wagtail.blocks import StreamValue
+
+    from apps.core.models import HomePage as _HP
+
+    body = _HP().body.stream_block
+    value = StreamValue(
+        body,
+        [
+            (
+                "impact_stats",
+                {
+                    "as_of": datetime.date(2026, 7, 23),
+                    "stats": [{"value": "467+", "label": "children treated"}],
+                },
+            )
+        ],
+    )
+    html = value.render_as_block()
+    assert "Updated at 23 Jul 2026" in html
+    assert "(updated at" not in html
+
+
 @pytest.mark.parametrize(
     ("url", "lang", "direction"),
     [("/en/", "en", "ltr"), ("/ur/", "ur", "rtl")],

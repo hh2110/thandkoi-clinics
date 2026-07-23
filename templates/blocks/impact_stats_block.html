@@ -8,8 +8,11 @@ figures it shows its own "coming soon" empty state.
 as "(updated at <date>)" when set — never computed, see ImpactStatsBlock's
 docstring.
 {% endcomment %}
-{% if value.as_of %}
+{% if value.as_of and value.caption %}
   {% blocktranslate asvar impact_caption with caption=value.caption date=value.as_of|date:"d M Y" %}{{ caption }} (updated at {{ date }}){% endblocktranslate %}
+  {% include "partials/sections/stat_band.html" with stats=value.stats caption=impact_caption %}
+{% elif value.as_of %}
+  {% blocktranslate asvar impact_caption with date=value.as_of|date:"d M Y" %}Updated at {{ date }}{% endblocktranslate %}
   {% include "partials/sections/stat_band.html" with stats=value.stats caption=impact_caption %}
 {% else %}
   {% include "partials/sections/stat_band.html" with stats=value.stats caption=value.caption %}
