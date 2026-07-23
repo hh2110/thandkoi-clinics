@@ -42,9 +42,58 @@
      stays legible" floor for the full lockup -- a smaller height satisfies
      "bigger than before" but not that legibility floor. .site-header__bar's
      padding-block (--space-2, 1rem) grows the bar to accommodate rather
-     than the logo overflowing the bar's edges. */
+     than the logo overflowing the bar's edges.
+
+     Plan 11 D11: logo.svg's wordmark is hard-coded dark-navy, so on the dark
+     theme it sat dark-on-dark and was nearly invisible. header.html now
+     renders both this lockup (`--light`) and a reversed lockup
+     `logo-reversed.png` (`--dark`; light wordmark, white ring, transparent
+     background) as two always-in-DOM <img>s, and the rules below toggle
+     which one is `display`ed via the same :root[data-theme] /
+     prefers-color-scheme cascade the rest of the site uses for colour — no
+     JS, no FOUC. Sizing (height:7rem; width:auto) stays shared across both
+     lockups so the swap doesn't change the logo's height; each <img>'s own
+     width/height attributes carry its own natural pixel ratio so the
+     browser's auto aspect-ratio doesn't distort either image. */
   height: 7rem;
   width: auto;
+}
+
+/* Default (light): show light lockup, hide reversed. */
+.site-header__logo--dark {
+  display: none;
+}
+
+.site-header__logo--light {
+  display: block;
+}
+
+/* OS dark preference. */
+@media (prefers-color-scheme: dark) {
+  .site-header__logo--light {
+    display: none;
+  }
+
+  .site-header__logo--dark {
+    display: block;
+  }
+}
+
+/* Explicit user choice overrides the OS preference in both directions. */
+:root[data-theme="light"] .site-header__logo--light {
+  display: block;
+}
+
+:root[data-theme="light"] .site-header__logo--dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .site-header__logo--light {
+  display: none;
+}
+
+:root[data-theme="dark"] .site-header__logo--dark {
+  display: block;
 }
 
 .site-header__controls {
