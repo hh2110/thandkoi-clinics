@@ -188,8 +188,15 @@ fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
   log "Dry run — stopping before any tag/deploy action"
-  echo "Would tag: $REF"
-  echo "Would deploy: $REF"
+  # --ref mode deploys an existing tag as-is — the "Cut and push the tag"
+  # step below only runs when the tag doesn't already exist, so a dry run
+  # of --ref must not claim a new tag would be cut (found by code-review-tc).
+  if git rev-parse "refs/tags/$REF" >/dev/null 2>&1; then
+    echo "Would deploy existing tag: $REF (no new tag cut)"
+  else
+    echo "Would tag: $REF"
+    echo "Would deploy: $REF"
+  fi
   exit 0
 fi
 
@@ -210,7 +217,14 @@ fi
 
 if ! git rev-parse "refs/tags/$REF" >/dev/null 2>&1; then
   log "Tagging $REF"
-  git tag "$REF" origin/main
+  # Tag the exact SHA already verified as CI-green and shown to the operator
+  # ($REMOTE_MAIN), not the mutable `origin/main` ref name — a concurrent
+  # fetch (another terminal, an IDE, a second invocation) between that
+  # verification and this line could otherwise move origin/main out from
+  # under an interactive confirm prompt, tagging a commit that was never
+  # actually checked (found by code-review-tc). This branch only runs on
+  # the "cut a new tag" path, where $REMOTE_MAIN is always set.
+  git tag "$REF" "$REMOTE_MAIN"
   git push origin "$REF"
 fi
 
