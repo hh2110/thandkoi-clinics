@@ -17,8 +17,11 @@ nav entry is merged, not the archive itself). This avoids a dropdown-menu
 widget, which this repo doesn't have yet (backlog item D8) — see
 apps.pipeline.models.ReportIndexPage's docstring for the full decision.
 
-"Donors & Partners" is also a plain link, not a dropdown, for the same
-reason (backlog item D8).
+Nav (2026-07-23, Plan 11 D10): the "Donors & Partners" nav link was removed
+per maintainer feedback. DonorsPartnersPage itself is unchanged and still
+live at /donors-partners/ — DonatePage.get_context() (apps/core/models.py)
+still reads it for the donate-page partner-logo carousel, so only this nav
+entry came out.
 {% endcomment %}
 {% with lang=LANGUAGE_CODE|default:"en" %}
 <nav aria-label="{% translate 'Primary' %}">
@@ -31,7 +34,6 @@ reason (backlog item D8).
       <li><a href="/{{ lang }}/about/">{% translate "About" %}</a></li>
       <li><a href="/{{ lang }}/team/">{% translate "Team" %}</a></li>
       <li><a href="/{{ lang }}/our-work/">{% translate "Our Work" %}</a></li>
-      <li><a href="/{{ lang }}/donors-partners/">{% translate "Donors & Partners" %}</a></li>
       <li><a href="/{{ lang }}/reports/">{% translate "Reports" %}</a></li>
       <li><a href="/{{ lang }}/newsletters/">{% translate "Newsletters" %}</a></li>
       <li><a href="/{{ lang }}/gallery/">{% translate "Gallery" %}</a></li>
