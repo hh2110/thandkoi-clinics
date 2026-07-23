@@ -191,12 +191,39 @@ class HomePage(Page):
 
         return compute_alltime_impact_stats().as_of
 
+    def get_body_split_on_circle_of_care(self):
+        """``body`` split around the Quality of Care circle, so the live
+        impact-stats band can render directly above it (maintainer ask,
+        2026-07-23) regardless of where an editor has placed the circle.
+
+        Returns ``(before, from_circle_onward)``. When no ``circle_of_care``
+        block is present, ``before`` is the whole body and the second half is
+        empty — the template falls back to appending the band at the end, so
+        it still always renders (Plan 11 Track F2's "unconditional" contract
+        is unchanged).
+        """
+        body_blocks = list(self.body)
+        circle_index = next(
+            (
+                i
+                for i, block in enumerate(body_blocks)
+                if block.block_type == "circle_of_care"
+            ),
+            None,
+        )
+        if circle_index is None:
+            return body_blocks, []
+        return body_blocks[:circle_index], body_blocks[circle_index:]
+
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         context["latest_report"] = self.get_latest_report()
         context["latest_newsletter"] = self.get_latest_newsletter()
         context["live_impact_stats"] = self.get_live_impact_stats()
         context["live_impact_stats_as_of"] = self.get_live_impact_stats_as_of()
+        body_before_circle, body_from_circle = self.get_body_split_on_circle_of_care()
+        context["body_before_circle_of_care"] = body_before_circle
+        context["body_from_circle_of_care"] = body_from_circle
         return context
 
     class Meta:

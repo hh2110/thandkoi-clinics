@@ -444,6 +444,20 @@ def test_home_page_get_live_impact_stats_as_of_is_none_with_no_data(db):
     assert home.get_live_impact_stats_as_of() is None
 
 
+def test_home_page_get_body_split_on_circle_of_care_falls_back_to_whole_body(db):
+    """A home page with no ``circle_of_care`` block (e.g. before an editor
+    has added one) still shows the live band — it lands after everything
+    rather than being dropped, keeping Track F2's "unconditional" contract."""
+    home = HomePageFactory(
+        body=[("hero", {"headline": "Welcome"})],
+    )
+
+    before, from_circle = home.get_body_split_on_circle_of_care()
+
+    assert [b.block_type for b in before] == ["hero"]
+    assert from_circle == []
+
+
 def test_home_page_renders_live_impact_stats_band(client, home_page):
     """The real page shows the live band, separate from the StreamField
     ``ImpactStatsBlock`` band already asserted by
@@ -467,6 +481,27 @@ def test_home_page_renders_live_impact_stats_band(client, home_page):
     assert '<p class="stat__value">1234</p>' in content
     assert '<p class="stat__value">987</p>' in content
     assert "Our impact so far (updated at 01 Jul 2026)" in content
+
+
+def test_home_page_renders_live_impact_stats_band_above_circle_of_care(
+    client, home_page
+):
+    """The live band isn't part of the StreamField body, so an editor can't
+    drag it above the Quality of Care circle — ``HomePage`` splits ``body``
+    around ``circle_of_care`` instead so the band always renders directly
+    above it (maintainer request, 2026-07-23), not unconditionally at the
+    very end of the page as it did when Track F2 first shipped."""
+    from apps.pipeline.factories import DailyAggregateFactory
+
+    DailyAggregateFactory(
+        clinic_date=datetime.date(2026, 7, 1),
+        total_visits=1234,
+        zakat_beneficiary_patients=987,
+    )
+
+    content = client.get("/en/").content.decode()
+
+    assert content.index("Clinic patients (all time)") < content.index("coc-section")
 
 
 def test_home_page_renders_live_impact_stats_empty_state_with_no_data(
