@@ -259,6 +259,52 @@ HOME_BODY = [
         },
     ),
     (
+        "circle_of_care",
+        {
+            "heading": "",
+            # Exactly 6 stages (CircleOfCareBlock.clean() enforces this) —
+            # matches what's live on production today (added by hand via
+            # /admin per Plan 11 D3; mirrored here so a fresh seed doesn't
+            # drift from what the home page has actually shipped with).
+            "stages": [
+                {
+                    "name": "Patient Registration",
+                    "short": "Patient Registration",
+                    "desc": "Secure, computerised records created for every visit.",
+                },
+                {
+                    "name": "Triage",
+                    "short": "Triage",
+                    "desc": "Complaint and vital signs assessed the moment you arrive.",
+                },
+                {
+                    "name": "Doctor's Consultation",
+                    "short": "Doctor's Consultation",
+                    "desc": "Care for children and adults, with dedicated "
+                    "women's and maternal health.",
+                },
+                {
+                    "name": "Diagnostic Services",
+                    "short": "Diagnostic Services",
+                    "desc": "Accessible testing and imaging to support timely "
+                    "clinical care.",
+                },
+                {
+                    "name": "Free Medication & Health Education",
+                    "short": "Free Medication",
+                    "desc": "Free essential medicines, plus prevention and "
+                    "self-care guidance.",
+                },
+                {
+                    "name": "Referral & Follow-up",
+                    "short": "Referral & Follow-up",
+                    "desc": "Coordinated referrals and continuity of care "
+                    "beyond the visit.",
+                },
+            ],
+        },
+    ),
+    (
         "donate_cta",
         {
             "heading": "Your Zakat keeps our doors open",
