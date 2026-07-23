@@ -55,18 +55,18 @@ checking is cheap.
 ## Examples
 
 **"Relabel 'Our impact so far' to include the as-of date."**
-Grep finds `ImpactStatBlock` is a hand-typed `CharBlock`
-(`apps/core/blocks.py`), not a page field a draft revision could touch on its
-own — the label text lives in a template. → **Code change**: edit the
-template, branch `feat/impact-label-date`, tests/lint, `code-review-tc`,
+Grep finds `ImpactStatBlock` (`apps/core/blocks.py`) is a `StructBlock` of
+hand-typed `CharBlock` fields, not a page field a draft revision could touch
+on its own — the heading text lives in a template. → **Code change**: edit
+the template, branch `feat/impact-label-date`, tests/lint, `code-review-tc`,
 draft PR.
 
 **"Add a new donor entry for the Ali family — they donated a water cooler."**
-Grep finds `DonorsPartnersPage` is a real Wagtail page with a `StreamField`
-donor list. → **Wagtail draft**: script that loads the page, appends the new
-donor block, calls `save_revision()`. Reported back to the maintainer as "a
-draft is waiting for you in the Wagtail admin" — never published
-automatically.
+Grep finds `DonorsPartnersPage` (`apps/core/models.py`) is a real Wagtail
+page with an orderable `donors` `InlinePanel`. → **Wagtail draft**: script
+that loads the page, appends the new `Donor` child object, calls
+`save_revision()`. Reported back to the maintainer as "a draft is waiting
+for you in the Wagtail admin" — never published automatically.
 
 **"Publish the July newsletter draft."**
 Explicit publish ask on content. → **Publish action**: confirm which draft
