@@ -313,8 +313,3 @@ own branch — status of each as of this write-up:**
 None of the three code branches are merged yet — each still needs its
 review loop to land clean, then a draft PR, then CI, before merge and
 deploy.
-
-Each of the four sessions above still needs its own Stage 2 planning /
-Stage 3 grounding pass and Stage 6 task slicing before implementation begins,
-per the lifecycle doc — this status note records the grouping, not a
-shortcut around that.
