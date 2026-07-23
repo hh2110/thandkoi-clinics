@@ -12,19 +12,30 @@ Answers Track F2's own "Follow-up action" note in
 
 ## What already exists to build on (precedent map, Stage 7)
 
-- **The exact output shape already has two live precedents in this repo** —
-  neither is hand-typed:
-  - `DailyReportPage.headline_stats` (`apps/pipeline/models.py:495-510`) returns
+- **The exact output shape already has two live-computed precedents in this
+  repo** — neither is hand-typed, though only one reads `DailyAggregate`:
+  - `DailyReportPage.headline_stats` (`apps/pipeline/models.py:491-510`) returns
     `[{"value": str(...), "label": _("...")}, ...]` computed straight from
     `self.aggregate` (a `DailyAggregate` row), explicitly documented as "read
-    live from `aggregate`, never copied onto this page."
-  - `CampReportPage.get_context()` (`apps/core/models.py:765`) builds the same
-    shape as `patient_stats` for its own template.
+    live from `aggregate`, never copied onto this page." **This is the
+    precedent for reading `DailyAggregate` into this exact shape.**
+  - `CampReportPage.get_context()` (`apps/core/models.py:763-773`) builds the
+    same `{value, label}` shape as `patient_stats` — but from *that page's own*
+    `patients_children`/`patients_general`/`patients_welfare` fields (plain
+    `Page` fields an admin fills in per camp report, Plan 06), **not** from
+    `DailyAggregate`. Correction while grounding this doc: `CampReportPage`
+    (Plan 06, a hand-authored page per camp) and `DailyAggregate` rows with
+    `report_kind="camp"` (Plan 11 C3, pipeline-ingested camp uploads) are two
+    separate data paths that happen to share the word "camp" — F2 aggregates
+    the latter, never the former. `CampReportPage.get_context()` is only cited
+    here as a second precedent that `stat_band.html` already renders
+    *computed*, non-StreamField dicts — not as evidence it reads
+    `DailyAggregate`.
   - Both feed `templates/partials/sections/stat_band.html`, which only cares
     about the `{value, label}` shape — it has no idea whether the caller is a
-    StreamField block or a live computation. **This means F2 needs no new
-    partial and no new block type** — it needs a new context variable of the
-    same shape, plumbed the same way.
+    StreamField block, a page's own fields, or a `DailyAggregate` computation.
+    **This means F2 needs no new partial and no new block type** — it needs a
+    new context variable of the same shape, plumbed the same way.
 - **`ImpactStatsBlock`/`ImpactStatBlock`** (`apps/core/blocks.py:79-104` /
   `19-35`) is the *hand-typed* path — StreamField-authored, admin types the
   string value and bumps `as_of` by hand. Its own docstring already names this
