@@ -288,9 +288,11 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       Office logo files** — no image needed for named donors, by design.
 - [ ] **D8.** Main nav items should support dropdown submenus (groundwork for D6
       and the merged Reports menu in C3).
-      **Dropped for future implementation (maintainer decision 2026-07-23)** —
-      not part of this round's remaining-work sessions; revisit as its own
-      plan/task when nav complexity actually demands it.
+      **Revisited same day (2026-07-23)** — dropped that morning as "not part
+      of this round," then reopened hours later by a maintainer design
+      handoff (`~/Downloads/header.zip`) collapsing the header to a single
+      row with a "More" dropdown (Team/Gallery/Contact). In progress on
+      `feat/single-row-header`, PR #94 — plain nested `<details>`, no new JS.
 - [x] **D9.** Gallery: clicking a cropped thumbnail should open a full-size
       modal.
       **Done (2026-07-22, branch `feat/gallery-lightbox-modal`),** merged PR
@@ -399,10 +401,8 @@ answer directly, then decide whether the answer implies a task:
 - **D5 (home-page building photo)** — dropped (maintainer decision
   2026-07-23), not just deferred; no condition noted for revisiting, so treat
   as fully out of scope unless the maintainer raises it again.
-- **D8 (nav dropdown submenus)** — dropped for future implementation
-  (maintainer decision 2026-07-23). Condition to bring back: revisit once nav
-  complexity (more top-level items, or another grouped menu beyond C3's merged
-  Reports menu) actually demands it — not speculatively.
+- **D8 (nav dropdown submenus)** — no longer parked; reopened same day (see
+  D8's own row above) via `feat/single-row-header`, PR #94.
 - **B11's categorical aggregation** (Python-computed theme counts/percentages
   for the free-text summary, matching the doc's own "GI 45%, MSK 30%..."
   example) — parked in favour of the prompt-only fix (maintainer decision
@@ -493,8 +493,8 @@ tests fixed up where they still referenced the now-unregistered
 renumbered to `0007` for the same reason.
 
 **Dropped, not slotted into any session:** D5 (building photo — no condition
-to revisit), D8 (nav dropdown submenus — parked until nav complexity actually
-demands it, see "Parked, deliberately").
+to revisit). D8 (nav dropdown submenus) was dropped here too, same day, but
+reopened hours later — see D8's own row above.
 
 **Four sessions run in parallel (maintainer decision 2026-07-23), each its
 own branch:**
