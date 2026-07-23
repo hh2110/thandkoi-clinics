@@ -124,6 +124,8 @@ def test_bank_setting_filled_but_never_overwrites_a_human_edit():
     setting = ContactBankSettings.for_site(site)
     assert setting.bank_iban == "PK83SONE0510930001644218"
     assert setting.bank_account_title == "The Thandkoi Clinics"
+    assert setting.phone == "+92 344 4111235"
+    assert setting.email == "info.thandkoiclinics@gmail.com"
 
     # A human corrects a value; re-running must not clobber it.
     setting.bank_iban = "PK00MANUAL0000000000000000"

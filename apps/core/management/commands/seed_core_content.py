@@ -90,11 +90,11 @@ ABOUT_FOUNDING = (
     "Assembly and MNA Mr. Asad Qaiser, alongside DHO Swabi Dr. Abdul Latif and "
     "other community leaders. The occasion was followed by a free medical camp, "
     "where consultations were provided, medicines were dispensed, and families "
-    "received care — marking the beginning of accessible healthcare for the "
+    "received care, marking the beginning of accessible healthcare for the "
     "community.</p>"
     "<p>A Free Medical Camp was organised under the Thandkoi Clinics initiative "
     "with the support of volunteer doctors from Khyber Teaching Hospital and "
-    "Police &amp; Services Hospital. Free consultations, medicines, and "
+    "Police & Services Hospital. Free consultations, medicines, and "
     "healthcare services were provided across Paediatrics, Gynaecology, General "
     "Medicine, and Psychiatry. In just one morning, the camp served 379 "
     "patients, with all services provided 100% free of cost.</p>"
@@ -133,8 +133,8 @@ COMMITTEE = [
 
 OURWORK_INTRO = (
     "<p>In support of our vision for accessible healthcare, we provide "
-    "comprehensive medical services under one roof — from everyday "
-    "consultations to emergency care — always with dignity, and free of cost to "
+    "comprehensive medical services under one roof, from everyday "
+    "consultations to emergency care, always with dignity and free of cost to "
     "those most in need.</p>"
 )
 # (name, description) for active services.
@@ -193,8 +193,8 @@ OURWORK_INFRASTRUCTURE = (
 )
 
 CONTACT_INTRO = (
-    "<p>We'd love to hear from you — for appointments, volunteering, or to "
-    "discuss in-kind support. Reach us using the details below.</p>"
+    "<p>We'd love to hear from you, whether for appointments, volunteering, or "
+    "to discuss in-kind support. Reach us using the details below.</p>"
 )
 
 DONATE_INTRO = (
@@ -211,7 +211,7 @@ DONATE_ZAKAT = (
     "transparently and accountably for those most in need.</p>"
 )
 DONATE_SADAQA = (
-    "<p>Sadaqa — voluntary charity — supports the clinic's day-to-day running, "
+    "<p>Sadaqa (voluntary charity) supports the clinic's day-to-day running, "
     "from medicines and equipment to keeping our doors open for everyone, "
     "regardless of their ability to pay.</p>"
 )
@@ -221,9 +221,9 @@ DONATE_HOW = (
     "contribution.</p>"
 )
 DONATE_IN_KIND = (
-    "<p>We also welcome in-kind support — medicines, medical equipment, and "
-    "volunteering time from healthcare professionals. Please get in touch via "
-    "our Contact page to arrange in-kind giving.</p>"
+    "<p>We also welcome in-kind support, such as medicines, medical equipment, "
+    "and volunteering time from healthcare professionals. Please get in touch "
+    "via our Contact page to arrange in-kind giving.</p>"
 )
 
 # Home StreamField body (block types match apps.core.blocks).
@@ -234,11 +234,11 @@ HOME_BODY = [
             "eyebrow": "Primary care · Thandkoi, Swabi",
             "headline": "Bringing healthcare to every doorstep",
             "intro": "A not-for-profit, family-run primary care clinic serving "
-            "our community on a Zakat and Sadaqa model — free for those most in "
+            "our community on a Zakat and Sadaqa model, free for those most in "
             "need.",
             "tagline": "صحت سب کے لیے",
             "stat_value": "100%",
-            "stat_label": "donor-funded — free for those in need",
+            "stat_label": "donor-funded, free for those in need",
         },
     ),
     (
@@ -267,8 +267,10 @@ HOME_BODY = [
     ),
 ]
 
-# Zakat/Sadaqa bank details for the site-wide setting (public donation info).
+# Contact & Zakat/Sadaqa bank details for the site-wide setting (public info).
 BANK = {
+    "phone": "+92 344 4111235",
+    "email": "info.thandkoiclinics@gmail.com",
     "bank_account_title": "The Thandkoi Clinics",
     "bank_name": "Soneri Bank",
     "bank_iban": "PK83SONE0510930001644218",

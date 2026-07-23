@@ -133,24 +133,24 @@ def test_home_title_is_not_doubled(client, home_page):
 
 
 def test_inner_page_title_has_site_suffix(client, home_page):
-    """A non-home page keeps the " — The Thandkoi Clinics" suffix."""
+    """A non-home page keeps the " - The Thandkoi Clinics" suffix."""
     AboutPageFactory(parent=home_page, title="About", slug="about")
     content = client.get("/en/about/").content.decode()
     title = re.search(r"<title>(.*?)</title>", content, re.S).group(1).strip()
-    assert title == "About — The Thandkoi Clinics"
+    assert title == "About - The Thandkoi Clinics"
 
 
 def test_home_social_meta_names_the_clinic_once(client, home_page):
     """OpenGraph/Twitter tags exist and og:title is the site name once.
 
     Social scrapers (WhatsApp etc.) use these explicit tags, so the doubled
-    "The Thandkoi Clinics — The Thandkoi Clinics" must not appear: the brand
+    "The Thandkoi Clinics - The Thandkoi Clinics" must not appear: the brand
     lives in og:site_name, and og:title is the page title alone.
     """
     content = client.get("/en/", follow=True).content.decode()
     assert '<meta property="og:title" content="The Thandkoi Clinics" />' in content
     assert '<meta property="og:site_name" content="The Thandkoi Clinics" />' in content
-    assert "— The Thandkoi Clinics" not in re.search(
+    assert "- The Thandkoi Clinics" not in re.search(
         r'og:title" content="([^"]*)"', content
     ).group(1)
     assert 'property="og:description"' in content
@@ -727,6 +727,28 @@ def test_footer_shows_placeholder_when_setting_empty(client, home_page):
     content = client.get("/en/").content.decode()
     assert "Contact details coming soon." in content
     assert "Bank details coming soon." in content
+
+
+def test_footer_contact_column_hidden_only_on_the_contact_page(client, home_page):
+    """The footer's own Contact column is suppressed on /contact/ itself.
+
+    The Contact page's body already shows the same email/phone; the site-wide
+    footer repeating the identical "Contact" heading and details right below
+    read as a duplicate Contact section (stakeholder feedback, 2026-07-23).
+    Every other page still shows the footer's Contact column as before.
+    """
+    ContactPageFactory(parent=home_page, slug="contact")
+    site = Site.objects.get(is_default_site=True)
+    contact = ContactBankSettings.for_site(site)
+    contact.email = "info.thandkoiclinics@example.org"
+    contact.save()
+
+    footer_contact_heading = '<h2 class="site-footer__heading">Contact</h2>'
+    contact_page = client.get("/en/contact/").content.decode()
+    assert footer_contact_heading not in contact_page
+
+    home = client.get("/en/").content.decode()
+    assert footer_contact_heading in home
 
 
 # --- Plan 05: donate placeholder ---------------------------------------------

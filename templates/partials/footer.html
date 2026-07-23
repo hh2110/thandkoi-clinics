@@ -11,10 +11,16 @@ with no redeploy.
 `settings` is absent — every block below then degrades to its "coming soon"
 placeholder rather than raising. That graceful-degradation is relied on by
 apps/core/tests.py::test_500_page_is_branded_and_has_no_stack_trace.
+
+The Contact page itself already shows this same email/phone in its own body
+(apps/core/templates/core/contact_page.html), so the footer's Contact column
+is suppressed there to avoid showing it twice in a row on one page (feedback,
+2026-07-23). Every other page keeps the footer Contact column as-is.
 {% endcomment %}
 {% with contact=settings.core.ContactBankSettings %}
 <footer class="site-footer">
   <div class="wrapper site-footer__grid">
+    {% if page.content_type.model != "contactpage" %}
     <div>
       <h2 class="site-footer__heading">{% translate "Contact" %}</h2>
       {% if contact.email or contact.phone %}
@@ -24,6 +30,7 @@ apps/core/tests.py::test_500_page_is_branded_and_has_no_stack_trace.
         <p>{% translate "Contact details coming soon." %}</p>
       {% endif %}
     </div>
+    {% endif %}
     <div>
       <h2 class="site-footer__heading">{% translate "Zakat & Sadaqa" %}</h2>
       {% if contact.bank_account_title or contact.bank_iban %}
