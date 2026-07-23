@@ -1493,6 +1493,30 @@ def test_freetext_summary_prompt_forbids_reidentifying_detail(
     assert "do not invent, estimate, or attribute anything" in lowered
 
 
+def test_freetext_summary_prompt_caps_at_fifty_words(home_page, mock_anthropic_client):
+    """Maintainer decision, 2026-07-23: cap the freetext summary at 50 words.
+    Replaces B10's "a few short thematic paragraphs" instruction (no room
+    for multiple paragraphs in a 50-word budget) and drops B8's original
+    "say so if a column has no entries" instruction — that's the
+    empty-columns-flag call's (B9's) job alone now, not worth spending part
+    of the word budget repeating."""
+    _ingest_tkc_daily_fixture()
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+    columns = freetext.collect_freetext_entries(visits)
+
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, mock_anthropic_client)
+    assert summary
+
+    assert len(mock_anthropic_client.calls) == 1
+    sent_system_prompt = mock_anthropic_client.calls[0]["system"]
+    assert sent_system_prompt == ai._FREETEXT_SUMMARY_SYSTEM_PROMPT
+    lowered = sent_system_prompt.lower()
+    assert "no more than 50 words" in lowered
+    assert "single short paragraph" in lowered
+    assert "thematic paragraphs" not in lowered
+    assert "say so plainly" not in lowered
+
+
 def test_empty_columns_flag_payload_contains_only_booleans(
     home_page, mock_anthropic_client
 ):
@@ -1551,16 +1575,20 @@ def test_empty_columns_flag_prompt_forbids_markdown_formatting(
 
 
 def test_draft_freetext_summary_accepts_a_realistic_full_length_response(home_page):
-    """Found by code-review-tc: MAX_FREETEXT_SUMMARY_LENGTH used to be 800,
-    tighter than the call's own max_tokens=600 could actually produce (~4
-    chars/token) — a genuinely good, full-length summary on a busy day with
-    rich free-text content was silently rejected as if the call had failed."""
+    """Found by code-review-tc (original 2026-07-23 version, before the
+    50-word cap below): MAX_FREETEXT_SUMMARY_LENGTH used to be tighter than
+    the call's own max_tokens could actually produce (~4 chars/token) — a
+    genuinely good, full-length summary was silently rejected as if the call
+    had failed. Re-sized the same day for the 50-word cap (max_tokens
+    600 -> 120, MAX_FREETEXT_SUMMARY_LENGTH 3000 -> 500) — this now checks a
+    ~50-word response, the longest this prompt actually asks for, still
+    clears the bound."""
     _ingest_tkc_daily_fixture()
     visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
     columns = freetext.collect_freetext_entries(visits)
-    long_text = ("Common themes across today's entries." + " ") * 40
+    long_text = ("Common themes across today's entries." + " ") * 9
     long_text = long_text.strip()
-    assert 800 < len(long_text) < ai.MAX_FREETEXT_SUMMARY_LENGTH
+    assert 300 < len(long_text) < ai.MAX_FREETEXT_SUMMARY_LENGTH
 
     client = _StubAnthropicClient(text=long_text)
     summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, client)
