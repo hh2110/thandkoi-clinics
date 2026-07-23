@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('pipeline', '0005_campuploadreportpage_dailyaggregate_report_kind_and_more'),
+        ('pipeline', '0006_dailyreportpage_empty_columns_flag_approved_and_more'),
     ]
 
     operations = [

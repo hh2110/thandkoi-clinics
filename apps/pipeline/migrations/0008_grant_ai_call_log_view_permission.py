@@ -68,7 +68,7 @@ def revoke_view_permission(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("pipeline", "0006_ai_call_log"),
+        ("pipeline", "0007_ai_call_log"),
         ("accounts", "0002_create_administrator_group"),
     ]
 
