@@ -104,22 +104,31 @@ the doc itself is not re-read going forward.
 - [x] **D1.** Enlarge the top-left logo; consider icon-only (drop the wordmark).
       **Done (2026-07-22, branch `feat/bigger-logo`),** PR not yet opened.
       Swapped to the existing `logo-mark.svg` (icon-only), 2.5rem → 4rem.
-- ~~**D5.** Add a building photo to the home page.~~ **Dropped (maintainer
-  decision 2026-07-23)** — not part of this plan's remaining scope.
-- [ ] **D2.** Relabel "Our impact so far" → "Our impact so far (updated at
+- [ ] ~~**D5.** Add a building photo to the home page.~~ **Dropped (maintainer
+      decision 2026-07-23)** — not part of this plan's remaining scope.
+- [x] **D2.** Relabel "Our impact so far" → "Our impact so far (updated at
       <date>)"; document/confirm how the figure is calculated (see open
       questions).
+      **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),** PR
+      not yet opened. The figure was never computed — `ImpactStatBlock` is a
+      hand-typed admin field; this adds an optional `as_of` date the admin
+      sets manually alongside it. Documented in
+      [docs/architecture-and-ai-brief.md](../../docs/architecture-and-ai-brief.md),
+      with live computation deferred to the new Track F candidate below.
 - [x] **D3.** Implement "circle of care" on the home page (redesign, same
       underlying information).
       **Done (2026-07-23, branch via PR #56),** merged to `main`. Six-wedge
       `CircleOfCareBlock` on `HomePage.body`, CMS-editable, capped at one per
       page.
-- [ ] **D4.** Newsletter branding: the clay-lamp ("chiragh") image/motif; remove
-      "چراغ شفا" from the Urdu home page per the maintainer's explicit ask (note:
-      CLAUDE.md's project tagline currently includes "چراغ شفا" — this is a
-      deliberate content change, not a doc contradiction; update CLAUDE.md's
-      Bilingual section in the same change per the Stage 4 "docs are living" rule
-      if the tagline is genuinely retired, or confirm it's page-scoped only).
+- [x] **D4.** Newsletter branding: the clay-lamp ("chiragh") image/motif; remove
+      "چراغ شفا" from the Urdu home page per the maintainer's explicit ask.
+      **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),** PR
+      not yet opened. Removed from the site-wide footer (the only live
+      occurrence) and updated CLAUDE.md's Bilingual section — **scope note:**
+      the footer renders on every page, not Home alone, flagged in case
+      something narrower was meant. No chiragh asset exists yet, so a
+      placeholder (mirroring the Donors & Partners page's pattern) was added
+      to the newsletter archive page pending a real asset.
 - [x] **D6.** New "Donors & Partners" page/menu item: organizational partners
       (Sugar Hospital, District Health Office) and named individual/in-kind
       donors (e.g. Basit — X-ray plant; one family — water coolers).
@@ -158,6 +167,14 @@ the doc itself is not re-read going forward.
 
   **Priority: P2.** E1 has real leverage (every future small site edit gets
   cheaper) but is itself a small design exercise before it's a task file.
+
+  **Options review done (2026-07-23):** see
+  [11-e1-e2-research-2026-07.md](11-e1-e2-research-2026-07.md) — recommends
+  building E1 now (a `route-change-request` skill, no new infra needed) and
+  confirms E2's defer with a refinement (the flagged `whatsapp-claude-plugin`
+  doesn't actually solve "import existing history"; manual copy-paste
+  remains the durable zero-build answer unless this becomes a recurring
+  pain point).
 
 ## Open questions (answer, not build)
 
