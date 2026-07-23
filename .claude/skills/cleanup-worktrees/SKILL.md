@@ -1,6 +1,6 @@
 ---
 name: cleanup-worktrees
-description: Sweep .claude/worktrees/ and local branches for finished (merged) work and remove it safely. Use when the user asks to "clean up worktrees", "clean up branches", or after confirming a PR merged and wanting the local leftovers gone.
+description: Sweep .claude/worktrees/ and local branches for finished (merged) work and remove it safely, including each worktree's own local Postgres database. Use when the user asks to "clean up worktrees", "clean up branches", or after confirming a PR merged and wanting the local leftovers gone.
 ---
 
 Reclaim disk space and branch clutter left behind by `EnterWorktree` sessions
@@ -20,7 +20,13 @@ git worktree list --porcelain
 ls -la .claude/worktrees/
 git branch -vv
 gh pr list --state merged --limit 30 --json number,title,headRefName,mergedAt
+PGPASSWORD=thandkoi psql -h localhost -U thandkoi -d thandkoi -tA -c \
+  "SELECT datname FROM pg_database WHERE datname ~ '^(test_)?thandkoi_.+';"
 ```
+
+The last query lists this project's per-worktree local Postgres databases (see
+"Worktree-scoped databases" below) — include them in the inventory alongside
+worktrees and branches, since they're ephemeral artifacts of the same kind.
 
 `.claude/worktrees/` can contain three kinds of entries:
 
@@ -66,6 +72,20 @@ For every registered worktree and every local branch, determine:
 5. **Is it the worktree the current session is sitting in, or one that shows
    changes you didn't make?** Never touch a worktree whose current state you
    can't explain — another concurrent session may be actively using it.
+6. **Does a `thandkoi_<slug>` / `test_thandkoi_<slug>` database from step 1
+   match this worktree?** Local dev practice is one Postgres DB per worktree,
+   named after the worktree directory (dashes → underscores, e.g. worktree
+   `daily-report-ux-pass` ↔ `thandkoi_daily_report_ux_pass`). A database
+   whose slug matches **no currently registered worktree at all** is an
+   orphan left behind by a past sweep that removed the directory but not the
+   database — confirmed in practice 2026-07-23 (six such orphans:
+   `thandkoi_patient_count_mismatch`, `thandkoi_daily_report_ux_pass`, and
+   four more, none with a matching worktree left on disk). Before dropping
+   any of these, check for active connections —
+   `psql -h localhost -U thandkoi -d thandkoi -tA -c "SELECT pid FROM
+   pg_stat_activity WHERE datname = '<name>'"` — a live connection means a
+   `runserver` or shell is actually using it right now; leave it and flag it
+   instead of dropping underneath a running process.
 
 ## 3. Decide, per the same rule every time
 
@@ -78,7 +98,17 @@ For every registered worktree and every local branch, determine:
   for this run). Try `git branch -d` first; if it refuses with "not fully
   merged" for a branch `gh` has already confirmed merged, that's the
   squash-merge false negative above, not a real risk — use `git branch -D`
-  instead of second-guessing the `gh` result.
+  instead of second-guessing the `gh` result. Drop its matching database(s)
+  in the same pass (`dropdb -h localhost -U thandkoi thandkoi_<slug>`, and
+  `test_thandkoi_<slug>` if present) — `dropdb` itself refuses if there's an
+  active connection, so it won't silently pull a DB out from under a running
+  process.
+- **Orphaned database with no matching worktree at all** → same treatment as
+  an orphaned directory: this is scratch dev/test data, always reproducible
+  via `migrate` plus the seed commands, never a source of unrecoverable
+  work, so it's safe to `dropdb` once the active-connection check above is
+  clear. No git-side ambiguity applies here — a missing worktree directory is
+  itself the signal that the work already left this database behind.
 - **Orphaned directory with no `.git` file, or a dangling one** → inspect
   before deleting even though git itself can't identify it:
   - If everything inside is build/dependency artifacts (`.venv`,
@@ -103,5 +133,5 @@ For every registered worktree and every local branch, determine:
 
 ## 4. Report
 
-Summarize what was removed (worktrees + local + remote branches) and what was
-left behind and why, so the user has a clean record of the sweep.
+Summarize what was removed (worktrees + local + remote branches + databases)
+and what was left behind and why, so the user has a clean record of the sweep.
