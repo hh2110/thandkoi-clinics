@@ -172,7 +172,7 @@ if [[ -z "$REF" ]]; then
     git log --oneline "$PREV_TAG"..origin/main
   else
     echo "No previous release tag found — this looks like the first release."
-    git log --oneline origin/main | head -20
+    git log --oneline origin/main | head -20 || true  # head closes the pipe early once satisfied; without this, SIGPIPE + pipefail kills the whole script under set -e (found by code-review-tc)
   fi
 
   BASE_TAG="v$(date +%Y.%m.%d)"
@@ -252,24 +252,36 @@ gh workflow run deploy.yml --repo "$REPO" -f ref="$REF"
 # candidate's own log for deploy.yml's "Deploying tag $REF (...)" line
 # (from its "Verify the ref is a release tag" step) rather than trusting
 # timing alone.
+#
+# Poll for up to 5 minutes (60 x 5s), not 2 — the same cancel-in-progress:
+# false concurrency group means a freshly-dispatched run can sit queued
+# behind a prior still-running deploy for a while before its log has
+# anything to match against (found by code-review-tc). Ruled-out candidates
+# (checked, log didn't match — most likely still queued with no log yet)
+# are remembered across iterations rather than re-fetched and re-grepped on
+# every tick, so a slow/rate-limited API doesn't waste the poll budget
+# re-checking runs that already came back negative.
 RUN_ID=""
-for _ in $(seq 1 24); do
+CHECKED=" "
+for _ in $(seq 1 60); do
   CANDIDATES=$(gh run list --repo "$REPO" --workflow deploy.yml --limit 10 \
     --json databaseId,createdAt,event \
     | jq -r --arg since "$TRIGGERED_AT" \
       '[.[] | select(.event == "workflow_dispatch" and .createdAt >= $since)]
        | sort_by(.createdAt) | .[].databaseId')
   for candidate in $CANDIDATES; do
+    [[ "$CHECKED" == *" $candidate "* ]] && continue
     if gh run view "$candidate" --repo "$REPO" --log 2>/dev/null \
         | grep -qF "Deploying tag ${REF} ("; then
       RUN_ID="$candidate"
       break
     fi
+    CHECKED="${CHECKED}${candidate} "
   done
   [[ -n "$RUN_ID" ]] && break
   sleep 5
 done
-[[ -n "$RUN_ID" ]] || fail "Could not find the workflow_dispatch run for $REF (none created at/after $TRIGGERED_AT confirmed deploying it after 2 minutes). Check the Actions tab directly: https://github.com/$REPO/actions/workflows/deploy.yml"
+[[ -n "$RUN_ID" ]] || fail "Could not find the workflow_dispatch run for $REF (none created at/after $TRIGGERED_AT confirmed deploying it after 5 minutes). The tag was already pushed — this may just mean the run is still queued behind another in-progress deploy (deploy-production's concurrency group doesn't cancel a prior run), not that anything failed. Check the Actions tab before assuming otherwise: https://github.com/$REPO/actions/workflows/deploy.yml"
 
 echo "Watching run $RUN_ID"
 gh run watch "$RUN_ID" --repo "$REPO" --exit-status
