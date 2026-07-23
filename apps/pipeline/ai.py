@@ -26,6 +26,7 @@ import json
 from typing import Any, Protocol
 
 from apps.pipeline.aggregation import ClinicAggregate
+from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
 from apps.pipeline.models import DailyAggregate
 
 # Direct identifiers that may appear as columns in a raw export. They are read
@@ -256,8 +257,6 @@ def build_freetext_summary_payload(
     free of patient identifiers by construction. Nothing else about a visit —
     no age band, sex, location, or any identifying field — is included.
     """
-    from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
-
     body = {FREETEXT_COLUMN_LABELS[name]: values for name, values in columns.items()}
     return {
         "model": FREETEXT_SUMMARY_MODEL,
@@ -328,8 +327,6 @@ def build_empty_columns_flag_payload(
     de-identified visits as :func:`build_freetext_summary_payload`. No visit
     data itself crosses into this payload, only the derived booleans.
     """
-    from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
-
     body = {
         FREETEXT_COLUMN_LABELS[name]: is_empty
         for name, is_empty in empty_columns.items()
