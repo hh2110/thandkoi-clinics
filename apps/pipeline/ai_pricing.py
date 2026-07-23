@@ -11,7 +11,8 @@ rather than a rate hard-coded at every call site.
 (fetched 2026-07-23).
 
 Only the two models this codebase actually calls (CLAUDE.md → Stack) have
-rows — see ``NEWSLETTER_DRAFTING_MODEL``/``DAILY_SUMMARY_MODEL`` in
+rows — see ``DRAFTING_MODEL``/``MONTHLY_NEWSLETTER_MODEL`` (both
+``claude-sonnet-5``) and ``DAILY_SUMMARY_MODEL`` (``claude-haiku-4-5``) in
 ``apps.pipeline.ai``. Add a row here before wiring in any new model.
 """
 
