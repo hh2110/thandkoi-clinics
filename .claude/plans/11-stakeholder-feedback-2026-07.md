@@ -201,6 +201,16 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       `AiCallLog` back to `IngestRun`/`NewsletterDraftRun`/`DailyAggregate` —
       the three call sites have no common triggering record to hang one off
       (see the model's docstring for the per-call-site reasoning).
+      **Follow-up (2026-07-23, branch `fix/meter-freetext-and-empty-columns-calls`):**
+      the maintainer noticed the free-text summary (B8, doctor/nurse notes)
+      never showed up in the cost log — only the daily-summary sentence did.
+      Root cause: B8/B9 (`feat/daily-report-freetext-summary`, PR #60)
+      shipped *before* this C2 branch, and neither branch wired the other's
+      call sites in (`_draft_short_text`'s own docstring said as much).
+      Fixed: `draft_freetext_summary`/`draft_empty_columns_flag` now pass
+      `on_response` just like `draft_daily_summary_sentence`, with two new
+      `CALL_SITE_FREETEXT_SUMMARY`/`CALL_SITE_EMPTY_COLUMNS_FLAG` choices on
+      `AiCallLog`.
 - [x] **C3.** Add a "camp report" upload type: same `.xls` format as the daily
       export, plus a camp-title field on upload. Merge the "Reports" and "Camp
       Reports" nav items into one "Reports" menu with two sections (daily

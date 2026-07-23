@@ -233,10 +233,11 @@ def _draft_short_text(
     ``on_response`` (Plan 11 C2), if given, runs right after a response comes
     back — before the length sanity check — so a caller can log AI-call
     usage/cost even for a response that ends up failing that check (the call
-    was billed for its tokens either way). Only the daily-summary call passes
-    one; the newer freetext-summary/empty-columns-flag calls below were never
-    wired into cost logging (out of scope for both the branch that added them
-    and the branch that added logging).
+    was billed for its tokens either way). Every short-drafting call site
+    below passes one — the freetext-summary/empty-columns-flag calls were
+    missed when cost logging first landed (each shipped in its own
+    out-of-scope branch) and stayed unmetered until this was found and
+    fixed.
     """
     try:
         active_client = client or get_anthropic_client()
@@ -416,12 +417,18 @@ def draft_freetext_summary(
     treatment as :func:`draft_daily_summary_sentence` (CLAUDE.md invariant
     #4's exception, widened 2026-07-23 to cover this call too) — whatever
     this returns (or ``""``) is stored directly onto the public page by
-    :func:`apps.pipeline.report_publishing.publish_daily_report`.
+    :func:`apps.pipeline.report_publishing.publish_daily_report`. Logs an
+    ``AiCallLog`` row via ``on_response``, same as
+    :func:`draft_daily_summary_sentence` (found unmetered and fixed, Plan 11
+    C2 follow-up).
     """
     return _draft_short_text(
         lambda: build_freetext_summary_payload(clinic_date, columns),
         client,
         MAX_FREETEXT_SUMMARY_LENGTH,
+        on_response=lambda response: _log_ai_call(
+            AiCallLog.CALL_SITE_FREETEXT_SUMMARY, FREETEXT_SUMMARY_MODEL, response
+        ),
     )
 
 
@@ -496,12 +503,17 @@ def draft_empty_columns_flag(
     see :data:`_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT`) unparsed; parsing happens
     at render time in ``apps.pipeline.models._parse_empty_columns_flag``. Same
     failure/auto-publish contract as :func:`draft_freetext_summary` above —
-    see :func:`_draft_short_text`.
+    see :func:`_draft_short_text`. Logs an ``AiCallLog`` row via
+    ``on_response``, same as :func:`draft_daily_summary_sentence` (found
+    unmetered and fixed, Plan 11 C2 follow-up).
     """
     return _draft_short_text(
         lambda: build_empty_columns_flag_payload(clinic_date, empty_columns),
         client,
         MAX_EMPTY_COLUMNS_FLAG_LENGTH,
+        on_response=lambda response: _log_ai_call(
+            AiCallLog.CALL_SITE_EMPTY_COLUMNS_FLAG, EMPTY_COLUMNS_FLAG_MODEL, response
+        ),
     )
 
 

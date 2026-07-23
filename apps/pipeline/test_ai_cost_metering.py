@@ -8,8 +8,10 @@ Anthropic client is impossible to construct here (see the autouse
 Three things are covered:
 
 * ``ai_pricing.compute_cost_usd`` — the cost-calculation math itself.
-* Each of the three real call sites in ``apps.pipeline.ai`` writes an
-  ``AiCallLog`` row after a successful call.
+* Each of the five real call sites in ``apps.pipeline.ai`` writes an
+  ``AiCallLog`` row after a successful call — including
+  ``draft_freetext_summary``/``draft_empty_columns_flag`` (B8/B9), found
+  unmetered and fixed as a Plan 11 C2 follow-up.
 * The admin listing (registered in ``apps.pipeline.wagtail_hooks``) renders
   for an Administrator, including the summed running total.
 """
@@ -210,6 +212,124 @@ def test_draft_daily_summary_sentence_survives_a_logging_failure(db, monkeypatch
     sentence = ai.draft_daily_summary_sentence(aggregate, client)
 
     assert sentence == "Today the clinic saw 4 visits."
+    assert not AiCallLog.objects.exists()
+
+
+# --- B8/B9: free-text summary + empty-columns flag (found unmetered) -------
+#
+# draft_freetext_summary/draft_empty_columns_flag shipped (Plan 11 B8/B9)
+# before cost metering (C2) existed, and neither branch wired the other in —
+# these two real call sites went unlogged until this was found and fixed.
+# Same four-test shape as the daily-summary sentence above.
+
+
+def test_draft_freetext_summary_logs_an_ai_call(db):
+    columns = {"presenting_complaints": ["fever", "cough"]}
+    client = _stub_client("Common themes: fever and cough.", 180, 40)
+
+    summary = ai.draft_freetext_summary(JULY, columns, client)
+
+    assert summary
+    log = AiCallLog.objects.get()
+    assert log.call_site == AiCallLog.CALL_SITE_FREETEXT_SUMMARY
+    assert log.model == ai.FREETEXT_SUMMARY_MODEL
+    assert log.input_tokens == 180
+    assert log.output_tokens == 40
+    assert log.cost_usd == compute_cost_usd(ai.FREETEXT_SUMMARY_MODEL, 180, 40)
+
+
+def test_draft_freetext_summary_still_logs_when_the_text_fails_sanity_check(db):
+    """Same guarantee as the daily-summary case: tokens were spent even if
+    the response fails the length sanity check afterwards."""
+    columns = {"presenting_complaints": ["fever"]}
+    too_long_text = "x" * (ai.MAX_FREETEXT_SUMMARY_LENGTH + 1)
+    client = _stub_client(too_long_text, 220, 600)
+
+    summary = ai.draft_freetext_summary(JULY, columns, client)
+
+    assert summary is None
+    log = AiCallLog.objects.get()
+    assert log.input_tokens == 220
+    assert log.output_tokens == 600
+
+
+def test_draft_freetext_summary_logs_nothing_when_the_client_raises(db):
+    def _raise(**kwargs):
+        raise TimeoutError("simulated AI timeout")
+
+    raising_client = SimpleNamespace(messages=SimpleNamespace(create=_raise))
+    columns = {"presenting_complaints": ["fever"]}
+
+    assert ai.draft_freetext_summary(JULY, columns, raising_client) is None
+    assert not AiCallLog.objects.exists()
+
+
+def test_draft_freetext_summary_survives_a_logging_failure(db, monkeypatch):
+    columns = {"presenting_complaints": ["fever"]}
+    client = _stub_client("Common themes: fever.", 180, 40)
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated DB failure")
+
+    monkeypatch.setattr(AiCallLog, "record", _raise)
+
+    summary = ai.draft_freetext_summary(JULY, columns, client)
+
+    assert summary == "Common themes: fever."
+    assert not AiCallLog.objects.exists()
+
+
+def test_draft_empty_columns_flag_logs_an_ai_call(db):
+    empty_columns = {"investigation": True, "presenting_complaints": False}
+    client = _stub_client('["Investigation"]', 90, 15)
+
+    flag = ai.draft_empty_columns_flag(JULY, empty_columns, client)
+
+    assert flag
+    log = AiCallLog.objects.get()
+    assert log.call_site == AiCallLog.CALL_SITE_EMPTY_COLUMNS_FLAG
+    assert log.model == ai.EMPTY_COLUMNS_FLAG_MODEL
+    assert log.input_tokens == 90
+    assert log.output_tokens == 15
+    assert log.cost_usd == compute_cost_usd(ai.EMPTY_COLUMNS_FLAG_MODEL, 90, 15)
+
+
+def test_draft_empty_columns_flag_still_logs_when_the_text_fails_sanity_check(db):
+    empty_columns = {"investigation": True}
+    too_long_text = "x" * (ai.MAX_EMPTY_COLUMNS_FLAG_LENGTH + 1)
+    client = _stub_client(too_long_text, 100, 200)
+
+    flag = ai.draft_empty_columns_flag(JULY, empty_columns, client)
+
+    assert flag is None
+    log = AiCallLog.objects.get()
+    assert log.input_tokens == 100
+    assert log.output_tokens == 200
+
+
+def test_draft_empty_columns_flag_logs_nothing_when_the_client_raises(db):
+    def _raise(**kwargs):
+        raise TimeoutError("simulated AI timeout")
+
+    raising_client = SimpleNamespace(messages=SimpleNamespace(create=_raise))
+    empty_columns = {"investigation": True}
+
+    assert ai.draft_empty_columns_flag(JULY, empty_columns, raising_client) is None
+    assert not AiCallLog.objects.exists()
+
+
+def test_draft_empty_columns_flag_survives_a_logging_failure(db, monkeypatch):
+    empty_columns = {"investigation": True}
+    client = _stub_client('["Investigation"]', 90, 15)
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("simulated DB failure")
+
+    monkeypatch.setattr(AiCallLog, "record", _raise)
+
+    flag = ai.draft_empty_columns_flag(JULY, empty_columns, client)
+
+    assert flag == '["Investigation"]'
     assert not AiCallLog.objects.exists()
 
 
