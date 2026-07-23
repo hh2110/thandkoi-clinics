@@ -1,109 +1,108 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% comment %}
-One daily clinic report — Plan 08. Every figure here comes from `aggregate`
-(a DailyAggregate read live in get_context, per that model's own docstring on
-never copying figures onto the page) — never from `page.summary_sentence`,
-which is rendered separately, below the figures, and is allowed to be blank
-(CLAUDE.md invariant #3: numbers from Python, prose never a source of a
-statistic).
+One daily clinic report — redesign (Plan 11 Track B12, 2026-07-23).
 
-`section--snug` (layout.css) is a page-scoped spacing modifier: every section
-here is a short, header-less block (title, figures, a couple of optional
-detail lists), so the sitewide `.section` rhythm (`--space-8` each side)
-stacks into a lot of dead air between them. Scoped to this page rather than
-shrinking `--space-8` itself, which other, longer pages still rely on.
+Every figure comes from `aggregate` (a DailyAggregate read live in
+get_context) — never from prose fields (CLAUDE.md invariant #3: numbers from
+Python, prose never the source of a statistic).
+
+Redesign vs. the previous version:
+  * Removed the "By diagnosis category" section entirely.
+  * Removed the "New patients" headline stat (still on the model/aggregate,
+    just no longer surfaced here — see DailyReportPage.headline_stats).
+  * Headline stats are now: Patients seen / Zakat / Regular.
+  * "By gender" + "By age band" are consolidated into one Breakdown block:
+    Gender (1/3 width) beside Age (2/3 width), equal height. Zakat/Regular is
+    NOT repeated here — it already lives in the headline stats.
+  * Age renders as four fixed bands (0–5, 6–18, 19–55, 56+) with a person
+    glyph per band — see DeidentifiedVisit.AGE_BAND_* and
+    parser_registry.age_band_for for the remapped banding.
+  * Empty-columns flag renders as labelled chips (get_context parses the
+    stored JSON array — see DailyReportPage._parse_empty_columns_flag),
+    not raw markdown text.
+
+All colour is from semantic tokens (tokens.css); component styles live in
+static/css/daily-report.css. `dr` is the page-scoped root class.
 {% endcomment %}
 
 {% block content %}
-  <section class="section section--snug">
-    <div class="wrapper prose">
-      <h1>{{ page.title }}</h1>
-      <p class="text-faint">{{ page.report_date }}</p>
-    </div>
-  </section>
+  <article class="dr wrapper">
 
-  <section class="section section--snug section--tinted stat-band" data-role="figures">
-    <div class="wrapper">
-      <div class="stat-band__grid">
-        {% for stat in page.headline_stats %}
-          <div class="stat">
-            <p class="stat__value">{{ stat.value }}</p>
-            {% if stat.label %}<p class="stat__label">{{ stat.label }}</p>{% endif %}
-          </div>
-        {% endfor %}
+    <header class="dr__header">
+      <p class="dr__eyebrow">{% translate "Daily report" %}</p>
+      <div class="dr__title-row">
+        <h1 class="dr__title">{{ page.report_date }}</h1>
       </div>
-    </div>
-  </section>
+    </header>
 
-  {% if page.summary_sentence %}
-    <section class="section section--snug" data-role="narrative">
-      <div class="wrapper prose">
+    <section class="dr__metrics" data-role="figures">
+      {% for stat in page.headline_stats %}
+        <div class="dr__metric">
+          <p class="dr__metric-value">{{ stat.value }}</p>
+          {% if stat.label %}<p class="dr__metric-label">{{ stat.label }}</p>{% endif %}
+        </div>
+      {% endfor %}
+    </section>
+
+    {% if page.summary_sentence %}
+      <section class="dr__lead" data-role="narrative">
         <p>{{ page.summary_sentence }}</p>
+      </section>
+    {% endif %}
+
+    <section class="dr__breakdown" data-role="breakdown">
+      <h2 class="dr__section-label">{% translate "Breakdown" %}</h2>
+      <div class="dr__breakdown-grid">
+
+        <div class="dr__card dr__card--gender">
+          <h3 class="dr__card-title">{% translate "Gender" %}</h3>
+          <div class="dr__bars">
+            {% for row in gender_rows %}
+              <div class="dr__bar-row">
+                <div class="dr__bar-head">
+                  <span class="dr__bar-label">{{ row.label }}</span>
+                  <span class="dr__bar-count">{{ row.count }}</span>
+                </div>
+                <div class="dr__bar-track">
+                  <div class="dr__bar-fill" style="width: {{ row.pct }}%;"></div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="dr__card dr__card--age">
+          <h3 class="dr__card-title">{% translate "Age" %}</h3>
+          <div class="dr__age-grid">
+            {% for band in age_bands %}
+              <div class="dr__age-item">
+                <div class="dr__age-icon">{% include band.icon_template %}</div>
+                <span class="dr__age-label">{{ band.label }}</span>
+                <span class="dr__age-count">{{ band.count }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
       </div>
     </section>
-  {% endif %}
 
-  {% if page.freetext_summary %}
-    {% comment %}
-    Auto-published alongside the numbers, same CLAUDE.md invariant #4
-    exception as `summary_sentence` above (widened 2026-07-23, Plan 11
-    Track B8, maintainer decision) — see DailyReportPage's docstring.
+    {% if page.freetext_summary %}
+      <section class="dr__notes" data-role="freetext-summary">
+        <h2 class="dr__notes-title">{% translate "Today's notes, summarised" %}</h2>
+        <p>{{ page.freetext_summary }}</p>
+      </section>
+    {% endif %}
 
-    `linebreaks` (Plan 11 B10, maintainer feedback: raw string had no
-    formatting): the model is asked (see `_FREETEXT_SUMMARY_SYSTEM_PROMPT`)
-    to write a few blank-line-separated thematic paragraphs, so this wraps
-    each in a real `<p>` — matching the newsletter body's real-HTML-block
-    prose precedent, same `.prose` spacing as everywhere else on this page —
-    instead of dumping one unstructured string into a single `<p>`.
-    {% endcomment %}
-    <section class="section section--snug" data-role="freetext-summary">
-      <div class="wrapper prose">
-        <h2>{% translate "Today's notes, summarised" %}</h2>
-        {{ page.freetext_summary|linebreaks }}
-      </div>
-    </section>
-  {% endif %}
+    {% if empty_columns %}
+      <section class="dr__flag" data-role="empty-columns-flag">
+        <p class="dr__flag-label">{% blocktranslate %}Empty columns for {{ report_date }}{% endblocktranslate %}</p>
+        <div class="dr__flag-chips">
+          {% for col in empty_columns %}<span class="dr__chip">{{ col }}</span>{% endfor %}
+        </div>
+      </section>
+    {% endif %}
 
-  {% if page.empty_columns_flag %}
-    <section class="section section--snug" data-role="empty-columns-flag">
-      <div class="wrapper prose">
-        <p class="text-faint">{{ page.empty_columns_flag }}</p>
-      </div>
-    </section>
-  {% endif %}
-
-  <section class="section section--snug">
-    <div class="wrapper">
-      <div class="card-grid card-grid--2">
-        <article class="card">
-          <h3 class="card__title">{% translate "By gender" %}</h3>
-          <ul class="prose">
-            <li>{% translate "Male" %}: <strong>{{ aggregate.male_patients }}</strong></li>
-            <li>{% translate "Female" %}: <strong>{{ aggregate.female_patients }}</strong></li>
-          </ul>
-        </article>
-        <article class="card">
-          <h3 class="card__title">{% translate "Zakat vs. paid" %}</h3>
-          <ul class="prose">
-            <li>{% translate "Zakat beneficiary" %}: <strong>{{ aggregate.zakat_beneficiary_patients }}</strong></li>
-            <li>{% translate "Paying" %}: <strong>{{ aggregate.paying_patients }}</strong></li>
-          </ul>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  {% if by_age_band %}
-    <section class="section section--snug">
-      <div class="wrapper prose">
-        <h2>{% translate "By age band" %}</h2>
-        <ul>
-          {% for label, count in by_age_band %}
-            <li>{{ label }}: <strong>{{ count }}</strong></li>
-          {% endfor %}
-        </ul>
-      </div>
-    </section>
-  {% endif %}
+  </article>
 {% endblock %}

@@ -58,7 +58,7 @@ class DeidentifiedVisitFactory(factory.django.DjangoModelFactory):
     ingest_run = factory.SubFactory(IngestRunFactory)
     visit_date = factory.LazyAttribute(lambda o: o.ingest_run.clinic_date)
     department = "General Medicine"
-    age_band = DeidentifiedVisit.AGE_BAND_18_40
+    age_band = DeidentifiedVisit.AGE_BAND_19_55
     sex = DeidentifiedVisit.SEX_FEMALE
     location = "Thandkoi"
     diagnosis_category = DeidentifiedVisit.DIAGNOSIS_HYPERTENSION
@@ -85,7 +85,7 @@ class DailyAggregateFactory(factory.django.DjangoModelFactory):
         lambda: {
             "by_department": {"General Medicine": 3},
             "by_diagnosis_category": {"hypertension": 2, "diabetes": 1},
-            "by_age_band": {"18-40": 3},
+            "by_age_band": {"19-55": 3},
         }
     )
 

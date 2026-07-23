@@ -18,14 +18,38 @@ is an audit trail only — who/when/parser/row-count/content-hash, never data.
 
 from __future__ import annotations
 
+import json
+
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext as _
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page
 
 from apps.core.models import CampReportIndexPage, paginate_archive
 from apps.pipeline.ai_pricing import compute_cost_usd
+
+
+def _parse_empty_columns_flag(raw: str) -> list[str]:
+    """Parse ``DailyReportPage.empty_columns_flag`` into a list of column names.
+
+    Plan 11 Track B12: the stored value is a JSON array of column-name
+    strings (see ``apps.pipeline.ai.draft_empty_columns_flag``), not prose —
+    the template renders each entry as a chip. Falls back to an empty list
+    (no chips render) for a blank field or anything that isn't a JSON array
+    of strings, rather than raising — this includes pre-B12 pages whose
+    field still holds the old free-form sentence, until they're republished.
+    """
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [item for item in parsed if isinstance(item, str)]
 
 
 class IngestRun(models.Model):
@@ -110,20 +134,26 @@ class DeidentifiedVisit(models.Model):
     fixed set the parser's keyword mapping can produce, never free text.
     """
 
-    AGE_BAND_0_4 = "0-4"
-    AGE_BAND_5_12 = "5-12"
-    AGE_BAND_13_17 = "13-17"
-    AGE_BAND_18_40 = "18-40"
-    AGE_BAND_41_60 = "41-60"
-    AGE_BAND_61_PLUS = "61+"
+    # Rebanded 2026-07-23 (Plan 11 Track B12, daily-report redesign) from the
+    # original six bands (0-4/5-12/13-17/18-40/41-60/61+) to these four fixed
+    # display bands, each with a person glyph on the report page. No data
+    # migration remaps existing rows onto the new bands (maintainer decision:
+    # `DeidentifiedVisit.age_band` only ever stored the band, never the raw
+    # age it was derived from, so an old band straddling a new boundary —
+    # e.g. 41-60 spanning both new 19-55 and 56+ — cannot be split accurately
+    # after the fact; the maintainer will instead delete pre-B12 ingests and
+    # re-upload the source exports, which recomputes everything under the new
+    # bands from scratch via `age_band_for`, below).
+    AGE_BAND_0_5 = "0-5"
+    AGE_BAND_6_18 = "6-18"
+    AGE_BAND_19_55 = "19-55"
+    AGE_BAND_56_PLUS = "56+"
     AGE_BAND_UNKNOWN = "unknown"
     AGE_BAND_CHOICES = [
-        (AGE_BAND_0_4, "0–4"),
-        (AGE_BAND_5_12, "5–12"),
-        (AGE_BAND_13_17, "13–17"),
-        (AGE_BAND_18_40, "18–40"),
-        (AGE_BAND_41_60, "41–60"),
-        (AGE_BAND_61_PLUS, "61+"),
+        (AGE_BAND_0_5, "0–5"),
+        (AGE_BAND_6_18, "6–18"),
+        (AGE_BAND_19_55, "19–55"),
+        (AGE_BAND_56_PLUS, "56+"),
         (AGE_BAND_UNKNOWN, "Unknown"),
     ]
 
@@ -464,33 +494,74 @@ class DailyReportPage(Page):
 
         Mirrors ``CampReportPage.get_context``'s ``patient_stats`` shape
         (Plan 06) — read live from ``aggregate``, never copied onto this page.
+
+        Redesigned 2026-07-23 (Plan 11 Track B12, maintainer decision): drops
+        "New patients" (``aggregate.new_patients`` stays on the model — just
+        no longer surfaced here) in favour of the Zakat/Regular split, which
+        used to live only in the "Breakdown" cards below.
         """
         return [
-            {"value": str(self.aggregate.total_visits), "label": "Patients seen"},
+            {"value": str(self.aggregate.total_visits), "label": _("Patients seen")},
             {
                 "value": str(self.aggregate.zakat_beneficiary_patients),
-                "label": "Zakat beneficiaries",
+                "label": _("Zakat"),
             },
-            {"value": str(self.aggregate.new_patients), "label": "New patients"},
+            {"value": str(self.aggregate.paying_patients), "label": _("Regular")},
         ]
 
     def get_context(self, request, *args, **kwargs):
+        """Build the redesigned page's context (Plan 11 Track B12, 2026-07-23).
+
+        "By department" and "By diagnosis category" are intentionally not
+        surfaced: the real TKC parser never populates `department`
+        (parser_tkc_daily_v1's own docstring), and diagnosis category was
+        dropped from this page entirely per the redesign (maintainer
+        decision). Both remain computed at the model layer
+        (`category_counts`) — this page just stops rendering them.
+        """
         context = super().get_context(request, *args, **kwargs)
-        context["aggregate"] = self.aggregate
-        # "By department" is intentionally not surfaced here: the real TKC
-        # parser never populates `department` (parser_tkc_daily_v1's own
-        # docstring), so this would always render as one dead "Unknown: N"
-        # line in production. `category_counts["by_department"]` is still
-        # computed at the model layer (harmless, and a future parser may
-        # populate it) — this page just stops rendering it.
-        #
-        # "By diagnosis category" was dropped from this page too (maintainer
-        # decision, 2026-07-23) — `category_counts["by_diagnosis_category"]`
-        # is still computed at the model layer, this page just stops
-        # rendering it.
-        context["by_age_band"] = sorted(
-            self.aggregate.category_counts.get("by_age_band", {}).items()
-        )
+        agg = self.aggregate
+        context["aggregate"] = agg
+
+        # Gender bars — percentage is presentation only; counts stay
+        # authoritative (rendered alongside every bar).
+        gender_counts = {
+            _("Female"): agg.female_patients,
+            _("Male"): agg.male_patients,
+        }
+        gender_max = max(gender_counts.values()) or 1
+        context["gender_rows"] = [
+            {"label": label, "count": count, "pct": round(count / gender_max * 100)}
+            for label, count in gender_counts.items()
+        ]
+
+        # Four fixed display bands (Plan 11 Track B12 age-band remap).
+        by_age = agg.category_counts.get("by_age_band", {})
+        context["age_bands"] = [
+            {
+                "label": "0–5",
+                "count": by_age.get(DeidentifiedVisit.AGE_BAND_0_5, 0),
+                "icon_template": "pipeline/age_icons/_age_0_5.html",
+            },
+            {
+                "label": "6–18",
+                "count": by_age.get(DeidentifiedVisit.AGE_BAND_6_18, 0),
+                "icon_template": "pipeline/age_icons/_age_6_18.html",
+            },
+            {
+                "label": "19–55",
+                "count": by_age.get(DeidentifiedVisit.AGE_BAND_19_55, 0),
+                "icon_template": "pipeline/age_icons/_age_19_55.html",
+            },
+            {
+                "label": "56+",
+                "count": by_age.get(DeidentifiedVisit.AGE_BAND_56_PLUS, 0),
+                "icon_template": "pipeline/age_icons/_age_56_plus.html",
+            },
+        ]
+
+        context["report_date"] = self.report_date
+        context["empty_columns"] = _parse_empty_columns_flag(self.empty_columns_flag)
         return context
 
     class Meta:

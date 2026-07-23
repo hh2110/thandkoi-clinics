@@ -303,16 +303,23 @@ FREETEXT_SUMMARY_MODEL = "claude-haiku-4-5"
 EMPTY_COLUMNS_FLAG_MODEL = "claude-haiku-4-5"
 
 # Sanity-check upper bounds, same role as MAX_DAILY_SUMMARY_LENGTH above: a
-# response over this length (or empty) is treated as a failed draft, not
-# published as-is. These calls are draft-only (never auto-published), so
-# there is no fallback-to-blank requirement driving the bound the way Plan
-# 08's exception does — it's purely a runaway-output guard, not a length
-# target: it must sit comfortably above what the call's own max_tokens can
-# actually produce (~4 chars/token for English, plus margin), or a genuinely
-# good, full-length response on a busy day gets rejected as if it had failed
-# (found by code-review-tc: the previous bounds were tighter than their
-# calls' max_tokens could produce — a valid 600-token freetext summary could
-# run well past the old 800-char cap).
+# response over this length (or empty) is treated as a failed draft — the
+# caller (apps.pipeline.report_publishing.publish_daily_report) falls back to
+# leaving the field blank/unchanged rather than publishing it, same auto-
+# publish contract as the daily-summary sentence (CLAUDE.md invariant #4's
+# exception, widened 2026-07-23 to cover these two calls as well) — it's
+# purely a runaway-output guard, not a length target: it must sit comfortably
+# above what the call's own max_tokens can actually produce (~4 chars/token
+# for English, plus margin), or a genuinely good, full-length response on a
+# busy day gets rejected as if it had failed (found by code-review-tc: the
+# previous bounds were tighter than their calls' max_tokens could produce —
+# a valid 600-token freetext summary could run well past the old 800-char
+# cap).
+#
+# Tightened 2026-07-23 (Plan 11 Track B12, daily-report redesign): the
+# freetext summary is now capped at ~50 words (see
+# _FREETEXT_SUMMARY_SYSTEM_PROMPT below), so its bound and max_tokens shrink
+# to match — still comfortably above what a real 50-word response needs.
 MAX_FREETEXT_SUMMARY_LENGTH = 600  # max_tokens=120 below
 MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 
@@ -328,17 +335,16 @@ MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 #
 # Restructured 2026-07-23 (Plan 11 Track B10, merged on top of B11):
 # maintainer feedback that the rendered summary "has no formatting at all" —
-# the template renders this via Django's `linebreaks` filter, so multiple
-# `<p>` tags are supported on render if the model writes blank-line-separated
-# paragraphs.
+# the template used to render this via Django's `linebreaks` filter, asking
+# for a few blank-line-separated thematic paragraphs.
 #
-# Capped to 50 words 2026-07-23 (maintainer decision, later same day): a
-# 50-word budget leaves no room for B10's "a few short thematic paragraphs"
-# structure, so that instruction is replaced with "one short paragraph"
-# here — `linebreaks` above still applies harmlessly if the model ever
-# returns a blank line, it just has nothing to split in practice now. Also
-# drops B8's original "if a column has no entries, say so plainly" — that's
-# now the empty-columns-flag call's (B9's) job alone
+# Capped to ~50 words 2026-07-23 (Plan 11 Track B12, daily-report redesign,
+# maintainer decision): a 50-word budget leaves no room for B10's "a few
+# short thematic paragraphs" structure, so this asks for one short paragraph
+# instead — the template renders it as a single `<p>`, no `linebreaks`
+# filter needed since there is no longer more than one paragraph to split.
+# Also drops B8's original "if a column has no entries, say so plainly" —
+# that's now the empty-columns-flag call's (B9's) job alone
 # (`_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT` below), and repeating it here would
 # spend a meaningful fraction of a 50-word budget on information the page
 # already states in its own section.
@@ -421,27 +427,29 @@ def draft_freetext_summary(
 
 # Tightened 2026-07-23 (same Plan 11 Track B10 maintainer feedback as
 # `_FREETEXT_SUMMARY_SYSTEM_PROMPT` above — "no formatting at all" — but this
-# prompt itself was missed when B10 first landed): the template renders this
-# field as one raw string in a single `<p>`, so a model output like
+# prompt itself was missed when B10 first landed): a model output like
 # "**Empty columns for 2026-07-20:** - Investigation - Plan" (markdown bold
-# heading + a bullet list) collapses to one unreadable run-on line — HTML
-# whitespace collapsing has no idea `**`/`- ` were meant to be structure.
-# Fixed by prompt only, matching B11's precedent of tightening wording rather
-# than changing what data reaches the model: explicitly ban markdown and
-# require one plain sentence, since this field is never meant to hold
-# multiple paragraphs the way `freetext_summary` is.
+# heading + a bullet list) is unusable once rendered as plain text.
+#
+# Restructured further 2026-07-23 (Plan 11 Track B12, daily-report redesign,
+# maintainer decision): the page now renders this as labelled chips, not a
+# prose sentence, so the model is asked for a JSON array of column names
+# instead of a sentence naming them — the "cleaner fix" over parsing prose
+# back into a list. Still a fixed-template restatement of already-computed
+# booleans (invariant #3) — the model picks names off the given list, it
+# does not decide or invent anything. A malformed (non-JSON, or non-array)
+# response degrades safely: apps.pipeline.models._parse_empty_columns_flag
+# falls back to an empty list, so the page just shows no chips that day
+# rather than rendering garbage — see that function's docstring.
 _EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT = (
-    "You write a short, plain-language note, for a clinic's public daily "
-    "report page, listing which of that clinic's free-text record columns "
-    "were left blank for the day. You are given, for each listed column, "
-    "whether it was entirely empty across every visit that day — a "
-    "true/false fact already determined for you; you must not recompute or "
-    "second-guess it. State only which columns are marked empty, as a "
-    "single plain sentence naming them, comma-separated. Do not use "
-    "headings, bullet points, bold text, or any other markup — plain prose "
-    "only, one sentence. Do not add commentary on why, and if none are "
-    "empty, say so in one short sentence instead of listing every column as "
-    "filled in."
+    "You are given, for a clinic's public daily report page, whether each of "
+    "its free-text record columns was entirely empty across today's visits "
+    "— a true/false fact already determined for you; you must not "
+    "recompute or second-guess it. Respond with a JSON array of strings: "
+    "the column labels (exactly as given), in the order given, for every "
+    "column marked true — and nothing else, no prose, no markdown, no "
+    "explanation. If none are marked true, respond with an empty JSON "
+    "array: []"
 )
 
 
@@ -482,10 +490,13 @@ def draft_empty_columns_flag(
     empty_columns: dict[str, bool],
     client: _AnthropicLike | None = None,
 ) -> str | None:
-    """Ask the model to phrase which columns are empty, or give up.
+    """Ask the model for a JSON array of the empty columns' names, or give up.
 
-    Same failure/auto-publish contract as :func:`draft_freetext_summary`
-    above — see :func:`_draft_short_text`.
+    Returns the model's raw response text (expected to be a JSON array —
+    see :data:`_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT`) unparsed; parsing happens
+    at render time in ``apps.pipeline.models._parse_empty_columns_flag``. Same
+    failure/auto-publish contract as :func:`draft_freetext_summary` above —
+    see :func:`_draft_short_text`.
     """
     return _draft_short_text(
         lambda: build_empty_columns_flag_payload(clinic_date, empty_columns),

@@ -67,22 +67,23 @@ def age_band_for(*, dob: date | None, age_years: int | None, on: date) -> str:
     age directly, not DOB). Returns
     :data:`DeidentifiedVisit.AGE_BAND_UNKNOWN` if neither is usable, rather
     than guessing.
+
+    Rebanded 2026-07-23 (Plan 11 Track B12, daily-report redesign) from the
+    original six bands to four fixed display bands — see
+    ``DeidentifiedVisit.AGE_BAND_*``'s decision comment for why this isn't
+    also a data migration remapping already-persisted rows.
     """
     if age_years is None and dob is not None:
         age_years = on.year - dob.year - ((on.month, on.day) < (dob.month, dob.day))
     if age_years is None or age_years < 0:
         return DeidentifiedVisit.AGE_BAND_UNKNOWN
-    if age_years <= 4:
-        return DeidentifiedVisit.AGE_BAND_0_4
-    if age_years <= 12:
-        return DeidentifiedVisit.AGE_BAND_5_12
-    if age_years <= 17:
-        return DeidentifiedVisit.AGE_BAND_13_17
-    if age_years <= 40:
-        return DeidentifiedVisit.AGE_BAND_18_40
-    if age_years <= 60:
-        return DeidentifiedVisit.AGE_BAND_41_60
-    return DeidentifiedVisit.AGE_BAND_61_PLUS
+    if age_years <= 5:
+        return DeidentifiedVisit.AGE_BAND_0_5
+    if age_years <= 18:
+        return DeidentifiedVisit.AGE_BAND_6_18
+    if age_years <= 55:
+        return DeidentifiedVisit.AGE_BAND_19_55
+    return DeidentifiedVisit.AGE_BAND_56_PLUS
 
 
 def normalise_sex(raw: str | None) -> str:
