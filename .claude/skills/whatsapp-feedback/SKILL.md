@@ -42,7 +42,10 @@ behalf.
 
 ## 3. Open the chat and read back to the cursor
 
-- Use WhatsApp Web's search box to find the chat by name and open it.
+- Use WhatsApp Web's search box to find the chat by name and open it. If more
+  than one chat matches the given name, don't guess — list the matches (chat
+  name plus whether it's a group or a DM) and ask the user which one they
+  meant before reading anything.
 - **Strictly read-only.** Never click send, never type into the message
   composer, never touch delete/clear-chat/archive/exit-group controls, and
   don't click anything that could trigger a confirmation dialog (per the
@@ -73,6 +76,10 @@ behalf.
   covered.
 - Upsert the chat's row in `.claude/state/whatsapp-feedback-log.csv`
   (`last_checked_at` = now, ISO timestamp, audit-only — not used for dedup).
+  Chat names can contain commas, quotes, or emoji — write the row with a real
+  CSV writer/library (or at minimum wrap `chat_name` in double quotes and
+  double up any embedded quotes) rather than a raw comma-joined string, so a
+  name like "Thandkoi Clinics, Feedback" can't split into an extra column.
 - Tell the user the new cursor so they know where the next run will resume.
 
 ## Notes
