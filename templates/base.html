@@ -65,6 +65,12 @@
     section vocabulary builds on the chrome + primitives above.
     {% endcomment %}
     <link rel="stylesheet" href="{% static 'css/layout.css' %}" />
+    {% comment %}
+    Daily report page redesign (Plan 11 Track B12) — scoped to `.dr`, reads
+    tokens.css only. Sitewide like components.css/layout.css rather than a
+    per-page block since no page-scoped CSS block exists yet in this base.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/daily-report.css' %}" />
     {% block extra_head %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">

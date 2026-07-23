@@ -130,6 +130,51 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       auto-publish exception conditions (fixed template, tested payload,
       non-blocking failure) still apply unchanged.
 
+- [x] **B12 (2026-07-23).** Visual redesign of the daily report page, from a
+      maintainer-supplied design handoff (`daily-report-update.zip`): three
+      headline stats (Patients seen / Zakat / Regular, "New patients"
+      dropped); "By diagnosis category" removed entirely; "By gender" + "By
+      age band" consolidated into one Breakdown block (Gender 1/3 width
+      beside Age 2/3, equal height); age rebanded to four fixed display
+      bands (0–5, 6–18, 19–55, 56+) each with a person glyph; empty-columns
+      flag renders as labelled chips instead of raw markdown text; free-text
+      notes summary capped at ~50 words.
+      **Done (2026-07-23, branch `feat/daily-report-redesign-b12`),** PR not
+      yet opened.
+
+      **Decision — age-band remap, no data migration (maintainer decision,
+      2026-07-23).** Rebanding from the original six bands
+      (0-4/5-12/13-17/18-40/41-60/61+) to the four new ones needs
+      `parser_registry.age_band_for` and `DeidentifiedVisit.AGE_BAND_*`
+      updated either way. The open question was whether to also add a data
+      migration remapping *already-persisted* rows onto the new bands.
+      Investigation found this can't be done accurately:
+      `DeidentifiedVisit.age_band` only ever stores the band, never the raw
+      age it was derived from (de-identification invariant #1), and three
+      old bands straddle a new boundary — 5-12, 18-40, and, worst, 41-60
+      (spanning both new 19-55 and 56+, up to ~25% of that band on the wrong
+      side of the cut with no way to recover which rows). A majority-span
+      approximation was proposed and rejected — **maintainer decision:
+      delete pre-B12 ingests and re-upload the source exports instead**,
+      which recomputes everything from scratch under the new bands via
+      `age_band_for`, with no approximation. This PR therefore ships only
+      the schema-level migration (`0010_alter_deidentifiedvisit_age_band`,
+      choices metadata only, no data operation) — re-ingesting historical
+      dates is a separate, manual, maintainer-run step, not part of this
+      branch.
+
+      **Reconciled against B10/B11 at rebase time.** B12 was branched off
+      `main` before PR #74 ("forbid markdown in empty-columns-flag prompt;
+      drop diagnosis-category section") landed, so `apps/pipeline/ai.py` and
+      `apps/pipeline/tests.py` had overlapping edits to the freetext-summary
+      and empty-columns-flag prompts — both independently converged on the
+      same ~50-word cap (`max_tokens=120`, `MAX_FREETEXT_SUMMARY_LENGTH=600`).
+      Resolved by rebasing B12 onto post-#74 `main`: kept #74's freetext-
+      summary wording (it already dropped B12's own redundant "if a column
+      has no entries, say so" clause) and kept B12's JSON-array restructure
+      of the empty-columns-flag prompt (superseding #74's plain-sentence
+      fix, since the chip UI needs a parseable list, not prose).
+
 ### Track C — Admin panel
 
 - [x] **C1.** Remove the now-unused "provisional schema" option from the upload

@@ -65,6 +65,7 @@ from apps.pipeline.models import (
     DailyReportPage,
     DeidentifiedVisit,
     IngestRun,
+    _parse_empty_columns_flag,
 )
 from apps.pipeline.parser_clinic_v1 import ClinicDailyExportV1Parser
 from apps.pipeline.parser_registry import (
@@ -429,7 +430,7 @@ EXPECTED_BY_DIAGNOSIS_CATEGORY = {
     "cardiac": 1,
     "other": 1,
 }
-EXPECTED_BY_AGE_BAND = {"5-12": 1, "18-40": 1, "61+": 1, "unknown": 1}
+EXPECTED_BY_AGE_BAND = {"6-18": 1, "19-55": 1, "56+": 1, "unknown": 1}
 
 
 def _build_clinic_v1_xlsx(rows=None) -> bytes:
@@ -500,10 +501,22 @@ def home_page(db):
 
 def test_age_band_for_bands_by_dob_relative_to_visit_date():
     on = datetime.date(2026, 7, 20)
-    assert age_band_for(dob=datetime.date(2020, 1, 1), age_years=None, on=on) == "5-12"
-    assert age_band_for(dob=datetime.date(1990, 5, 5), age_years=None, on=on) == "18-40"
-    assert age_band_for(dob=datetime.date(1960, 3, 3), age_years=None, on=on) == "61+"
+    assert age_band_for(dob=datetime.date(2020, 1, 1), age_years=None, on=on) == "6-18"
+    assert age_band_for(dob=datetime.date(1990, 5, 5), age_years=None, on=on) == "19-55"
+    assert age_band_for(dob=datetime.date(1960, 3, 3), age_years=None, on=on) == "56+"
     assert age_band_for(dob=None, age_years=None, on=on) == "unknown"
+
+
+def test_age_band_for_boundaries_between_the_four_bands():
+    """The four fixed display bands (Plan 11 Track B12): exact boundary ages
+    (5/6, 18/19, 55/56) land on the correct side of each cut."""
+    on = datetime.date(2026, 7, 20)
+    assert age_band_for(dob=None, age_years=5, on=on) == "0-5"
+    assert age_band_for(dob=None, age_years=6, on=on) == "6-18"
+    assert age_band_for(dob=None, age_years=18, on=on) == "6-18"
+    assert age_band_for(dob=None, age_years=19, on=on) == "19-55"
+    assert age_band_for(dob=None, age_years=55, on=on) == "19-55"
+    assert age_band_for(dob=None, age_years=56, on=on) == "56+"
 
 
 def test_normalise_sex_maps_free_text_to_fixed_set():
@@ -553,7 +566,7 @@ def test_content_hash_for_rows_changes_when_only_freetext_columns_change():
     base = ParsedVisitRow(
         visit_date=datetime.date(2026, 7, 8),
         department="General Medicine",
-        age_band=DeidentifiedVisit.AGE_BAND_18_40,
+        age_band=DeidentifiedVisit.AGE_BAND_19_55,
         sex=DeidentifiedVisit.SEX_MALE,
         location="Thandkoi",
         diagnosis_category=DeidentifiedVisit.DIAGNOSIS_OTHER,
@@ -1545,16 +1558,16 @@ def test_empty_columns_flag_payload_contains_only_booleans(
     assert '\\"investigation\\": true' in sent
 
 
-def test_empty_columns_flag_prompt_forbids_markdown_formatting(
+def test_empty_columns_flag_prompt_requires_a_json_array_no_markdown(
     home_page, mock_anthropic_client
 ):
-    """The template renders `empty_columns_flag` as one raw string in a
-    single `<p>` (unlike `freetext_summary`, which gets the `linebreaks`
-    filter — see the daily report template). A model output using markdown
-    (a bold heading, a bullet list) collapses to one unreadable run-on line,
-    since HTML whitespace collapsing has no idea `**`/`- ` were meant to be
-    structure. Fixed by tightening this prompt (it was missed when B10 first
-    tightened the sibling `_FREETEXT_SUMMARY_SYSTEM_PROMPT`)."""
+    """Plan 11 Track B12: the template renders `empty_columns_flag` as
+    labelled chips (`DailyReportPage._parse_empty_columns_flag` parses the
+    stored value as a JSON array), so the prompt asks for a JSON array of
+    column labels — and explicitly bans prose/markdown, which would fail to
+    parse as JSON and just degrade to "no chips" rather than a readable
+    fallback. (Originally tightened for the older prose-sentence shape by
+    B10/B11 — missed when B10 first landed — then restructured to JSON here.)"""
     _ingest_tkc_daily_fixture()
     visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
     empty_columns = freetext.compute_empty_columns(visits)
@@ -1568,8 +1581,8 @@ def test_empty_columns_flag_prompt_forbids_markdown_formatting(
     sent_system_prompt = mock_anthropic_client.calls[0]["system"]
     assert sent_system_prompt == ai._EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT
     lowered = sent_system_prompt.lower()
-    assert "do not use headings, bullet points, bold text" in lowered
-    assert "single plain sentence" in lowered
+    assert "json array" in lowered
+    assert "no prose, no markdown" in lowered
     # Existing safeguards must still be present, not replaced.
     assert "must not recompute or second-guess it" in lowered
 
@@ -1579,11 +1592,11 @@ def test_draft_freetext_summary_accepts_a_realistic_full_length_response(home_pa
     50-word cap below): MAX_FREETEXT_SUMMARY_LENGTH used to be tighter than
     the call's own max_tokens could actually produce (~4 chars/token) — a
     genuinely good, full-length summary was silently rejected as if the call
-    had failed. Re-sized the same day for the 50-word cap (max_tokens
-    600 -> 120, MAX_FREETEXT_SUMMARY_LENGTH 3000 -> 600, keeping the same
-    ~4-chars/token comfortable-margin ratio as before) — this now checks a
-    ~50-word response, the longest this prompt actually asks for, still
-    clears the bound."""
+    had failed. Re-sized the same day for the 50-word cap (Plan 11 Track
+    B12: max_tokens 600 -> 120, MAX_FREETEXT_SUMMARY_LENGTH 3000 -> 600,
+    keeping the same ~4-chars/token comfortable-margin ratio as before) —
+    this now checks a ~50-word response, the longest this prompt actually
+    asks for, still clears the bound."""
     _ingest_tkc_daily_fixture()
     visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
     columns = freetext.collect_freetext_entries(visits)
@@ -1907,21 +1920,23 @@ def test_home_page_get_latest_report_returns_latest_published_daily_report(db):
 # --- Daily report page UX pass (Plan 08 follow-up) --------------------------
 
 
-def test_daily_report_page_context_omits_by_department_and_diagnosis_keeps_age_band(
-    home_page,
-):
-    """`by_department` is never in the template context — the real TKC parser
-    never populates `department` (parser_tkc_daily_v1's own docstring), so
-    rendering it would always show one dead "Unknown: N" line.
-    `by_diagnosis_category` was also dropped (maintainer decision,
-    2026-07-23). `by_age_band` is untouched."""
+def test_daily_report_page_context_builds_redesigned_breakdown_data(home_page):
+    """Plan 11 Track B12 redesign: `by_department`/`by_diagnosis_category` are
+    never in the template context (the diagnosis-category section was
+    dropped, and the real TKC parser never populates `department` —
+    parser_tkc_daily_v1's own docstring — so rendering it would always show
+    one dead "Unknown: N" line). `gender_rows`/`age_bands` replace the old
+    raw `by_gender`/`by_age_band` breakdowns with the shapes the redesigned
+    template consumes directly."""
     report_date = datetime.date(2026, 7, 10)
     aggregate = DailyAggregateFactory(
         clinic_date=report_date,
+        male_patients=1,
+        female_patients=3,
         category_counts={
             "by_department": {"General Medicine": 3},
             "by_diagnosis_category": {"hypertension": 2},
-            "by_age_band": {"18-40": 3},
+            "by_age_band": {"19-55": 3, "56+": 1},
         },
     )
     page = DailyReportPageFactory(
@@ -1935,24 +1950,55 @@ def test_daily_report_page_context_omits_by_department_and_diagnosis_keeps_age_b
 
     assert "by_department" not in context
     assert "by_diagnosis_category" not in context
-    assert context["by_age_band"] == [("18-40", 3)]
+    assert "by_age_band" not in context
+
+    assert context["gender_rows"] == [
+        {"label": "Female", "count": 3, "pct": 100},
+        {"label": "Male", "count": 1, "pct": 33},
+    ]
+    assert context["age_bands"] == [
+        {
+            "label": "0–5",
+            "count": 0,
+            "icon_template": "pipeline/age_icons/_age_0_5.html",
+        },
+        {
+            "label": "6–18",
+            "count": 0,
+            "icon_template": "pipeline/age_icons/_age_6_18.html",
+        },
+        {
+            "label": "19–55",
+            "count": 3,
+            "icon_template": "pipeline/age_icons/_age_19_55.html",
+        },
+        {
+            "label": "56+",
+            "count": 1,
+            "icon_template": "pipeline/age_icons/_age_56_plus.html",
+        },
+    ]
+    assert context["report_date"] == report_date
+    assert context["empty_columns"] == []
 
 
-def test_daily_report_page_rendering_reflects_ux_pass_copy_and_card_changes(
-    client, home_page
-):
-    """UX-pass copy/structure fixes: "By sex" -> "By gender"; the always-empty
-    "New vs. follow-up" card and the "By department" section no longer
-    render, "By diagnosis category" was dropped (maintainer decision,
-    2026-07-23), while the still-wanted breakdown sections are unaffected."""
+def test_daily_report_page_rendering_reflects_b12_redesign(client, home_page):
+    """Plan 11 Track B12 redesign: three headline stats (no "New patients"),
+    no diagnosis-category section, breakdown consolidated into Gender + Age
+    cards with the four fixed age glyphs, no bare "By age band"/"By diagnosis
+    category" headings left over from the previous layout."""
     index = ReportIndexPageFactory(parent=home_page, slug="reports")
     report_date = datetime.date(2026, 7, 10)
     aggregate = DailyAggregateFactory(
         clinic_date=report_date,
+        total_visits=4,
+        zakat_beneficiary_patients=3,
+        paying_patients=1,
+        new_patients=2,
         category_counts={
             "by_department": {"General Medicine": 3},
             "by_diagnosis_category": {"hypertension": 2},
-            "by_age_band": {"18-40": 3},
+            "by_age_band": {"19-55": 3},
         },
     )
     DailyReportPageFactory(
@@ -1964,22 +2010,30 @@ def test_daily_report_page_rendering_reflects_ux_pass_copy_and_card_changes(
 
     content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
 
-    assert "By gender" in content
+    assert "Patients seen" in content
+    assert "Zakat" in content
+    assert "Regular" in content
+    assert "New patients" not in content
+
+    assert "Breakdown" in content
+    assert "Gender" in content
+    assert "19–55" in content
+    assert "56+" in content
+
+    assert "By diagnosis category" not in content
+    assert "By age band" not in content
+    assert "By department" not in content
     assert "By sex" not in content
     assert "New vs. follow-up" not in content
-    assert "By department" not in content
-    assert "By diagnosis category" not in content
-    assert "By age band" in content
 
 
-def test_daily_report_page_renders_freetext_summary_as_real_paragraphs(
+def test_daily_report_page_renders_freetext_summary_as_a_single_paragraph(
     client, home_page
 ):
-    """Plan 11 B10: maintainer feedback that the free-text summary "has no
-    formatting at all". A multi-paragraph AI draft (blank-line separated, per
-    `_FREETEXT_SUMMARY_SYSTEM_PROMPT`) must render as real `<p>` tags — via
-    the `linebreaks` filter — not as one raw string dumped into a single
-    `<p>`, matching the newsletter body's real-HTML-block prose precedent."""
+    """Plan 11 Track B12: the freetext summary is capped at ~50 words (one
+    short paragraph, per `_FREETEXT_SUMMARY_SYSTEM_PROMPT`) — the template
+    renders it as a single plain `<p>`, no `linebreaks` filter/multi-paragraph
+    splitting needed since there's no longer more than one paragraph."""
     index = ReportIndexPageFactory(parent=home_page, slug="reports")
     report_date = datetime.date(2026, 7, 10)
     DailyReportPageFactory(
@@ -1987,21 +2041,47 @@ def test_daily_report_page_renders_freetext_summary_as_real_paragraphs(
         slug=report_date.isoformat(),
         report_date=report_date,
         aggregate=DailyAggregateFactory(clinic_date=report_date),
-        freetext_summary=(
-            "Most complaints were respiratory infections and fevers.\n\n"
-            "Medicines prescribed were mostly antibiotics and paracetamol."
-        ),
+        freetext_summary="Most complaints were respiratory infections and fevers.",
     )
 
     content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
 
     assert "<p>Most complaints were respiratory infections and fevers.</p>" in content
-    assert (
-        "<p>Medicines prescribed were mostly antibiotics and paracetamol.</p>"
-        in content
+
+
+def test_daily_report_page_renders_empty_columns_as_chips(client, home_page):
+    """Plan 11 Track B12: `empty_columns_flag` stores a JSON array of column
+    names (see `ai.draft_empty_columns_flag`) — the template renders each as
+    a labelled chip, not the old raw markdown-flecked sentence."""
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    report_date = datetime.date(2026, 7, 10)
+    DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=DailyAggregateFactory(clinic_date=report_date),
+        empty_columns_flag=json.dumps(["Investigation", "Plan"]),
     )
-    # Not one raw string dumped into a single paragraph.
-    assert "fevers.\n\nMedicines" not in content
+
+    content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
+
+    assert '<span class="dr__chip">Investigation</span>' in content
+    assert '<span class="dr__chip">Plan</span>' in content
+    assert "**" not in content
+
+
+def test_parse_empty_columns_flag_falls_back_to_empty_list_on_malformed_data():
+    """Defensive parsing (Plan 11 Track B12): a blank field, a non-JSON
+    string (e.g. a pre-B12 page's old free-form sentence), or JSON that
+    isn't an array of strings all degrade to "no chips" rather than
+    raising or rendering garbage."""
+    assert _parse_empty_columns_flag("") == []
+    assert _parse_empty_columns_flag("Investigation and Plan were empty.") == []
+    assert _parse_empty_columns_flag('{"not": "a list"}') == []
+    assert _parse_empty_columns_flag('["Investigation", "Plan"]') == [
+        "Investigation",
+        "Plan",
+    ]
 
 
 def test_report_index_page_renders_intro_when_set(client, home_page):
@@ -2028,7 +2108,7 @@ def test_persist_parsed_export_groups_rows_by_visit_date(home_page):
         ParsedVisitRow(
             visit_date=datetime.date(2026, 7, 1),
             department="General Medicine",
-            age_band=DeidentifiedVisit.AGE_BAND_18_40,
+            age_band=DeidentifiedVisit.AGE_BAND_19_55,
             sex=DeidentifiedVisit.SEX_MALE,
             location="Thandkoi",
             diagnosis_category=DeidentifiedVisit.DIAGNOSIS_OTHER,
@@ -2038,7 +2118,7 @@ def test_persist_parsed_export_groups_rows_by_visit_date(home_page):
         ParsedVisitRow(
             visit_date=datetime.date(2026, 7, 2),
             department="General Medicine",
-            age_band=DeidentifiedVisit.AGE_BAND_18_40,
+            age_band=DeidentifiedVisit.AGE_BAND_19_55,
             sex=DeidentifiedVisit.SEX_FEMALE,
             location="Thandkoi",
             diagnosis_category=DeidentifiedVisit.DIAGNOSIS_OTHER,
