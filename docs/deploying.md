@@ -39,16 +39,30 @@ PR → CI (ruff + pytest, AI mocked) → review → merge to main
 Merging to `main` **never** changes production on its own. Production only
 changes when a human runs the Deploy workflow.
 
-### 1. Cut a release tag
-
-Deploys target a **tag**, not a moving branch — so "what's in production" is
-always a specific, named commit.
+### Cut a release tag and deploy it
 
 ```bash
-git checkout main && git pull
-git tag v2026.07.20        # date-based; add -2, -3… for a second release same day
-git push origin v2026.07.20
+scripts/release.sh
 ```
+
+This one script (not a Claude Code skill — added 2026-07-23, replacing the
+earlier `release-prod` skill, per maintainer preference for a plain,
+inspectable script over an agent-driven one) does the whole runbook:
+
+1. Checks `main` is up to date with `origin/main`, CI is green on that exact
+   commit, and `RENDER_DEPLOY_HOOK_URL` is configured.
+2. Prints what's shipping since the previous release tag.
+3. Prompts for confirmation (the deploy gate — see below).
+4. Cuts and pushes a date-based tag (`vYYYY.MM.DD`, or `-2`/`-3`… for a
+   second release the same day).
+5. Triggers the Deploy workflow for that tag and watches it to completion.
+6. Health-checks production (`/healthz`) with a few retries.
+
+Only one flag: `--ref vYYYY.MM.DD` (deploy an existing tag as-is instead of
+cutting a new one — see Rollback below). There is no way to skip the
+confirmation prompt or the CI check — every release, including a rollback,
+requires a human to type `y` at the terminal. Run `scripts/release.sh --help`
+for the full usage note.
 
 Tags are **lightweight and date-based** (`v2026.07.20`), not semver — a CMS
 website has no API consumers for "breaking change" semantics to describe; a tag
@@ -58,17 +72,14 @@ Optionally, publish a [GitHub Release](https://github.com/hh2110/thandkoi-clinic
 from the tag with auto-generated notes — a free, human-readable "what shipped
 and when" log.
 
-### 2. Run the Deploy workflow
-
-The Deploy workflow (`.github/workflows/deploy.yml`) is `workflow_dispatch`-only
-and takes a **required `ref` input** — the tag you just cut.
-
-- **UI:** Actions → **Deploy** → *Run workflow* → enter the tag (e.g.
-  `v2026.07.20`) → *Run*.
-- **CLI:** `gh workflow run deploy.yml -f ref=v2026.07.20`
-
-The workflow checks out the tag, **verifies the ref really is a tag** (it
-refuses a branch or raw SHA), and triggers a Render deploy of that exact commit.
+Under the hood, this drives the Deploy workflow (`.github/workflows/deploy.yml`),
+which is `workflow_dispatch`-only and takes a **required `ref` input** — the
+tag. It checks out the tag, **verifies the ref really is a tag** (it refuses a
+branch or raw SHA), and triggers a Render deploy of that exact commit. You can
+still run it directly (UI: Actions → **Deploy** → *Run workflow*; CLI:
+`gh workflow run deploy.yml -f ref=v2026.07.20`) if you want to skip the
+script's precondition checks for some reason — not recommended for a normal
+release.
 
 ## Who approves the deploy gate
 
@@ -86,14 +97,17 @@ The `production` GitHub Environment still exists, but **only to scope secrets**
 
 ## Rollback
 
-Re-run the Deploy workflow with the **previous** tag as the `ref`:
+Re-deploy the **previous** tag:
 
 ```bash
-gh workflow run deploy.yml -f ref=v2026.07.19
+scripts/release.sh --ref v2026.07.19
 ```
 
 Because deploys are tag-addressed, rollback is precise — no guessing which entry
-in Render's own deploy history is the right one.
+in Render's own deploy history is the right one. `--ref` skips the
+main/CI-freshness checks (there's nothing to check — you're deploying a tag
+that already exists) but still confirms before triggering and health-checks
+after.
 
 ## AI content review is a *separate* gate
 
