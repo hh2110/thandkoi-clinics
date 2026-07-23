@@ -183,9 +183,11 @@ the doc itself is not re-read going forward.
 These are the maintainer asking the team something, not requesting a feature —
 answer directly, then decide whether the answer implies a task:
 
-1. **"How is impact so far calculated?"** — trace and document the current
-   calculation (likely in `apps/core/models.py` or a template tag); becomes D2
-   if the answer needs restating on-page.
+1. ~~**"How is impact so far calculated?"**~~ **Answered, via D2
+   (2026-07-23):** it isn't — `ImpactStatBlock` is a hand-typed admin field,
+   not a computation. Documented in
+   [docs/architecture-and-ai-brief.md](../../docs/architecture-and-ai-brief.md),
+   with live computation deferred to the new Track F candidate below.
 2. **"Does the home-page 'latest daily report' link expect a picture?"** —
    check the current template/content model for that link and confirm.
 3. **"How do I upload a newsletter?"** (example file: "May June TTC Newsletter"
@@ -288,23 +290,29 @@ renumbered to `0007` for the same reason.
 to revisit), D8 (nav dropdown submenus — parked until nav complexity actually
 demands it, see "Parked, deliberately").
 
-**Remaining work, grouped into sessions (maintainer decision 2026-07-23) —
-one session/branch per group below, not one task file per item:**
+**Four sessions run in parallel (maintainer decision 2026-07-23), each its
+own branch — status of each as of this write-up:**
 
-1. **B8 + B9** (one branch/session) — Claude-generated free-text summary and
-   the companion empty-column flag, built together since they share the same
-   input columns and the same grounding resolution (Track B note above).
-2. **C2** (one branch/session) — Anthropic API cost surfaced in the admin
-   panel; still needs the metering approach (token-count × published rate)
-   decided before slicing into a task file.
-3. **Track D remainder** (one branch/session) — D2 (impact-so-far date label
-   + calculation doc) and D4 (chiragh branding + Urdu tagline removal) only,
-   now that D3 is done and D5/D8 are dropped.
-4. **E1 + E2 research** (one session, research only — no build) — a short
-   options review for both: E1's update-routing skill design, and E2's
-   WhatsApp-ingestion options (including the `whatsapp-claude-plugin`
-   candidate) per the existing Parked note tying E2 to E1's outcome. This
-   session produces a decision/design write-up, not a task file yet.
+1. **B8 + B9** — `feat/daily-report-freetext-summary`. Implemented, tested,
+   through two rounds of code-review-tc fixes (a re-ingest-time draft
+   blanking bug, a content-hash dedup decision reversed after a second review
+   pass — see `ParsedVisitRow._canonical_tuple`'s comment — sanity-check
+   bounds too tight for their own `max_tokens`, and cleanup). Re-review in
+   progress; PR not yet opened.
+2. **C2** — `feat/admin-ai-cost-metering`. Implemented, tested, through two
+   rounds of code-review-tc fixes (a logging-failure-discards-a-good-response
+   bug, a `cost_usd` precision bug that truncated small calls to $0.00).
+   Re-review in progress; PR not yet opened.
+3. **Track D remainder (D2 + D4)** — `feat/impact-label-chiragh-branding`.
+   Implemented, tested, through code-review-tc fixes (a bare-caption
+   rendering bug) plus a maintainer scope confirmation on D4 (site-wide
+   footer removal was intended). Marked done above; PR not yet opened.
+4. **E1 + E2 research** — done, no build. See
+   [11-e1-e2-research-2026-07.md](11-e1-e2-research-2026-07.md).
+
+None of the three code branches are merged yet — each still needs its
+review loop to land clean, then a draft PR, then CI, before merge and
+deploy.
 
 Each of the four sessions above still needs its own Stage 2 planning /
 Stage 3 grounding pass and Stage 6 task slicing before implementation begins,
