@@ -1959,6 +1959,26 @@ def test_report_index_page_renders_intro_when_set(client, home_page):
     assert "Every report we publish, in one place." in content
 
 
+def test_report_index_page_renders_section_intros_when_set(client, home_page):
+    """Same optional-intro pattern as the page-level ``intro`` above, applied
+    to the two section headings the nav-merge (2026-07-22) added — "Daily
+    reports" and "Camp reports" each get their own small, independently
+    editable blurb rather than sharing the page-level one."""
+    ReportIndexPageFactory(
+        parent=home_page,
+        slug="reports",
+        daily_reports_intro="<p>Published straight from each day's clinic export.</p>",
+        camp_reports_intro=(
+            "<p>A few recent outreach camps — see the full archive for more.</p>"
+        ),
+    )
+
+    content = client.get("/en/reports/").content.decode()
+
+    assert "Published straight from each day's clinic export." in content
+    assert "A few recent outreach camps" in content
+
+
 def test_persist_parsed_export_groups_rows_by_visit_date(home_page):
     """A single export spanning more than one clinic-date produces one
     IngestRun/DailyAggregate per date, not one lumped together."""

@@ -349,10 +349,18 @@ class ReportIndexPage(Page):
     """
 
     intro = RichTextField(blank=True, help_text="Optional intro copy for the archive.")
+    daily_reports_intro = RichTextField(
+        blank=True, help_text="Optional intro copy for the 'Daily reports' section."
+    )
+    camp_reports_intro = RichTextField(
+        blank=True, help_text="Optional intro copy for the 'Camp reports' section."
+    )
 
     content_panels = [
         *Page.content_panels,
         FieldPanel("intro"),
+        FieldPanel("daily_reports_intro"),
+        FieldPanel("camp_reports_intro"),
     ]
 
     max_count = 1
