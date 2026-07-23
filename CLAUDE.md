@@ -86,7 +86,12 @@ rules are architectural constraints, not preferences — never weaken them:
   after — a PR only gets opened once its branch's review is clean. This
   applies uniformly, including to branches an agent/session produced as part
   of a larger batch — reviewing each one is not optional cleanup, it's the
-  step that comes before a PR exists at all.
+  step that comes before a PR exists at all. **Keep every re-run targeted**
+  (2026-07-23 — see the skill's own "Token discipline" note): only the first
+  pass on a branch needs the whole diff; every loop iteration after a fix
+  should scope the re-review to just the files that fix touched, not the
+  full branch again, and a tiny or docs-only diff should get a single-pass
+  read instead of the full multi-agent workflow.
 - **PR flow:** once review is clean, open a PR with `gh pr create` (draft —
   see the personal lifecycle doc's "drafts stay drafts until I sign off");
   keep PRs scoped to one plan/step. Merge once CI is green and the PR has been
