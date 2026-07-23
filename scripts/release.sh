@@ -209,11 +209,21 @@ gh workflow run deploy.yml --repo "$REPO" -f ref="$REF"
 # Poll for up to 5 minutes (60 x 5s), not 2 — the same cancel-in-progress:
 # false concurrency group means a freshly-dispatched run can sit queued
 # behind a prior still-running deploy for a while before its log has
-# anything to match against. Ruled-out candidates (checked, log didn't
-# match — most likely still queued with no log yet) are remembered across
-# iterations rather than re-fetched and re-grepped on every tick, so a
-# slow/rate-limited API doesn't waste the poll budget re-checking runs that
-# already came back negative.
+# anything to match against. A candidate is only ever ruled out (added to
+# CHECKED and never re-examined) once its own run has reached a terminal
+# `status` of "completed" AND its log still doesn't match — checking status
+# first (cheap, no --log fetch) before trusting a miss is required because a
+# run's own life cycle can be shorter than one 5s poll tick (observed
+# 2026-07-23: a real deploy run completed in 15s total, and its "Deploying
+# tag $REF (" line — logged partway through, once the "Verify the ref" step
+# runs — didn't exist yet the moment this loop first saw the run as a
+# candidate; grepping that in-progress run's partial log came back with no
+# match, and the old code treated that miss as final, permanently ruling out
+# the one run that was actually deploying and later failing the whole
+# script even though the deploy itself succeeded). Runs still queued/
+# in_progress are cheap to re-poll every tick via --json status alone; only
+# a completed run's log is ever grepped, and only a completed run with no
+# match is ever added to CHECKED.
 RUN_ID=""
 CHECKED=" "
 for _ in $(seq 1 60); do
@@ -224,8 +234,15 @@ for _ in $(seq 1 60); do
        | sort_by(.createdAt) | .[].databaseId')
   for candidate in $CANDIDATES; do
     [[ "$CHECKED" == *" $candidate "* ]] && continue
-    if gh run view "$candidate" --repo "$REPO" --log 2>/dev/null \
-        | grep -qF "Deploying tag ${REF} ("; then
+    CANDIDATE_STATUS=$(gh run view "$candidate" --repo "$REPO" --json status --jq .status 2>/dev/null || echo "")
+    [[ "$CANDIDATE_STATUS" == "completed" ]] || continue
+    CANDIDATE_LOG=$(gh run view "$candidate" --repo "$REPO" --log 2>/dev/null || echo "")
+    # An empty fetch (transient API error, or logs not archived yet even
+    # though status just flipped to completed) is left off CHECKED so it
+    # gets retried next tick — only a non-empty log that genuinely lacks the
+    # match line is treated as a confirmed miss.
+    [[ -z "$CANDIDATE_LOG" ]] && continue
+    if grep -qF "Deploying tag ${REF} (" <<<"$CANDIDATE_LOG"; then
       RUN_ID="$candidate"
       break
     fi
