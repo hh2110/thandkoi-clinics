@@ -123,7 +123,14 @@ exactly 3 stats today):
   beneficiaries (all time)" — this one figure *is* a cross-`report_kind` sum,
   deliberately: Zakat-funded care is the clinic's core mission framing
   regardless of venue, unlike patient counts which the maintainer specifically
-  wants split by venue.
+  wants split by venue. In practice this cross-sum is equivalent to summing
+  clinic (`report_kind="daily"`) rows alone — per the maintainer (2026-07-23),
+  camp patients are never Zakat beneficiaries (see 4a), so camp rows'
+  `zakat_beneficiary_patients` always contribute 0. The query stays a
+  cross-`report_kind` sum anyway rather than hand-restricting it to `daily`
+  only — one uniform query is simpler than special-casing a field that's
+  already structurally zero on the camp side, and it stays correct even if
+  that structural fact were ever to change.
 
 This set is a proposed default, easy to change at the task-slicing stage
 (Stage 6) — it's a labeling/selection choice, not an architecture decision,
@@ -154,16 +161,13 @@ camp_total_visits = CAMP_PATIENTS_PRE_PIPELINE_OFFSET + Sum(...)  # report_kind=
   never change, not house style being followed. If more pre-pipeline camps
   turn out to be un-recorded later, that's a new decision to make explicitly
   then, not a case for building configurability now.
-- **Scoped to the camp total only — not the Zakat-beneficiary figure.** The
-  maintainer's ask was specifically about the camp patient count; whether
-  those 187 patients were Zakat beneficiaries is unknown to this doc. Folding
-  an unverified split into the Zakat figure would be inventing a number
-  invariant #3 doesn't allow, whereas leaving the Zakat total exactly as
-  computed from real rows is honest about what's actually known — it just
-  slightly under-states the Zakat total by however many of those 187 would
-  have qualified. **Open question for the maintainer:** if the split for that
-  first camp is known (e.g. "all 187 were Zakat beneficiaries"), say so and
-  this doc will add a second offset constant for the Zakat sum too.
+- **Scoped to the camp total only — never the Zakat-beneficiary figure.**
+  Resolved by the maintainer (2026-07-23): **camp patients are not Zakat
+  patients**, full stop — not a fact specific to the missing first camp, but
+  true of camp attendance generally (matches 4's note that camp rows'
+  `zakat_beneficiary_patients` is structurally 0). So the 187 offset is added
+  only to `camp_total_visits` and never has a Zakat-side counterpart to add —
+  there is no second constant to introduce here, now or later.
 - Documented in the module's docstring the same way this repo documents every
   other magic number (e.g. `ImpactStatBlock`'s "Real figures are entered by
   hand for now" note, `DailyAggregate`'s `report_kind` docstring) — why it
@@ -236,8 +240,6 @@ aggregation is correct. They can be built and shipped in either order.
 - Whether to retire `ImpactStatsBlock` from the home page once the live
   section ships (section 5) — maintainer's call, not required for F2.
 - Exact caption/eyebrow copy for the new section.
-- Whether the 187-patient historical camp offset (section 4a) also has a
-  known Zakat/regular split — currently applied only to the camp total.
 
 ## Reference material
 
