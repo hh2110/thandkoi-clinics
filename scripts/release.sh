@@ -10,14 +10,26 @@
 # Usage:
 #   scripts/release.sh                    # cut a new date-based tag from origin/main, deploy it
 #   scripts/release.sh --ref vYYYY.MM.DD  # deploy an existing tag as-is (rollback/redeploy) — no new tag cut
+#   scripts/release.sh --yes              # skip the interactive y/N confirmation (see below)
 #
 # Requires: gh (authenticated), git, jq, curl.
 #
-# The script always prompts for an explicit y/N confirmation before tagging
-# or deploying — there is no flag to skip it and no non-interactive mode. A
-# human typing "y" at the terminal is the deploy gate; an AI agent must never
-# feed or pipe an automated answer to this prompt on its own initiative, same
-# as this script's deleted predecessor (the release-prod skill) required.
+# By default the script prompts for an explicit y/N confirmation before
+# tagging or deploying. --yes skips that prompt and proceeds straight to
+# tagging/deploying once every precondition above it (main == origin/main,
+# CI green on that commit, deploy-hook secret present) has already passed —
+# it does not skip or weaken any of those checks, only the final "do you
+# want to do this" prompt.
+#
+# 2026-07-23 policy reversal (maintainer decision, explicit and informed):
+# this flag did not exist until today. It was deliberately absent through
+# five rounds of code review specifically to stop an AI agent from deploying
+# to production on its own initiative — the maintainer then asked for it
+# back, was shown that tradeoff directly (this flag lets any agent session
+# deploy without a human typing anything, ever), and confirmed they wanted
+# it anyway. --yes still requires being explicitly passed on every
+# invocation; nothing here changes the default (still fully interactive) or
+# weakens any precondition check above.
 
 set -euo pipefail
 
@@ -37,6 +49,7 @@ confirm() {
 }
 
 REF=""
+YES=0
 REMOTE_MAIN=""  # only set on the "cut a new tag" path; kept defined (empty)
                 # here so the --ref path's later fallback echo can't trip
                 # `set -u`'s unbound-variable check
@@ -47,6 +60,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || fail "--ref requires a tag argument, e.g. --ref v2026.07.20"
       REF="$2"
       shift 2
+      ;;
+    --yes)
+      YES=1
+      shift
       ;;
     -h|--help)
       # Only the header comment block (shebang through the blank line before
@@ -142,8 +159,12 @@ echo "Commit: $(git rev-parse "$REF" 2>/dev/null || echo "$REMOTE_MAIN")"
 echo "Target: production (https://thandkoiclinics.com)"
 echo
 
-confirm "Deploy $REF to production? [y/N]" \
-  || { echo "Aborted — nothing was tagged or deployed."; exit 1; }
+if [[ "$YES" == "1" ]]; then
+  echo "--yes passed — skipping the interactive confirmation."
+else
+  confirm "Deploy $REF to production? [y/N]" \
+    || { echo "Aborted — nothing was tagged or deployed."; exit 1; }
+fi
 
 # --- Cut and push the tag (only when we made a new one) ---------------------
 
