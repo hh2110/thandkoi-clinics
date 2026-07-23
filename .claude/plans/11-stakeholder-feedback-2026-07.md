@@ -123,10 +123,12 @@ the doc itself is not re-read going forward.
 - [x] **D4.** Newsletter branding: the clay-lamp ("chiragh") image/motif; remove
       "چراغ شفا" from the Urdu home page per the maintainer's explicit ask.
       **Done (2026-07-23, branch `feat/impact-label-chiragh-branding`),** PR
-      not yet opened. Removed from the site-wide footer (the only live
-      occurrence) and updated CLAUDE.md's Bilingual section — **scope note:**
-      the footer renders on every page, not Home alone, flagged in case
-      something narrower was meant. No chiragh asset exists yet, so a
+      not yet opened. Removed from two live occurrences — the site-wide
+      footer (renders on every page, not Home alone) and the Home page's
+      hero tagline — plus matching seed/fixture data, and updated CLAUDE.md's
+      Bilingual section. **Scope confirmed with the maintainer (2026-07-23):**
+      the site-wide footer removal was intended, not Home-page-only — no
+      further scope change needed. No chiragh asset exists yet, so a
       placeholder (mirroring the Donors & Partners page's pattern) was added
       to the newsletter archive page pending a real asset.
 - [x] **D6.** New "Donors & Partners" page/menu item: organizational partners
