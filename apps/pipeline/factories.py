@@ -101,7 +101,7 @@ class DailyReportPageFactory(_TreePageFactory):
     class Meta:
         model = DailyReportPage
 
-    title = factory.LazyAttribute(lambda o: f"Daily report — {o.report_date}")
+    title = factory.LazyAttribute(lambda o: f"Daily report: {o.report_date}")
     slug = factory.LazyAttribute(lambda o: o.report_date.isoformat())
     report_date = factory.LazyFunction(datetime.date.today)
     aggregate = factory.SubFactory(

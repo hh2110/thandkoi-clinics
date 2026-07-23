@@ -112,7 +112,7 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     page = DailyReportPage.objects.filter(report_date=clinic_date).first()
     if page is None:
         page = DailyReportPage(
-            title=f"Daily report — {clinic_date.isoformat()}",
+            title=f"Daily report: {clinic_date.isoformat()}",
             slug=clinic_date.isoformat(),
             report_date=clinic_date,
             aggregate=aggregate,
