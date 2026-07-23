@@ -286,13 +286,14 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       PR #53, placeholders throughout per maintainer decision. **Still
       needed from the maintainer: the Sugar Hospital and District Health
       Office logo files** — no image needed for named donors, by design.
-- [ ] **D8.** Main nav items should support dropdown submenus (groundwork for D6
+- [x] **D8.** Main nav items should support dropdown submenus (groundwork for D6
       and the merged Reports menu in C3).
       **Revisited same day (2026-07-23)** — dropped that morning as "not part
       of this round," then reopened hours later by a maintainer design
       handoff (`~/Downloads/header.zip`) collapsing the header to a single
-      row with a "More" dropdown (Team/Gallery/Contact). In progress on
-      `feat/single-row-header`, PR #94 — plain nested `<details>`, no new JS.
+      row with a "More" dropdown (Team/Gallery/Contact). **Done (2026-07-23,
+      branch `feat/single-row-header`),** merged PR #94 — plain nested
+      `<details>`, no new JS.
 - [x] **D9.** Gallery: clicking a cropped thumbnail should open a full-size
       modal.
       **Done (2026-07-22, branch `feat/gallery-lightbox-modal`),** merged PR
