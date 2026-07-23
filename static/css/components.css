@@ -16,10 +16,30 @@
 
 .site-header__bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   padding-block: var(--space-2);
+}
+
+/* Single-row header (2026-07-23): nav.html renders inline in this bar now,
+   pushed to the far end. Below 56rem the mobile <details> disclosure
+   (.primary-nav) takes flex-basis:100% so its opened list wraps onto its
+   own line under the logo + hamburger + controls, matching how the old
+   second full-width nav row read, without needing a second block-level
+   element. */
+.site-header__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+@media (max-width: 55.99rem) {
+  .primary-nav {
+    flex-basis: 100%;
+  }
 }
 
 .site-header__brand {
@@ -102,11 +122,10 @@
 /* --- Primary nav -----------------------------------------------------------
    Plain HTML/CSS <details> disclosure for the mobile nav — no JS beyond the
    theme toggle (Plan 03's "minimal JS" decision). On wide viewports the
-   <details> chrome is hidden and the list is shown inline instead. */
-.primary-nav {
-  border-block-end: 1px solid var(--color-border-default);
-}
-
+   <details> chrome is hidden and the list is shown inline instead.
+   Single-row header (2026-07-23): this no longer sits in its own full-width
+   band, so the divider border only applies while open on mobile (below),
+   not unconditionally. */
 .primary-nav[open] > summary {
   border-block-end: 1px solid var(--color-border-default);
 }
@@ -164,10 +183,6 @@
 }
 
 @media (min-width: 56rem) {
-  .primary-nav {
-    border-block-end: none;
-  }
-
   .primary-nav > summary {
     display: none;
   }
@@ -181,22 +196,123 @@
     content-visibility: visible;
   }
 
+  /* Single-row header (2026-07-23): this list now sits inline inside
+     .site-header__bar (already centered by the .wrapper it's nested in), not
+     in its own full-width band — so unlike before it needs no independent
+     max-width/margin-inline/padding of its own. */
   .primary-nav__list {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    /* Align the inline nav with the centered content wrapper (logo + page
-       body) rather than running full-bleed to the viewport edge, and give the
-       row vertical breathing room. */
-    max-width: 72rem;
-    margin-inline: auto;
-    padding: var(--space-1) var(--space-2) var(--space-2);
+  }
+}
+
+/* --- Nav dropdown ("More") --------------------------------------------------
+   Plan 11 D8's revisit (2026-07-23, single-row header redesign) — see
+   nav.html's comment for why this exists now and why it's a plain nested
+   <details>, no JS. Mobile (below): an indented block list, consistent with
+   the rest of the disclosed .primary-nav__list. Desktop (56rem+, further
+   below): an absolutely-positioned flyout instead. */
+.nav-dropdown__trigger {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.nav-dropdown__trigger::-webkit-details-marker {
+  display: none;
+}
+
+.nav-dropdown__details[open] > .nav-dropdown__trigger {
+  color: var(--color-brand-hover);
+}
+
+.nav-dropdown__caret {
+  font-size: var(--font-size-xs);
+  transition: transform 0.18s ease;
+}
+
+.nav-dropdown__details[open] > .nav-dropdown__trigger .nav-dropdown__caret {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown__menu {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) var(--space-2) var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.nav-dropdown__menu a {
+  display: block;
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.nav-dropdown__menu a:hover,
+.nav-dropdown__menu a:focus-visible {
+  color: var(--color-brand-hover);
+}
+
+@media (min-width: 56rem) {
+  .nav-dropdown {
+    position: relative;
   }
 
-  .primary-nav[open] > summary {
-    border-block-end: none;
+  .nav-dropdown__details::details-content {
+    content-visibility: visible;
+  }
+
+  .nav-dropdown__menu {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    inset-inline-end: 0;
+    min-width: 10rem;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--space-1);
+    z-index: 20;
+    opacity: 0;
+    transform: translateY(-0.375rem);
+    pointer-events: none;
+    /* visibility, not just opacity, gates this: forcing content-visibility
+       above keeps the closed menu in the render tree (needed for the fade to
+       play at all), which would otherwise leave its links keyboard-focusable
+       even while invisible. visibility:hidden removes that focusability;
+       delaying it until the fade-out finishes (below) keeps the animation. */
+    visibility: hidden;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
+  }
+
+  .nav-dropdown__menu a {
+    padding: 0.5625rem 0.875rem;
+    border-radius: 8px;
+  }
+
+  .nav-dropdown__menu a:hover,
+  .nav-dropdown__menu a:focus-visible {
+    background-color: var(--color-accent-soft-bg);
+    color: var(--color-text);
+  }
+
+  .nav-dropdown__details[open] > .nav-dropdown__menu {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    visibility: visible;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0s;
   }
 }
 

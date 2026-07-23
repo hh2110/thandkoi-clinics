@@ -374,8 +374,11 @@ class ReportIndexPage(Page):
     daily reports (this index's own archive) and a camp-reports teaser
     (sourced from ``core.CampReportIndexPage``, which keeps its own URL and
     archive; only the nav *entry* is merged, not the content type) — rather
-    than introducing a dropdown-menu widget (not yet built anywhere in this
-    repo; that's backlog item D8).
+    than a dropdown submenu. (Plan 11 D8 later did add a "More" dropdown
+    elsewhere in the nav, 2026-07-23's single-row header redesign — but this
+    Reports/Camp-Reports merge predates it and was never revisited to use
+    it, since the two-section page here already resolved the nav-crowding
+    problem on its own.)
     """
 
     intro = RichTextField(blank=True, help_text="Optional intro copy for the archive.")
