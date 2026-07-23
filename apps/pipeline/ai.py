@@ -557,6 +557,16 @@ MAX_NEWSLETTER_TOOL_TURNS = 6
 # ship regardless).
 MAX_MONTHLY_NEWSLETTER_LENGTH = 6000
 
+# Found via bulk synthetic-data testing (2026-07-23): with `thinking`
+# disabled (see `draft_monthly_newsletter_body`'s comment on why), the model
+# had nowhere to put its tone/approach reasoning except the visible response
+# — so it wrote that reasoning as the response's own opening paragraph(s),
+# which `_build_newsletter_body` (newsletter_drafting.py) then published
+# verbatim as if it were newsletter content. The same verbatim-publish path
+# also revealed the model reaching for Markdown (`**bold**`, `---` dividers)
+# that renders as literal asterisks/dashes, since `_build_newsletter_body`
+# escapes each paragraph into a plain `<p>` with no Markdown processing. Both
+# fixed by making the output contract explicit rather than assumed.
 _MONTHLY_NEWSLETTER_SYSTEM_PROMPT = (
     "You are drafting one issue of a not-for-profit clinic's monthly "
     "newsletter for its public website. You do not have this month's figures "
@@ -568,8 +578,16 @@ _MONTHLY_NEWSLETTER_SYSTEM_PROMPT = (
     "community, weaving in the admin's notes and any photo captions you are "
     "given. You are working from de-identified aggregate counts and "
     "admin-supplied notes only — never ask about or refer to an individual "
-    "patient. When you are ready, respond with the final newsletter body text "
-    "in plain prose and stop calling tools."
+    "patient. When you are ready, respond with ONLY the newsletter body text "
+    "itself, in plain-text paragraphs separated by a blank line, and stop "
+    "calling tools. Your response is published to the public website exactly "
+    "as written, so: do not include any preamble, meta-commentary, or notes "
+    "about your approach, tone, or reasoning — begin directly with the "
+    "newsletter's own first sentence, with nothing before it. Do not use "
+    "Markdown or any other markup (no **bold**, no # headings, no --- "
+    "dividers, no bullet lists) — your response is inserted as plain "
+    "unprocessed text, so any such syntax would appear literally on the "
+    "page rather than being rendered."
 )
 
 MONTHLY_NEWSLETTER_TOOLS: list[dict[str, object]] = [
