@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 ('model', models.CharField(help_text='Anthropic model id, e.g. claude-sonnet-5.', max_length=60)),
                 ('input_tokens', models.PositiveIntegerField()),
                 ('output_tokens', models.PositiveIntegerField()),
-                ('cost_usd', models.DecimalField(decimal_places=4, help_text='input_tokens/output_tokens x the published per-model rate at call time — see apps.pipeline.ai_pricing.', max_digits=10)),
+                ('cost_usd', models.DecimalField(decimal_places=8, help_text='input_tokens/output_tokens x the published per-model rate at call time — see apps.pipeline.ai_pricing.', max_digits=12)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
             ],
             options={

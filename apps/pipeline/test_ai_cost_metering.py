@@ -81,6 +81,27 @@ def test_compute_cost_usd_returns_zero_for_an_unrecognized_model():
     assert compute_cost_usd("some-future-model", 1000, 1000) == Decimal("0")
 
 
+def test_ai_call_log_record_does_not_truncate_a_small_call_to_zero(db):
+    """Found by code-review-tc: cost_usd used to be DecimalField(decimal_places=4),
+    silently rounding a small/cheap call (well within a single request's normal
+    token counts) down to $0.0000 and undercounting the admin's running total.
+    """
+    log = AiCallLog.record(
+        call_site=AiCallLog.CALL_SITE_DAILY_SUMMARY,
+        model="claude-haiku-4-5",
+        input_tokens=10,
+        output_tokens=5,
+    )
+    input_rate, output_rate = PRICING_PER_MILLION_TOKENS["claude-haiku-4-5"]
+    expected = (Decimal(10) * input_rate + Decimal(5) * output_rate) / Decimal(
+        "1000000"
+    )
+    assert expected == Decimal("0.000035")
+    assert log.cost_usd == expected
+    assert log.cost_usd != Decimal("0")
+    assert AiCallLog.objects.get(pk=log.pk).cost_usd == expected
+
+
 def test_ai_call_log_record_computes_and_persists_cost(db):
     log = AiCallLog.record(
         call_site=AiCallLog.CALL_SITE_DAILY_SUMMARY,

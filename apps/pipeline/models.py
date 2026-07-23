@@ -752,8 +752,8 @@ class AiCallLog(models.Model):
     input_tokens = models.PositiveIntegerField()
     output_tokens = models.PositiveIntegerField()
     cost_usd = models.DecimalField(
-        max_digits=10,
-        decimal_places=4,
+        max_digits=12,
+        decimal_places=8,
         help_text="input_tokens/output_tokens x the published per-model rate "
         "at call time — see apps.pipeline.ai_pricing.",
     )
