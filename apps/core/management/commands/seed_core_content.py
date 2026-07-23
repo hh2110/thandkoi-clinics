@@ -34,6 +34,7 @@ from apps.core.models import (
     HomePage,
     OurWorkPage,
     Service,
+    SocialLink,
     TeamMember,
     TeamPage,
 )
@@ -279,6 +280,17 @@ BANK = {
     "address": "Thandkoi, Swabi, Khyber Pakhtunkhwa, Pakistan",
 }
 
+# (label, url) — social links for the same setting. Seeded separately from
+# BANK: these are orderable child objects (SocialLink), not plain scalar
+# fields, so they can't go through the generic getattr/setattr loop below.
+SOCIAL_LINKS = [
+    (
+        "Facebook",
+        "https://www.facebook.com/profile.php"
+        "?id=61588951366955&name=xhp_nt__fb__action__open_user",
+    ),
+]
+
 
 class Command(BaseCommand):
     help = (
@@ -425,3 +437,13 @@ class Command(BaseCommand):
             )
         else:
             self.stdout.write("  exists   Contact & bank details (left as-is)")
+
+        if obj.social_links.exists():
+            self.stdout.write("  exists   Social links (left as-is)")
+        else:
+            for label, url in SOCIAL_LINKS:
+                obj.social_links.add(SocialLink(label=label, url=url))
+            obj.save()
+            self.stdout.write(
+                self.style.SUCCESS(f"  set      Social links ({len(SOCIAL_LINKS)})")
+            )
