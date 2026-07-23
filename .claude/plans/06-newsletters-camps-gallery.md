@@ -80,6 +80,16 @@ here.
 | Consent field | `consent_confirmed` required (not just present) on every `GalleryImage` and every Camp Report photo before publish | Plan 04 introduced this as a convention; this is the plan where it's actually load-bearing — these are exactly the photos likely to show identifiable patients. |
 | Home teaser wiring | Query the latest published `NewsletterPage`; leave the Report half of the teaser exactly as Plan 04 left it (hidden) until Plan 08 | Partial wiring is fine — the teaser was built to degrade gracefully per-content-type, not all-or-nothing. |
 
+> **2026-07-23 update (branch `chore/remove-camp-upload-feature`):** the
+> patients-served-by-category split, `services_offered`, and
+> `partner_credits` described in the "Camp Report fields" row above were
+> removed from `CampReportPage` entirely and replaced with a single optional
+> `report_document` attachment field. Maintainer decision — moving away from
+> a generic/structured-stats direction for this page. The camp-upload flow
+> (Plan 11 Track C3) that once auto-parsed camp exports into this archive
+> was also removed in the same branch; `CampReportPage` is hand-authored
+> only again.
+
 ## Proposed page tree additions
 
 ```

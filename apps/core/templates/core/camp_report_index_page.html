@@ -22,9 +22,6 @@ Newsletter archive; lists only published reports, newest first.
               {{ camp_report.camp_date }}{% if camp_report.location %} · {{ camp_report.location }}{% endif %}
             </p>
             <h3 class="card__title"><a href="{{ camp_report.url }}">{{ camp_report.title }}</a></h3>
-            <p class="card__body">
-              {% blocktranslate count total=camp_report.total_patients_served %}{{ total }} patient served{% plural %}{{ total }} patients served{% endblocktranslate %}
-            </p>
           </article>
         {% empty %}
           <p class="card-grid__empty text-faint">{% translate "Camp reports coming soon." %}</p>

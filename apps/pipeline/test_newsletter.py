@@ -42,7 +42,7 @@ from apps.core.models import NewsletterIndexPage, NewsletterPage
 from apps.pipeline import ai, newsletter_tools
 from apps.pipeline.ai import PATIENT_IDENTIFYING_COLUMNS
 from apps.pipeline.factories import DailyAggregateFactory
-from apps.pipeline.models import IngestRun, NewsletterDraftRun
+from apps.pipeline.models import NewsletterDraftRun
 from apps.pipeline.monthly_rollup import (
     compute_month_over_month_trend,
     compute_monthly_rollup,
@@ -148,33 +148,6 @@ def test_compute_monthly_rollup_sums_dailyaggregates_for_the_calendar_month(db):
         "General Medicine": 13,
         "Cardiology": 2,
     }
-
-
-def test_compute_monthly_rollup_excludes_camp_aggregates(db):
-    """Camp-upload flow (2026-07-22): a camp's ``DailyAggregate`` row (
-    ``report_kind='camp'``) must never be folded into the clinic's monthly
-    newsletter rollup, even when it falls in the target month or shares a
-    date with the clinic's own daily aggregate."""
-    DailyAggregateFactory(
-        clinic_date=datetime.date(2026, 7, 1),
-        report_kind=IngestRun.KIND_DAILY,
-        total_visits=10,
-    )
-    DailyAggregateFactory(
-        clinic_date=datetime.date(2026, 7, 1),
-        report_kind=IngestRun.KIND_CAMP,
-        total_visits=250,
-    )
-    DailyAggregateFactory(
-        clinic_date=datetime.date(2026, 7, 15),
-        report_kind=IngestRun.KIND_CAMP,
-        total_visits=999,
-    )
-
-    rollup = compute_monthly_rollup(JULY)
-
-    assert rollup.day_count == 1
-    assert rollup.total_visits == 10
 
 
 def test_compute_monthly_rollup_normalises_any_day_to_the_first_of_month(db):

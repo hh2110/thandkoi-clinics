@@ -41,7 +41,6 @@ def _counter(values) -> dict[str, int]:
 def recompute_daily_aggregate(
     clinic_date: date,
     *,
-    report_kind: str = IngestRun.KIND_DAILY,
     latest_ingest_run: IngestRun | None = None,
 ) -> DailyAggregate:
     """Rebuild ``DailyAggregate`` for one date from ``DeidentifiedVisit`` rows.
@@ -54,19 +53,8 @@ def recompute_daily_aggregate(
     ingest happened). Every figure here comes from a plain Python count over
     already-de-identified rows — deterministic, byte-for-byte reproducible
     (CLAUDE.md invariant #3).
-
-    ``report_kind`` (camp-upload flow, 2026-07-22) scopes the recompute to
-    just the visits from that kind of upload — a camp and the clinic's own
-    daily activity can share a calendar date but must never be aggregated
-    together (see ``IngestRun.report_kind``'s docstring). Filtered via
-    ``ingest_run__report_kind`` since ``DeidentifiedVisit`` itself carries no
-    ``report_kind`` column — only its owning ``IngestRun`` does.
     """
-    visits = list(
-        DeidentifiedVisit.objects.filter(
-            visit_date=clinic_date, ingest_run__report_kind=report_kind
-        )
-    )
+    visits = list(DeidentifiedVisit.objects.filter(visit_date=clinic_date))
     total = len(visits)
 
     male = sum(1 for v in visits if v.sex == DeidentifiedVisit.SEX_MALE)
@@ -102,7 +90,7 @@ def recompute_daily_aggregate(
         defaults["latest_ingest_run"] = latest_ingest_run
 
     aggregate, _created = DailyAggregate.objects.update_or_create(
-        clinic_date=clinic_date, report_kind=report_kind, defaults=defaults
+        clinic_date=clinic_date, defaults=defaults
     )
     return aggregate
 
@@ -138,20 +126,12 @@ def _ingest_one_date(
     *,
     parser_key: str,
     uploaded_by,
-    report_kind: str = IngestRun.KIND_DAILY,
 ) -> DateIngestResult:
-    """Content-hash dedup/replace for a single clinic-date, in one transaction.
-
-    ``report_kind`` scopes every step (existing-aggregate lookup, the
-    supersede delete, and the recompute) to just this kind of upload, so a
-    camp upload landing on a date that also has the clinic's own daily
-    activity affects only its own rows/aggregate, never the other kind's
-    (see ``IngestRun.report_kind``'s docstring).
-    """
+    """Content-hash dedup/replace for a single clinic-date, in one transaction."""
     content_hash = content_hash_for_rows(rows)
 
     existing_aggregate = (
-        DailyAggregate.objects.filter(clinic_date=clinic_date, report_kind=report_kind)
+        DailyAggregate.objects.filter(clinic_date=clinic_date)
         .select_related("latest_ingest_run")
         .first()
     )
@@ -165,7 +145,6 @@ def _ingest_one_date(
         # no row/aggregate data is touched — a true no-op.
         IngestRun.objects.create(
             clinic_date=clinic_date,
-            report_kind=report_kind,
             parser_key=parser_key,
             uploaded_by=uploaded_by,
             row_count=0,
@@ -182,21 +161,16 @@ def _ingest_one_date(
     with transaction.atomic():
         run = IngestRun.objects.create(
             clinic_date=clinic_date,
-            report_kind=report_kind,
             parser_key=parser_key,
             uploaded_by=uploaded_by,
             row_count=len(rows),
             content_hash=content_hash,
             status=status,
         )
-        # Supersede: an existing date's rows *of this report_kind* are
-        # replaced wholesale, never appended to — this is what makes a
-        # corrected re-upload a true replace rather than a silent
-        # double-count, while leaving the other report_kind's rows for the
-        # same date untouched.
-        DeidentifiedVisit.objects.filter(
-            visit_date=clinic_date, ingest_run__report_kind=report_kind
-        ).delete()
+        # Supersede: an existing date's rows are replaced wholesale, never
+        # appended to — this is what makes a corrected re-upload a true
+        # replace rather than a silent double-count.
+        DeidentifiedVisit.objects.filter(visit_date=clinic_date).delete()
         DeidentifiedVisit.objects.bulk_create(
             [
                 DeidentifiedVisit(
@@ -222,9 +196,7 @@ def _ingest_one_date(
                 for row in rows
             ]
         )
-        recompute_daily_aggregate(
-            clinic_date, report_kind=report_kind, latest_ingest_run=run
-        )
+        recompute_daily_aggregate(clinic_date, latest_ingest_run=run)
 
     return DateIngestResult(clinic_date=clinic_date, status=status, row_count=len(rows))
 
@@ -234,31 +206,17 @@ def persist_parsed_export(
     *,
     parser_key: str,
     uploaded_by,
-    report_kind: str = IngestRun.KIND_DAILY,
-    camp_title: str | None = None,
 ) -> IngestSummary:
     """Group rows by clinic-date, ingest each date, then auto-publish its report.
 
-    The report auto-publish (and, for a daily report, its AI summary-sentence
-    call) deliberately happens *after* each date's DB transaction commits —
-    never inside it — so a slow or failing AI call can never hold the
-    row/aggregate write open.
-
-    ``report_kind``/``camp_title`` (camp-upload flow, 2026-07-22): a
-    ``report_kind`` of ``"camp"`` publishes a ``CampUploadReportPage`` instead
-    of a ``DailyReportPage`` for each date the export covers, titled from
-    ``camp_title`` (required by ``ExportUploadForm`` whenever ``report_kind``
-    is ``"camp"`` — see that form's ``clean()``). A camp export spanning more
-    than one date (unusual, but the format allows it) publishes one camp
-    report page per date, all sharing that one title.
+    The report auto-publish (and its AI summary-sentence call) deliberately
+    happens *after* each date's DB transaction commits — never inside it — so
+    a slow or failing AI call can never hold the row/aggregate write open.
     """
     # Local import: report_publishing depends on this module's models but not
     # on ingest itself, so there's no cycle — kept local purely to keep this
     # module's own import list focused on persistence, not publishing.
-    from apps.pipeline.report_publishing import (
-        publish_camp_report,
-        publish_daily_report,
-    )
+    from apps.pipeline.report_publishing import publish_daily_report
 
     rows_by_date: dict[date, list[ParsedVisitRow]] = defaultdict(list)
     for row in parsed.rows:
@@ -271,14 +229,10 @@ def persist_parsed_export(
             rows_by_date[clinic_date],
             parser_key=parser_key,
             uploaded_by=uploaded_by,
-            report_kind=report_kind,
         )
         results.append(result)
         if result.status != IngestRun.STATUS_DUPLICATE:
-            if report_kind == IngestRun.KIND_CAMP:
-                publish_camp_report(clinic_date, camp_title=camp_title or "")
-            else:
-                publish_daily_report(clinic_date)
+            publish_daily_report(clinic_date)
 
     return IngestSummary(parser_key=parser_key, results=results)
 
@@ -288,8 +242,6 @@ def ingest_export(
     *,
     parser_key: str,
     uploaded_by,
-    report_kind: str = IngestRun.KIND_DAILY,
-    camp_title: str | None = None,
 ) -> IngestSummary:
     """Parse an in-memory upload and persist it. The upload view's one call.
 
@@ -297,8 +249,6 @@ def ingest_export(
     returns only de-identified rows); nothing here retains a reference to it
     afterwards, so it is free to be garbage-collected once this returns —
     the raw bytes are never written anywhere.
-
-    ``report_kind``/``camp_title``: see :func:`persist_parsed_export`.
     """
     parser = ParserRegistry.get(parser_key)
     parsed = parser.parse(uploaded_file)
@@ -306,6 +256,4 @@ def ingest_export(
         parsed,
         parser_key=parser_key,
         uploaded_by=uploaded_by,
-        report_kind=report_kind,
-        camp_title=camp_title,
     )

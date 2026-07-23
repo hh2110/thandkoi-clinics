@@ -15,7 +15,6 @@ from wagtail.models import Page
 
 from apps.pipeline.models import (
     AiCallLog,
-    CampUploadReportPage,
     DailyAggregate,
     DailyReportPage,
     DeidentifiedVisit,
@@ -108,21 +107,6 @@ class DailyReportPageFactory(_TreePageFactory):
     aggregate = factory.SubFactory(
         DailyAggregateFactory,
         clinic_date=factory.SelfAttribute("..report_date"),
-    )
-
-
-class CampUploadReportPageFactory(_TreePageFactory):
-    class Meta:
-        model = CampUploadReportPage
-
-    title = factory.LazyAttribute(lambda o: o.camp_title)
-    slug = factory.LazyAttribute(lambda o: o.camp_date.isoformat())
-    camp_date = factory.LazyFunction(datetime.date.today)
-    camp_title = "Free Medical Camp"
-    aggregate = factory.SubFactory(
-        DailyAggregateFactory,
-        clinic_date=factory.SelfAttribute("..camp_date"),
-        report_kind=IngestRun.KIND_CAMP,
     )
 
 

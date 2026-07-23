@@ -48,9 +48,6 @@ archive's own page/URL rather than a second paginated list here).
           <article class="card card--interactive">
             <p class="eyebrow">{{ camp_report.camp_date }}</p>
             <h3 class="card__title"><a href="{{ camp_report.url }}">{{ camp_report.title }}</a></h3>
-            <p class="card__body">
-              {% blocktranslate count total=camp_report.total_patients_served %}{{ total }} patient served{% plural %}{{ total }} patients served{% endblocktranslate %}
-            </p>
           </article>
         {% empty %}
           <p class="card-grid__empty text-faint">{% translate "Camp reports coming soon." %}</p>

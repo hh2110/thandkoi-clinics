@@ -23,8 +23,8 @@ lifecycle instead.)
 The mechanism is Django's own management shell, run on the live Render
 instance over SSH — the same Wagtail Python API
 (`page.add_child()`, `revision.publish()`, `wagtaildocs.Document`) that
-`apps/pipeline/models.py`'s `CampUploadReportPage` already uses internally to
-auto-publish camp reports from a `DailyAggregate`. There is no bespoke
+`apps/pipeline/models.py`'s `DailyReportPage` already uses internally to
+auto-publish daily reports from a `DailyAggregate`. There is no bespoke
 management command per task — the shell is generic; only the Python snippet
 changes.
 
@@ -75,14 +75,13 @@ page = CampReportPage(
     title="Inauguration Report",
     camp_date="2026-XX-XX",  # never fabricated — ask if unknown
     location="Thandkoi, Swabi, KPK",
-    narrative=f'<p>Read the full report: '
-              f'<a linktype="document" id="{doc.id}">{doc.title}</a></p>',
+    narrative="<p>A short account of the camp.</p>",
+    report_document=doc,
 )
 parent.add_child(instance=page)
 page.save_revision().publish()
 ```
 
-`CampReportPage` has no dedicated document-attachment field (see
-`apps/core/models.py`) — linking the PDF into the rich-text `narrative` field
-is the only way to surface it today. A first-class "attached report PDF"
-field would be a small, separate code change if that's ever wanted broadly.
+`CampReportPage` has a dedicated `report_document` field (see
+`apps/core/models.py`) — set it directly to a `Document` instance, as above,
+rather than linking the PDF into the rich-text `narrative` field.
