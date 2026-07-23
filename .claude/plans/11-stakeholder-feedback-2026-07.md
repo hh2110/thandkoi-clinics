@@ -468,6 +468,16 @@ confirming per format first; and how `DailyAggregate` should be queried
 per-`report_kind` for the live stat without a per-request full-table scan
 becoming a home-page performance concern as data grows.
 
+**F2's Stage 2 planning pass is done:** see
+[11-f2-live-impact-stats-planning.md](11-f2-live-impact-stats-planning.md)
+(2026-07-23) — settles the data layer (a new `apps/pipeline/impact_stats.py`
+module, DB-side grouped `Sum()`, no new index/caching needed at this clinic's
+scale), confirms `ImpactStatsBlock` stays untouched with the live stats as a
+new unconditional section mirroring `get_latest_report()`'s pattern, and
+notes F2 has no dependency on F1 — it works today against whatever
+`DailyAggregate` rows already exist. F1 (multi-day upload) still needs its
+own planning pass before either is sliced into a numbered plan.
+
 ## Reference material
 
 - Source feedback: maintainer's Google Doc, "Feedback" (2026-07-22 capture;
