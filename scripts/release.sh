@@ -263,14 +263,32 @@ echo "This script only confirms the trigger fired; it does not wait for Render's
 # --- Health check --------------------------------------------------------------
 
 log "Health-checking production (a few retries — Render's swap isn't instant)"
+HEALTHY=0
 for i in 1 2 3 4 5 6; do
   CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTH_URL" || echo "000")
   if [[ "$CODE" == "200" ]]; then
     echo "OK — $HEALTH_URL returned 200"
-    exit 0
+    HEALTHY=1
+    break
   fi
   echo "Attempt $i: $HEALTH_URL returned $CODE — retrying in 15s"
   sleep 15
 done
+[[ "$HEALTHY" == "1" ]] || fail "$HEALTH_URL did not return 200 after several retries. Check the Render dashboard directly before assuming this deploy is healthy."
 
-fail "$HEALTH_URL did not return 200 after several retries. Check the Render dashboard directly before assuming this deploy is healthy."
+# --- GitHub Release ------------------------------------------------------------
+
+# Only after a confirmed-healthy deploy — the Release is a record of what
+# actually shipped, not of an attempt. Skipped if $REF already has a Release
+# (the --ref redeploy/rollback path targets a tag that was already released
+# when it first shipped; a redeploy doesn't change the code, so that Release
+# is left untouched rather than edited or duplicated).
+if gh release view "$REF" --repo "$REPO" >/dev/null 2>&1; then
+  log "GitHub Release for $REF already exists — leaving it untouched"
+else
+  log "Publishing GitHub Release for $REF"
+  gh release create "$REF" --repo "$REPO" --title "$REF" --generate-notes \
+    || echo "WARNING: could not create the GitHub Release for $REF (deploy itself succeeded). Create it manually if wanted: gh release create $REF --repo $REPO --generate-notes"
+fi
+
+exit 0
