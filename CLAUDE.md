@@ -77,6 +77,29 @@ rules are architectural constraints, not preferences — never weaken them:
 - **PostgreSQL** — aggregates and de-identified data only.
 - **Hosting:** Render (or Railway), ~US$20–30/month all-in.
 
+## Traffic analytics (Umami)
+
+Site traffic (visits, top pages, referrers, time on site) is tracked with
+**Umami Cloud** — a cookieless, aggregate-only script, added deliberately as a
+recorded reversal of the earlier "no analytics by default" guardrail (Plan 12
+Track B; see `templates/base.html` and Plan 01's dated addendum). The site's
+`UMAMI_WEBSITE_ID` is set in Render (see `docs/deploying.md`), not sensitive —
+it's a public value embedded in every page's HTML source anyway.
+
+There is no MCP server wired up for Umami in this project (no official one
+exists; a few community ones do, but none are connected here). To check
+analytics or edit the dashboard, use Chrome browser automation:
+
+1. Navigate to `https://cloud.umami.is/login`.
+2. Click "Continue with Google" — this picks up the maintainer's already
+   authenticated Google session (`hikmatyarhasan@gmail.com`) with no password
+   prompt. If a password prompt ever does appear, stop and hand off to the
+   maintainer rather than entering one.
+3. The site is listed as "Thandkoi Clinics" (`thandkoiclinics.com`). A saved
+   board named **"Thandkoi clinics"** (Boards in the left nav) already has the
+   key widgets: Metrics bar (visitors/visits/views/bounce rate/visit
+   duration), a visitors-over-time chart, Top pages, and Referrers.
+
 ## Workflow conventions
 
 - **Plans live in [`.claude/plans/`](.claude/plans/).** We plan each build step,
