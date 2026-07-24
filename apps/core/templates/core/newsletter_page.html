@@ -14,7 +14,25 @@ splits, and any legacy paragraph/photo blocks) sit below it.
 The beacon photo is a fixed series asset (static/images/newsletter-beacon.png),
 not per-issue editorial content — same reasoning as the masthead text itself
 being a fixed template string rather than a model field (D14's Option A).
+
+Plan 11 D15: overrides base.html's link-preview (OG/Twitter) image with a
+fixed "Beacon + lamp" branded card (static/images/og-newsletter.png) instead
+of the sitewide favicon default, so sharing a newsletter link on WhatsApp/
+iMessage/Facebook/X shows the branded card. Fixed series asset, same
+reasoning as the masthead beacon photo above — not per-issue editorial
+content (see the D15 plan note for the future per-issue option).
 {% endcomment %}
+
+{% block twitter_card %}summary_large_image{% endblock %}
+
+{% block social_image_tags %}
+  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-newsletter.png' %}" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="{% translate 'The Thandkoi Beacon — the Thandkoi Clinics newsletter' %}" />
+  <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-newsletter.png' %}" />
+{% endblock %}
 
 {% block content %}
   <header class="nl-masthead">

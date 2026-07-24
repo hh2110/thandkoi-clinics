@@ -1009,6 +1009,36 @@ def test_newsletter_page_renders_under_its_index(client, home_page):
     assert "News from the clinic." in content
 
 
+def test_newsletter_social_meta_uses_the_branded_og_card(client, home_page):
+    """A newsletter issue overrides base.html's favicon default with the
+    branded share card, so WhatsApp/iMessage/Facebook/X link previews show
+    the "Beacon + lamp" card instead of the sitewide favicon (Plan 11 D15).
+    """
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="july-2026",
+        title="July 2026 Update",
+        issue_date=datetime.date(2026, 7, 1),
+    )
+    content = client.get("/en/newsletters/july-2026/").content.decode()
+    og_url = "http://testserver/static/images/og-newsletter.png"
+    favicon_url = "http://testserver/static/favicons/favicon-512.png"
+    assert '<meta name="twitter:card" content="summary_large_image" />' in content
+    assert f'property="og:image" content="{og_url}" />' in content
+    assert f'name="twitter:image" content="{og_url}" />' in content
+    assert f'property="og:image" content="{favicon_url}" />' not in content
+
+
+def test_other_pages_still_use_the_default_favicon_og_image(client, home_page):
+    """Non-newsletter pages are unaffected by the D15 override (regression
+    guard for base.html's now-overridable social_image_tags block)."""
+    content = client.get("/en/", follow=True).content.decode()
+    assert '<meta name="twitter:card" content="summary" />' in content
+    assert "favicon-512.png" in content
+    assert "og-newsletter.png" not in content
+
+
 def test_newsletter_body_renders_paragraph_and_consented_photo(client, home_page):
     """The body StreamField renders both block types it mixes.
 

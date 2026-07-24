@@ -498,7 +498,7 @@ as D12 below.
       - Mobile responsive: stacked column below 56rem (this file's existing
         mobile-first convention), not the handoff's own 860px breakpoint.
 
-- [ ] **D14 (round 4, 2026-07-24).** Newsletter redesign — recreate "The
+- [x] **D14 (round 4, 2026-07-24).** Newsletter redesign — recreate "The
       Thandkoi Beacon" issue page + archive tile from a maintainer-supplied
       design handoff (`~/Downloads/newsletter.zip` →
       `design_handoff_newsletter/`, see its own README). Answers open
@@ -593,12 +593,60 @@ as D12 below.
       three men) — a content-entry detail for the SSH step above, not a code
       change.
 
-      **Open item, not resolved by this PR:** the handoff's own README flags
-      `photo-beacon.png` as "appears to be a stock photo... confirm you have
-      a licence before production." Committed to the branch as-is (it's the
-      maintainer's own supplied asset) but flagged here and in the PR
-      description — needs a maintainer licence confirmation before this
-      branch is taken out of draft/merged to production.
+      **Open item, resolved 2026-07-24 (post-merge):** the handoff's own
+      README flagged `photo-beacon.png` as "appears to be a stock photo...
+      confirm you have a licence before production." The maintainer
+      confirmed they hold the licence before merge. Merged as PR #110.
+
+- [x] **D15 (round 4 follow-up, 2026-07-24).** Newsletter link-preview (OG)
+      card — branded "Beacon + lamp" image shown when a newsletter URL is
+      shared on WhatsApp/iMessage/Facebook/X, replacing the sitewide favicon
+      that every page fell back to (`~/Downloads/update.zip` →
+      `design_handoff_newsletter_og/`, a delta on top of D14, see its own
+      README).
+
+      **Grounding.** `templates/base.html` hard-coded `og:image`/
+      `twitter:image` to `favicons/favicon-512.png` for every page, with no
+      override point. The handoff's own recommended approach (fixed series
+      card, no model change) was adopted as-is — it already matched this
+      repo's Option A precedent from D14 (series identity is fixed template
+      content, not per-issue editorial data).
+
+      **Implementation.** `base.html`: wrapped `twitter:card`'s value and
+      the `og:image`/`twitter:image` tags in two new overridable blocks
+      (`{% block twitter_card %}`, `{% block social_image_tags %}`) inside
+      the existing `{% if request %}` guard — identical default output for
+      every page that doesn't override them (verified via
+      `test_other_pages_still_use_the_default_favicon_og_image`).
+      `core/newsletter_page.html`: overrides both blocks to request the
+      large Twitter card and point `og:image`/`twitter:image` at the new
+      fixed asset `static/images/og-newsletter.png` (1200×630, from the
+      handoff), with `og:image:type`/`width`/`height`/`alt` set per OG spec.
+      The editable source (`og-card-template.html` + source PNG/SVG) from
+      the handoff was **not** committed — the handoff itself marks it
+      optional/"not needed for launch"; it's for a possible future
+      per-issue-image feature, which isn't built (no `share_image` field
+      added to `NewsletterPage`).
+
+      **Precedent map.**
+
+      | Element | Precedent |
+      |---|---|
+      | Overridable social-meta block in `base.html` | `{% block title %}`/`{% block title_suffix %}` (same file) — same "block with an identical default, overridden per page-type" shape |
+      | Per-page-type template override | `core/newsletter_page.html` already overrides other `base.html` structure (masthead, D14) |
+
+      **Feature flag: none** — same reasoning as D14; a template-only
+      change to an existing content type, Wagtail's draft/publish gate is
+      the only gate needed.
+
+      **Verify after deploy (from the handoff, not yet done — deploy is a
+      separate human-gated step):** confirm
+      `https://thandkoiclinics.com/static/images/og-newsletter.png`
+      resolves over HTTPS, then re-scrape a real newsletter URL via the
+      Facebook Sharing Debugger (`developers.facebook.com/tools/debug/`) to
+      force WhatsApp/Facebook's cache to pick up the new card — their
+      caches are otherwise sticky and a pre-deploy share will "stick" to
+      the old favicon.
 
 ### Track E — Process & tooling
 
