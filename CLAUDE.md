@@ -109,6 +109,16 @@ rules are architectural constraints, not preferences — never weaken them:
   see the personal lifecycle doc's "drafts stay drafts until I sign off");
   keep PRs scoped to one plan/step. Merge once CI is green and the PR has been
   taken out of draft.
+- **Label every PR by its Conventional-Commit type** (2026-07-24), right
+  after opening it: `feat` → `enhancement`, `fix` → `bug`, `docs` →
+  `documentation`, `chore` → `chore` (e.g.
+  `gh pr edit <number> --add-label enhancement`). This is what
+  [`.github/release.yml`](.github/release.yml) groups the auto-generated
+  GitHub Release notes by — GitHub's release-notes generator reads only PR
+  labels, never commit messages or titles, so a PR left unlabeled falls into
+  the release notes' catch-all "Other Changes" bucket instead of its real
+  category. Skip only for the rare PR whose title doesn't start with one of
+  these four types.
 - **After every merge:** run the [`cleanup-worktrees`](.claude/skills/cleanup-worktrees/SKILL.md)
   skill immediately (2026-07-23 — the trigger is "a PR just merged," not
   "whenever the worktree pile-up gets noticed"), and flip that plan's row in
