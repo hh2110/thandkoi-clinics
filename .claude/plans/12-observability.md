@@ -194,8 +194,9 @@ site-wide script include with no partial user-facing behavior to gate
 - [ ] Read `UMAMI_WEBSITE_ID` from settings/env (decide secret vs plain
       constant at implementation time — it's a public, non-sensitive site ID
       embedded in the page source either way).
-- [ ] Update `docs/deploying.md` and add a short one-line addendum to
-      Plan 01's "Privacy guardrails to bake in now" section pointing here.
+- [ ] Update `docs/deploying.md` to document `UMAMI_WEBSITE_ID`. (The Plan 01
+      "Privacy guardrails to bake in now" addendum pointing here was already
+      added when this plan was drafted — no further action needed on it.)
 - [ ] Maintainer: create the Umami Cloud site, set the website ID.
 - [ ] Deploy a new tag; run the Track B gating check.
 

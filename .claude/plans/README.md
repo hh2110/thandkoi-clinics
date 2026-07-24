@@ -59,5 +59,5 @@ Deferred by decision on 2026-07-19; revisit after the core is live:
 - **Bilingual generation** — Urdu (and Pashto) translation/drafting of site
   content and AI-generated newsletters/reports.
 - **Ops hardening** — deploy hardening, backups, funding-export tooling.
-  (Monitoring, the fourth original item here, is no longer deferred — see
-  [Plan 12](12-observability.md), drafted 2026-07-24.)
+  (Monitoring, one of the four original items here, is no longer deferred —
+  see [Plan 12](12-observability.md), drafted 2026-07-24.)
