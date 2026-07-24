@@ -77,6 +77,27 @@ rules are architectural constraints, not preferences — never weaken them:
 - **PostgreSQL** — aggregates and de-identified data only.
 - **Hosting:** Render (or Railway), ~US$20–30/month all-in.
 
+## Observability
+
+Sentry error tracking is live in production (Plan 12 Track A,
+[.claude/plans/12-observability.md](.claude/plans/12-observability.md)).
+`SENTRY_DSN` is read in `config/settings/prod.py` with a blank default and the
+SDK only initializes if it's set — deliberately soft-fail, unlike
+`ANTHROPIC_API_KEY`/`MEDIA_*`, so a missing/revoked DSN never affects boot or
+behavior. Events are tagged with `environment=production` and `release`
+(Render's auto-injected `RENDER_GIT_COMMIT` — no separate release-tag env var
+exists). See [docs/deploying.md](docs/deploying.md) → Secrets.
+
+A **Sentry MCP server** is registered on the maintainer's machine for this
+project (`claude mcp add --transport http sentry https://mcp.sentry.dev/mcp`,
+scope `local` — lives in Claude Code's own config, not the repo, so it won't
+exist on a fresh clone or another machine; OAuth-connected to the
+maintainer's Sentry account as of 2026-07-24). Where present, query
+issues/events/traces directly via its `mcp__sentry__*` tools instead of
+driving the dashboard through a browser. MCP servers load at session start,
+so a session already running before the server was added won't see the tools
+until it's restarted; check with `claude mcp list`.
+
 ## Traffic analytics (Umami)
 
 Site traffic (visits, top pages, referrers, time on site) is tracked with
