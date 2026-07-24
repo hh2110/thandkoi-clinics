@@ -188,15 +188,18 @@ site-wide script include with no partial user-facing behavior to gate
 - [ ] Deploy a new tag; run both Track A gating checks.
 
 **Track B — traffic analytics**
-- [ ] Add the Umami script tag to `templates/base.html`, replacing the
+- [x] Add the Umami script tag to `templates/base.html`, replacing the
       "no analytics by default" comment with one explaining the decision and
-      linking this plan.
-- [ ] Read `UMAMI_WEBSITE_ID` from settings/env (decide secret vs plain
-      constant at implementation time — it's a public, non-sensitive site ID
-      embedded in the page source either way).
-- [ ] Update `docs/deploying.md` to document `UMAMI_WEBSITE_ID`. (The Plan 01
+      linking this plan. (PR #116)
+- [x] Read `UMAMI_WEBSITE_ID` from settings/env — landed as a plain env var
+      (`config/settings/base.py`, default `""`) exposed to templates via a new
+      `apps.core.context_processors.analytics` context processor; not a
+      secret, since it's a public site ID embedded in the page source either
+      way. (PR #116)
+- [x] Update `docs/deploying.md` to document `UMAMI_WEBSITE_ID`. (The Plan 01
       "Privacy guardrails to bake in now" addendum pointing here was already
       added when this plan was drafted — no further action needed on it.)
+      (PR #116)
 - [ ] Maintainer: create the Umami Cloud site, set the website ID.
 - [ ] Deploy a new tag; run the Track B gating check.
 
