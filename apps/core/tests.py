@@ -413,6 +413,41 @@ def test_home_page_get_live_impact_stats_sums_dailyaggregate_rows(db):
     ]
 
 
+# --- Plan 11 Track F3: manual "average Zakat spend" third stat --------------
+
+
+def test_home_page_get_live_impact_stats_appends_zakat_avg_spend_when_set(db):
+    """A third, hand-typed figure appends after the two live ones when the
+    admin has filled in ``zakat_avg_spend`` — the value renders verbatim
+    (free text, like ``ImpactStatBlock.value``), not reformatted."""
+    home = HomePageFactory(zakat_avg_spend="PKR 180/visit")
+
+    stats = home.get_live_impact_stats()
+
+    assert stats == [
+        {"value": "0", "label": "Clinic patients (all time)"},
+        {"value": "0", "label": "Zakat beneficiaries (all time)"},
+        {
+            "value": "PKR 180/visit",
+            "label": "Average spend per Zakat-funded visit",
+        },
+    ]
+
+
+def test_home_page_get_live_impact_stats_omits_zakat_avg_spend_when_blank(db):
+    """Left blank (the factory/model default), the band stays two-stat —
+    matches the section's existing "no half-broken state" convention rather
+    than showing an empty third figure."""
+    home = HomePageFactory()
+
+    stats = home.get_live_impact_stats()
+
+    assert len(stats) == 2
+    assert all(
+        stat["label"] != "Average spend per Zakat-funded visit" for stat in stats
+    )
+
+
 def test_home_page_get_context_includes_live_impact_stats(db):
     from django.test import RequestFactory
 
@@ -517,6 +552,20 @@ def test_home_page_renders_live_impact_stats_empty_state_with_no_data(
     assert "Our impact so far" in content
     assert "(updated at" not in content
     assert "Figures coming soon." not in content
+
+
+def test_home_page_renders_zakat_avg_spend_as_third_stat(client, home_page):
+    """With ``zakat_avg_spend`` set in the admin, the live band shows three
+    figures instead of two — the value renders verbatim, unformatted."""
+    home_page.zakat_avg_spend = "PKR 180/visit"
+    home_page.save()
+
+    content = client.get("/en/").content.decode()
+
+    assert "Clinic patients (all time)" in content
+    assert "Zakat beneficiaries (all time)" in content
+    assert "Average spend per Zakat-funded visit" in content
+    assert '<p class="stat__value">PKR 180/visit</p>' in content
 
 
 def test_circle_of_care_block_requires_exactly_six_stages():

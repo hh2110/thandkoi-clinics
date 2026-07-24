@@ -498,6 +498,32 @@ notes F2 has no dependency on F1 — it works today against whatever
 `DailyAggregate` rows already exist. F1 (multi-day upload) still needs its
 own planning pass before either is sliced into a numbered plan.
 
+- **F3. Manual "average Zakat patient spend" figure in the live impact band
+  (2026-07-24).** Maintainer ask, prompted by reviewing a clinic
+  `expenditure_report_all` export (billing/fees by patient, out of scope for
+  this repo — see `CLAUDE.md` invariant #1, never persisted): they want a
+  third figure, average PKR spend per Zakat-funded visit, shown alongside
+  F2's two live stats in the "Our impact so far" band. Unlike F2, this
+  **cannot** be computed live — `DailyAggregate` (`apps/pipeline/models.py`)
+  has no fee/expenditure columns at all; the pipeline never ingests financial
+  data, only visit/demographic counts (per the PHI-minimization design, Plan
+  08). So this is a hand-typed field, not a query, sized small enough to skip
+  its own planning doc:
+  - One new `HomePage` field, `zakat_avg_spend` — a free-text `CharField`
+    (admin controls formatting, e.g. "PKR 180/visit"), mirroring
+    `ImpactStatBlock.value`'s existing "free text, not a number field"
+    convention (`apps/core/blocks.py:19-35`), and following the same
+    manual-field-on-`HomePage` precedent as `report_teaser_image`.
+  - `HomePage.get_live_impact_stats()` appends a third `{value, label}` entry
+    only when the field is set (blank stays two-stat, matching the
+    band's existing "no half-broken state" convention) — label is a fixed
+    translatable string, not editable, matching F2's two hardcoded labels.
+  - Needs a migration (new nullable/blank field) — otherwise no schema or
+    privacy-invariant impact; the field never touches `DeidentifiedVisit` or
+    any PHI-adjacent model.
+  - The maintainer sets/updates the actual figure by hand in Wagtail whenever
+    they have fresh expenditure data — this repo never re-derives it.
+
 ## Reference material
 
 - Source feedback: maintainer's Google Doc, "Feedback" (2026-07-22 capture;

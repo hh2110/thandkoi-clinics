@@ -92,11 +92,22 @@ class HomePage(Page):
         "generic clinic/camp photo the admin curates by hand. Falls back to "
         "the shared placeholder until set.",
     )
+    zakat_avg_spend = models.CharField(
+        max_length=16,
+        blank=True,
+        help_text="Third figure in the live 'Our impact so far' band: average "
+        "spend per Zakat-funded visit, formatted exactly as it should show "
+        '(e.g. "PKR 180/visit"). Hand-typed and hand-updated — the pipeline '
+        "never ingests fee/expenditure data (Plan 11 Track F3), so unlike the "
+        "other two figures in the band this one can't be computed live. Left "
+        "blank, the band shows only the two live stats.",
+    )
 
     content_panels = [
         *Page.content_panels,
         FieldPanel("body"),
         FieldPanel("report_teaser_image"),
+        FieldPanel("zakat_avg_spend"),
     ]
 
     # Only one HomePage, sitting directly under the Wagtail root; the other core
@@ -154,17 +165,24 @@ class HomePage(Page):
     def get_live_impact_stats(self) -> list[dict[str, str]]:
         """All-time impact figures for the "Our impact so far" band.
 
-        Mirrors ``DailyReportPage.headline_stats``'s exact shape and
-        stringification convention — read live from ``DailyAggregate`` on
-        every request, never cached onto this page. See
+        The first two figures mirror ``DailyReportPage.headline_stats``'s
+        exact shape and stringification convention — read live from
+        ``DailyAggregate`` on every request, never cached onto this page. See
         ``apps.pipeline.impact_stats.compute_alltime_impact_stats`` for why
-        this is only two figures, not the three the Track F2 planning doc
-        originally proposed.
+        F2 shipped only these two, not the three its planning doc originally
+        proposed.
+
+        A third, hand-typed figure (``zakat_avg_spend``) is appended when set
+        (Plan 11 Track F3) — average spend per Zakat-funded visit can't be
+        computed live because ``DailyAggregate`` carries no fee/expenditure
+        data at all, so this one is maintainer-entered in the admin rather
+        than queried. Blank stays a two-stat band, matching the section's
+        existing "no half-broken state" convention.
         """
         from apps.pipeline.impact_stats import compute_alltime_impact_stats
 
         stats = compute_alltime_impact_stats()
-        return [
+        result = [
             {
                 "value": str(stats.total_visits),
                 "label": _("Clinic patients (all time)"),
@@ -174,6 +192,14 @@ class HomePage(Page):
                 "label": _("Zakat beneficiaries (all time)"),
             },
         ]
+        if self.zakat_avg_spend:
+            result.append(
+                {
+                    "value": self.zakat_avg_spend,
+                    "label": _("Average spend per Zakat-funded visit"),
+                }
+            )
+        return result
 
     def get_live_impact_stats_as_of(self) -> datetime.date | None:
         """The most recent clinic-date behind :meth:`get_live_impact_stats`.
