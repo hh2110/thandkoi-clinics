@@ -211,6 +211,26 @@ def test_no_third_party_font_or_cdn_requests(client, home_page):
     assert "fonts.gstatic.com" not in content
 
 
+# --- Plan 12 Track B: Umami traffic analytics --------------------------------
+
+
+@override_settings(UMAMI_WEBSITE_ID="")
+def test_no_analytics_script_when_umami_website_id_unset(client, home_page):
+    """With no website ID configured, no analytics script renders at all."""
+    response = client.get("/en/")
+    content = response.content.decode()
+    assert "cloud.umami.is" not in content
+
+
+@override_settings(UMAMI_WEBSITE_ID="fake-website-id-1234")
+def test_umami_script_renders_when_website_id_set(client, home_page):
+    """With a website ID configured, the Umami script tag renders with it."""
+    response = client.get("/en/")
+    content = response.content.decode()
+    assert 'src="https://cloud.umami.is/script.js"' in content
+    assert 'data-website-id="fake-website-id-1234"' in content
+
+
 # --- Plan 03.5: page-body layout kit -----------------------------------------
 
 # (template, minimal context, a substring the render must contain). The
