@@ -2156,3 +2156,81 @@ def test_reports_index_omits_funding_mix_section_with_no_data(client, home_page)
     content = client.get(index.url).content.decode()
 
     assert "Patient footfall" not in content
+
+
+def test_funding_mix_slot_dates_reserves_a_slot_for_a_weekday_gap(home_page):
+    """Mon–Sat days without a report still get a slot (rendered empty by
+    the caller, i.e. a visible gap); a Sunday without a report gets none."""
+    index = ReportIndexPageFactory(parent=home_page)
+    monday, wednesday = datetime.date(2026, 7, 20), datetime.date(2026, 7, 22)
+    monday_row = DailyAggregateFactory(clinic_date=monday)
+    wednesday_row = DailyAggregateFactory(clinic_date=wednesday)
+    rows_by_date = {monday: monday_row, wednesday: wednesday_row}
+
+    dates = index._funding_mix_slot_dates(
+        rows_by_date, datetime.date(2026, 7, 18), datetime.date(2026, 7, 23)
+    )
+
+    assert dates == [
+        datetime.date(2026, 7, 18),  # Sat, no data — still a slot (gap)
+        # 19 Jul (Sun), no data — no slot at all, expected closure
+        monday,  # Mon, has data
+        datetime.date(2026, 7, 21),  # Tue, no data — still a slot (gap)
+        wednesday,  # Wed, has data
+        datetime.date(2026, 7, 23),  # Thu, no data — still a slot (gap)
+    ]
+
+
+def test_funding_mix_slot_dates_keeps_a_sunday_that_has_data(home_page):
+    """An exceptional open Sunday (a row exists) is treated like any other
+    day with data, not folded out."""
+    index = ReportIndexPageFactory(parent=home_page)
+    sunday = datetime.date(2026, 7, 19)
+    sunday_row = DailyAggregateFactory(clinic_date=sunday)
+
+    dates = index._funding_mix_slot_dates({sunday: sunday_row}, sunday, sunday)
+
+    assert dates == [sunday]
+
+
+def test_get_funding_mix_positions_bars_by_slot_not_row_order(home_page):
+    """A Mon–Sat gap between two data days shifts the later bar right by
+    the gap's own slots, instead of the timeline compressing the two data
+    days to adjacent positions."""
+    today = timezone.localdate()
+    index = ReportIndexPageFactory(parent=home_page)
+    earlier, later = today - datetime.timedelta(days=3), today
+    DailyAggregateFactory(
+        clinic_date=earlier,
+        total_visits=4,
+        zakat_beneficiary_patients=4,
+        paying_patients=0,
+    )
+    DailyAggregateFactory(
+        clinic_date=later,
+        total_visits=6,
+        zakat_beneficiary_patients=6,
+        paying_patients=0,
+    )
+
+    funding_mix = index.get_funding_mix()
+    rows_by_date = {
+        earlier: DailyAggregate.objects.get(clinic_date=earlier),
+        later: DailyAggregate.objects.get(clinic_date=later),
+    }
+    window_start = today - datetime.timedelta(days=index.FUNDING_MIX_WINDOW_DAYS)
+    slot_dates = index._funding_mix_slot_dates(rows_by_date, window_start, today)
+    earlier_index = slot_dates.index(earlier)
+    later_index = slot_dates.index(later)
+    # At most one of the two days between `earlier` and `later` can be a
+    # Sunday, so at least one is a guaranteed gap slot.
+    assert later_index - earlier_index >= 2
+
+    bars = {bar["date"]: bar for bar in funding_mix["bars"]}
+    assert set(bars) == {earlier, later}
+    slot_width = round(
+        (index._CHART_WIDTH - index._PAD_LEFT - index._PAD_RIGHT) / len(slot_dates), 2
+    )
+    expected_gap = round((later_index - earlier_index) * slot_width, 1)
+    actual_gap = round(bars[later]["label_x"] - bars[earlier]["label_x"], 1)
+    assert actual_gap == expected_gap
