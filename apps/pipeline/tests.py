@@ -1432,17 +1432,125 @@ def test_compute_empty_columns_with_no_visits_flags_everything_empty():
     assert all(empty.values())
 
 
+def test_group_for_visit_buckets_by_age_band_and_sex():
+    """Plan 14's approximation: bands 0-5/6-18 are "children" regardless of
+    sex; 19-55/56+ split into male_adults/female_adults by sex."""
+    child_young = DeidentifiedVisit(
+        age_band=DeidentifiedVisit.AGE_BAND_0_5, sex=DeidentifiedVisit.SEX_MALE
+    )
+    assert freetext._group_for_visit(child_young) == freetext.GROUP_CHILDREN
+
+    child_older = DeidentifiedVisit(
+        age_band=DeidentifiedVisit.AGE_BAND_6_18, sex=DeidentifiedVisit.SEX_FEMALE
+    )
+    assert freetext._group_for_visit(child_older) == freetext.GROUP_CHILDREN
+
+    male_adult = DeidentifiedVisit(
+        age_band=DeidentifiedVisit.AGE_BAND_19_55, sex=DeidentifiedVisit.SEX_MALE
+    )
+    assert freetext._group_for_visit(male_adult) == freetext.GROUP_MALE_ADULTS
+
+    older_male_adult = DeidentifiedVisit(
+        age_band=DeidentifiedVisit.AGE_BAND_56_PLUS, sex=DeidentifiedVisit.SEX_MALE
+    )
+    assert freetext._group_for_visit(older_male_adult) == freetext.GROUP_MALE_ADULTS
+
+    female_adult = DeidentifiedVisit(
+        age_band=DeidentifiedVisit.AGE_BAND_19_55, sex=DeidentifiedVisit.SEX_FEMALE
+    )
+    assert freetext._group_for_visit(female_adult) == freetext.GROUP_FEMALE_ADULTS
+
+
+def test_group_for_visit_excludes_unknown_age_band_and_unknown_sex_adults():
+    """Plan 14 grounding note: an ``AGE_BAND_UNKNOWN`` visit, or an adult
+    whose sex is ``SEX_OTHER_UNKNOWN``, is deliberately not folded into any
+    of the three groups — not guessed at, and not given a fourth bucket."""
+    unknown_age = DeidentifiedVisit(
+        age_band=DeidentifiedVisit.AGE_BAND_UNKNOWN, sex=DeidentifiedVisit.SEX_MALE
+    )
+    assert freetext._group_for_visit(unknown_age) is None
+
+    unknown_sex_adult = DeidentifiedVisit(
+        age_band=DeidentifiedVisit.AGE_BAND_19_55,
+        sex=DeidentifiedVisit.SEX_OTHER_UNKNOWN,
+    )
+    assert freetext._group_for_visit(unknown_sex_adult) is None
+
+
+def test_collect_freetext_entries_by_group_buckets_by_demographic_group(home_page):
+    """Real TKC fixture, exercising the actual parser's ``age_band_for``
+    output rather than synthetic instances: Fatima Bibi (adult, DOB gives
+    age 38) is female -> female_adults; Ahmed Khan has no DOB at all ->
+    ``AGE_BAND_UNKNOWN`` -> excluded from every group; Zainab Ali (DOB gives
+    age 10) -> children, regardless of her sex."""
+    _ingest_tkc_daily_fixture()
+    visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
+
+    groups = freetext.collect_freetext_entries_by_group(visits)
+
+    assert groups[freetext.GROUP_FEMALE_ADULTS]["prescribed_medicine"] == ["Amlodipine"]
+    assert groups[freetext.GROUP_MALE_ADULTS]["prescribed_medicine"] == []
+    assert groups[freetext.GROUP_CHILDREN]["prescribed_medicine"] == []
+    # Ahmed Khan (excluded — unknown age band) is the fixture's only visit
+    # prescribed Metformin — it must not surface under any group.
+    all_prescribed = [
+        value
+        for group_entries in groups.values()
+        for value in group_entries["prescribed_medicine"]
+    ]
+    assert "Metformin" not in all_prescribed
+
+
+def test_parse_freetext_summary_by_group_reads_a_valid_response():
+    raw = json.dumps(
+        {"male_adults": "M draft.", "female_adults": "F draft.", "children": "C draft."}
+    )
+    assert freetext.parse_freetext_summary_by_group(raw) == {
+        "male_adults": "M draft.",
+        "female_adults": "F draft.",
+        "children": "C draft.",
+    }
+
+
+def test_parse_freetext_summary_by_group_drops_blank_and_unexpected_entries():
+    """A category with nothing to summarise that day (empty string, per the
+    prompt's own instruction), whitespace-only text, and any key outside the
+    three known groups are all dropped rather than surfacing as a blank-but-
+    present value."""
+    raw = json.dumps(
+        {
+            "male_adults": "M draft.",
+            "female_adults": "",
+            "children": "   ",
+            "unexpected_key": "should never appear",
+        }
+    )
+    assert freetext.parse_freetext_summary_by_group(raw) == {"male_adults": "M draft."}
+
+
+def test_parse_freetext_summary_by_group_falls_back_to_empty_on_malformed_input():
+    """Mirrors ``_parse_empty_columns_flag``'s defensive shape: anything
+    that isn't a clean match degrades to ``{}`` rather than raising."""
+    assert freetext.parse_freetext_summary_by_group("") == {}
+    assert freetext.parse_freetext_summary_by_group("not json") == {}
+    assert freetext.parse_freetext_summary_by_group("[]") == {}
+    non_string_value = json.dumps({"male_adults": 5})
+    assert freetext.parse_freetext_summary_by_group(non_string_value) == {}
+
+
 def test_freetext_summary_payload_contains_only_freetext_columns(
     home_page, mock_anthropic_client
 ):
     """Invariant #2 for the B8 call: only the seven confirmed-PII-free
-    free-text columns cross into the payload — no identifying column name or
-    value, and none of ``DailyAggregate``'s own figures either."""
+    free-text columns (plus, since Plan 14, which of the three demographic
+    groups each entry came from) cross into the payload — no identifying
+    column name or value, and none of ``DailyAggregate``'s own figures
+    either."""
     _ingest_tkc_daily_fixture()
     visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
-    columns = freetext.collect_freetext_entries(visits)
+    groups = freetext.collect_freetext_entries_by_group(visits)
 
-    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, mock_anthropic_client)
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, groups, mock_anthropic_client)
     assert summary  # the stub returned its canned (bounds-safe) text
 
     assert len(mock_anthropic_client.calls) == 1
@@ -1464,7 +1572,8 @@ def test_freetext_summary_payload_sends_urdu_text_unescaped():
     have been drafting from unreadable escape codes, not the real clinical
     language."""
     payload = ai.build_freetext_summary_payload(
-        TKC_VISIT_DATE, {"presenting_complaints": ["بخار اور کھانسی"]}
+        TKC_VISIT_DATE,
+        {"children": {"presenting_complaints": ["بخار اور کھانسی"]}},
     )
     sent = payload["messages"][0]["content"]
     assert "بخار اور کھانسی" in sent
@@ -1501,9 +1610,9 @@ def test_freetext_summary_prompt_forbids_reidentifying_detail(
         "Impetigo on the left forearm for 9 days, first noticed after "
         "returning from a family wedding in Mardan"
     )
-    columns = {"clinical_notes": [fingerprintable_entry]}
+    groups = {"male_adults": {"clinical_notes": [fingerprintable_entry]}}
 
-    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, mock_anthropic_client)
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, groups, mock_anthropic_client)
     assert summary  # the stub returned its canned (bounds-safe) text
 
     assert len(mock_anthropic_client.calls) == 1
@@ -1520,26 +1629,35 @@ def test_freetext_summary_prompt_forbids_reidentifying_detail(
     assert "do not invent, estimate, or attribute anything" in lowered
 
 
-def test_freetext_summary_prompt_caps_at_fifty_words(home_page, mock_anthropic_client):
-    """Maintainer decision, 2026-07-23: cap the freetext summary at 50 words.
-    Replaces B10's "a few short thematic paragraphs" instruction (no room
-    for multiple paragraphs in a 50-word budget) and drops B8's original
-    "say so if a column has no entries" instruction — that's the
-    empty-columns-flag call's (B9's) job alone now, not worth spending part
-    of the word budget repeating."""
+def test_freetext_summary_prompt_asks_for_three_thirty_word_groups(
+    home_page, mock_anthropic_client
+):
+    """Plan 14 (maintainer decision, 2026-07-24): the single ~50-word
+    paragraph B12 asked for is now three per-category summaries (male
+    adults / female adults / children), each capped at 30 words (revised
+    same day from an initial 20-word ask, before implementation), returned
+    as one JSON object rather than prose — mirrors B9's JSON-array shape
+    for the same "cleaner to parse" reason. Drops B8's original "say so if
+    a column has no entries" instruction — that's still the
+    empty-columns-flag call's (B9's) job alone, not this one's."""
     _ingest_tkc_daily_fixture()
     visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
-    columns = freetext.collect_freetext_entries(visits)
+    groups = freetext.collect_freetext_entries_by_group(visits)
 
-    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, mock_anthropic_client)
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, groups, mock_anthropic_client)
     assert summary
 
     assert len(mock_anthropic_client.calls) == 1
     sent_system_prompt = mock_anthropic_client.calls[0]["system"]
     assert sent_system_prompt == ai._FREETEXT_SUMMARY_SYSTEM_PROMPT
     lowered = sent_system_prompt.lower()
-    assert "no more than 50 words" in lowered
-    assert "single short paragraph" in lowered
+    assert "no more than 30 words" in lowered
+    assert "male_adults" in lowered
+    assert "female_adults" in lowered
+    assert "children" in lowered
+    assert "json object" in lowered
+    assert "no prose, no markdown" in lowered
+    assert "single short paragraph" not in lowered
     assert "thematic paragraphs" not in lowered
     assert "say so plainly" not in lowered
 
@@ -1606,37 +1724,66 @@ def test_draft_freetext_summary_accepts_a_realistic_full_length_response(home_pa
     50-word cap below): MAX_FREETEXT_SUMMARY_LENGTH used to be tighter than
     the call's own max_tokens could actually produce (~4 chars/token) — a
     genuinely good, full-length summary was silently rejected as if the call
-    had failed. Re-sized the same day for the 50-word cap (Plan 11 Track
-    B12: max_tokens 600 -> 120, MAX_FREETEXT_SUMMARY_LENGTH 3000 -> 600,
-    keeping the same ~4-chars/token comfortable-margin ratio as before) —
-    this now checks a ~50-word response, the longest this prompt actually
-    asks for, still clears the bound."""
+    had failed. Re-sized for the 50-word cap (Plan 11 Track B12), then again
+    for Plan 14's three 30-word-per-category JSON response (2026-07-24:
+    max_tokens 200 -> 300, MAX_FREETEXT_SUMMARY_LENGTH 1000 -> 1500, keeping
+    the same ~4-chars/token comfortable-margin ratio as before) — this now
+    checks a realistic three-group JSON response, close to the longest this
+    prompt actually asks for, still clears the bound."""
     _ingest_tkc_daily_fixture()
     visits = DeidentifiedVisit.objects.filter(visit_date=TKC_VISIT_DATE)
-    columns = freetext.collect_freetext_entries(visits)
-    long_text = ("Common themes across today's entries." + " ") * 9
-    long_text = long_text.strip()
+    groups = freetext.collect_freetext_entries_by_group(visits)
+    thirty_words = ("Common themes across today's entries " * 5).strip()
+    long_text = json.dumps(
+        {
+            "male_adults": thirty_words,
+            "female_adults": thirty_words,
+            "children": thirty_words,
+        }
+    )
     assert 300 < len(long_text) < ai.MAX_FREETEXT_SUMMARY_LENGTH
 
     client = _StubAnthropicClient(text=long_text)
-    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, columns, client)
+    summary = ai.draft_freetext_summary(TKC_VISIT_DATE, groups, client)
 
     assert summary == long_text
 
 
-def test_publish_daily_report_auto_publishes_freetext_summary_and_flag(
-    home_page, mock_anthropic_client
-):
+def _freetext_group_response(
+    *,
+    male_adults: str = "Male adults draft.",
+    female_adults: str = "Female adults draft.",
+    children: str = "Children draft.",
+) -> str:
+    """A valid B8 group-summary JSON response, for tests that need the raw
+    AI response to actually parse into all three fields (``mock_anthropic_client``'s
+    shared ``CANNED_PROSE`` is plain prose, not JSON, so it parses to ``{}``
+    — fine for tests that only check *some* field is truthy on the old
+    single-field shape, not enough once each of the three new fields needs
+    its own real value to assert against)."""
+    return json.dumps(
+        {
+            "male_adults": male_adults,
+            "female_adults": female_adults,
+            "children": children,
+        }
+    )
+
+
+def test_publish_daily_report_auto_publishes_freetext_summary_and_flag(home_page):
     """CLAUDE.md invariant #4's exception (Plan 08's daily-summary sentence),
     widened 2026-07-23 to also cover B8/B9: both are written straight onto
     the live page, same as `summary_sentence`, with no separate approval
-    step."""
+    step. Plan 14 (2026-07-24): B8 is now three fields, one per category."""
     _ingest_tkc_daily_fixture()
+    client = _StubAnthropicClient(text=_freetext_group_response())
 
-    page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
+    page = publish_daily_report(TKC_VISIT_DATE, client=client)
 
     assert page.live is True
-    assert page.freetext_summary
+    assert page.freetext_summary_male_adults == "Male adults draft."
+    assert page.freetext_summary_female_adults == "Female adults draft."
+    assert page.freetext_summary_children == "Children draft."
     assert page.empty_columns_flag
 
 
@@ -1644,8 +1791,8 @@ def test_daily_report_page_publishes_numbers_even_when_freetext_ai_calls_fail(
     home_page,
 ):
     """Same guarantee as the summary-sentence call: a client whose call
-    raises still results in a published page, with both B8/B9 fields left
-    blank rather than blocking anything."""
+    raises still results in a published page, with B8's three fields and B9
+    left blank rather than blocking anything."""
     _ingest_tkc_daily_fixture()
 
     def _raise(**kwargs):
@@ -1655,38 +1802,55 @@ def test_daily_report_page_publishes_numbers_even_when_freetext_ai_calls_fail(
     page = publish_daily_report(TKC_VISIT_DATE, client=raising_client)
 
     assert page.live is True
-    assert page.freetext_summary == ""
+    assert page.freetext_summary_male_adults == ""
+    assert page.freetext_summary_female_adults == ""
+    assert page.freetext_summary_children == ""
     assert page.empty_columns_flag == ""
 
 
-def test_republish_refreshes_freetext_summary_from_latest_data(
-    home_page, mock_anthropic_client
-):
+def test_republish_refreshes_freetext_summary_from_latest_data(home_page):
     """A corrected re-upload (modelled here the same way
     `test_daily_report_page_publishes_numbers_even_when_ai_client_fails`
     models a republish — calling `publish_daily_report` again directly)
-    regenerates and re-publishes the summary from the latest data."""
+    regenerates and re-publishes each category's summary from the latest
+    data, independently."""
     _ingest_tkc_daily_fixture()
-    publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
-
-    page = publish_daily_report(
-        TKC_VISIT_DATE, client=_StubAnthropicClient(text="A different draft.")
+    publish_daily_report(
+        TKC_VISIT_DATE,
+        client=_StubAnthropicClient(text=_freetext_group_response()),
     )
 
-    assert page.freetext_summary == "A different draft."
+    page = publish_daily_report(
+        TKC_VISIT_DATE,
+        client=_StubAnthropicClient(
+            text=_freetext_group_response(
+                male_adults="New male draft.",
+                female_adults="New female draft.",
+                children="New children draft.",
+            )
+        ),
+    )
+
+    assert page.freetext_summary_male_adults == "New male draft."
+    assert page.freetext_summary_female_adults == "New female draft."
+    assert page.freetext_summary_children == "New children draft."
 
 
-def test_republish_with_failing_ai_call_preserves_the_prior_live_summary(
-    home_page, mock_anthropic_client
-):
+def test_republish_with_failing_ai_call_preserves_the_prior_live_summary(home_page):
     """Found by code-review-tc (when this was still a review-gated draft,
     before the 2026-07-23 auto-publish widening — the same protection
     matters even more now that these values reach the public page directly):
     a transient AI failure on a later re-ingest must not blank an
-    already-live summary/flag."""
+    already-live summary/flag. Applies per category (Plan 14) — a failed
+    re-ingest must not blank any of the three fields."""
     _ingest_tkc_daily_fixture()
-    page = publish_daily_report(TKC_VISIT_DATE, client=mock_anthropic_client)
-    live_summary = page.freetext_summary
+    page = publish_daily_report(
+        TKC_VISIT_DATE,
+        client=_StubAnthropicClient(text=_freetext_group_response()),
+    )
+    live_male = page.freetext_summary_male_adults
+    live_female = page.freetext_summary_female_adults
+    live_children = page.freetext_summary_children
     live_flag = page.empty_columns_flag
 
     def _raise(**kwargs):
@@ -1696,8 +1860,39 @@ def test_republish_with_failing_ai_call_preserves_the_prior_live_summary(
     page = publish_daily_report(TKC_VISIT_DATE, client=raising_client)
 
     assert page.live is True
-    assert page.freetext_summary == live_summary
+    assert page.freetext_summary_male_adults == live_male
+    assert page.freetext_summary_female_adults == live_female
+    assert page.freetext_summary_children == live_children
     assert page.empty_columns_flag == live_flag
+
+
+def test_republish_preserves_only_the_category_whose_response_came_back_blank(
+    home_page,
+):
+    """Plan 14's per-field preserve-on-falsy rule is independent per
+    category: if a re-ingest's response is missing/blank for exactly one
+    group (e.g. no children visited that day this time), only that field is
+    left untouched — the other two still update from the fresh response."""
+    _ingest_tkc_daily_fixture()
+    publish_daily_report(
+        TKC_VISIT_DATE,
+        client=_StubAnthropicClient(text=_freetext_group_response()),
+    )
+
+    page = publish_daily_report(
+        TKC_VISIT_DATE,
+        client=_StubAnthropicClient(
+            text=_freetext_group_response(
+                male_adults="New male draft.",
+                female_adults="New female draft.",
+                children="",
+            )
+        ),
+    )
+
+    assert page.freetext_summary_male_adults == "New male draft."
+    assert page.freetext_summary_female_adults == "New female draft."
+    assert page.freetext_summary_children == "Children draft."
 
 
 # --- Recompute command: DailyAggregate is a derived cache -------------------
@@ -1888,13 +2083,10 @@ def test_daily_report_page_rendering_reflects_b12_redesign(client, home_page):
     assert "New vs. follow-up" not in content
 
 
-def test_daily_report_page_renders_freetext_summary_as_a_single_paragraph(
-    client, home_page
-):
-    """Plan 11 Track B12: the freetext summary is capped at ~50 words (one
-    short paragraph, per `_FREETEXT_SUMMARY_SYSTEM_PROMPT`) — the template
-    renders it as a single plain `<p>`, no `linebreaks` filter/multi-paragraph
-    splitting needed since there's no longer more than one paragraph."""
+def test_daily_report_page_renders_three_freetext_summary_cards(client, home_page):
+    """Plan 14 (2026-07-24): the single-paragraph freetext summary (Plan 11
+    Track B12) is now three category cards, each its own `<p>`, in a
+    three-column grid — one per `DailyReportPage.freetext_summary_*` field."""
     index = ReportIndexPageFactory(parent=home_page, slug="reports")
     report_date = datetime.date(2026, 7, 10)
     DailyReportPageFactory(
@@ -1902,12 +2094,65 @@ def test_daily_report_page_renders_freetext_summary_as_a_single_paragraph(
         slug=report_date.isoformat(),
         report_date=report_date,
         aggregate=DailyAggregateFactory(clinic_date=report_date),
-        freetext_summary="Most complaints were respiratory infections and fevers.",
+        freetext_summary_male_adults="Male adults summary text.",
+        freetext_summary_female_adults="Female adults summary text.",
+        freetext_summary_children="Children summary text.",
     )
 
     content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
 
-    assert "<p>Most complaints were respiratory infections and fevers.</p>" in content
+    assert "notes, summarised" in content
+    assert "Male adults" in content
+    assert "<p>Male adults summary text.</p>" in content
+    assert "Female adults" in content
+    assert "<p>Female adults summary text.</p>" in content
+    assert "Children" in content
+    assert "<p>Children summary text.</p>" in content
+
+
+def test_daily_report_page_hides_freetext_summary_section_when_all_three_blank(
+    client, home_page
+):
+    """No category had a usable draft (or the AI calls failed) — the whole
+    section is omitted rather than rendering an empty heading with no
+    cards under it."""
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    report_date = datetime.date(2026, 7, 10)
+    DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=DailyAggregateFactory(clinic_date=report_date),
+    )
+
+    content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
+
+    assert "notes, summarised" not in content
+
+
+def test_daily_report_page_renders_only_the_non_blank_freetext_categories(
+    client, home_page
+):
+    """A day with, say, no child visits at all leaves that one field blank
+    (Plan 14's per-category preserve/blank rule) — the section still
+    renders for the categories that do have a draft, just without a card
+    for the one that doesn't."""
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    report_date = datetime.date(2026, 7, 10)
+    DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=DailyAggregateFactory(clinic_date=report_date),
+        freetext_summary_male_adults="Male adults summary text.",
+    )
+
+    content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
+
+    assert "notes, summarised" in content
+    assert "Male adults" in content
+    assert "Female adults" not in content
+    assert "Children" not in content
 
 
 def test_daily_report_page_renders_empty_columns_as_chips(client, home_page):

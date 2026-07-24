@@ -304,15 +304,20 @@ def draft_daily_summary_sentence(
 #
 # Both still follow invariant #3's shape ("numbers computed in Python, AI
 # writes prose only"): B8 is handed only the non-blank free-text entries
-# already collected by ``apps.pipeline.freetext.collect_freetext_entries``;
-# B9 is handed only the already-computed booleans from
-# ``apps.pipeline.freetext.compute_empty_columns`` and may only *phrase* that
-# fact, never decide it.
+# already collected by
+# ``apps.pipeline.freetext.collect_freetext_entries_by_group`` (Plan 14,
+# 2026-07-24 — see below); B9 is handed only the already-computed booleans
+# from ``apps.pipeline.freetext.compute_empty_columns`` and may only *phrase*
+# that fact, never decide it.
 #
 # Grounding note: sending the seven named free-text columns to a model is
 # authorised by the maintainer's 2026-07-23 decision (see
 # ``apps.pipeline.freetext``'s module docstring) — they are confirmed free of
 # patient identifiers by construction, not by any scrubbing this module does.
+# B8 additionally now sends which of three demographic groups each entry
+# came from (Plan 14, 2026-07-24, maintainer decision — see CLAUDE.md
+# invariant #2's dated note and ``apps.pipeline.freetext``'s own Plan 14
+# grounding note).
 
 # Short, fixed-template tasks restating/flagging already-computed input — the
 # same classification as DAILY_SUMMARY_MODEL above (CLAUDE.md → Stack).
@@ -351,7 +356,15 @@ EMPTY_COLUMNS_FLAG_MODEL = "claude-haiku-4-5"
 # to finish the sentence it was already writing instead of being cut off
 # for drifting slightly past target, matching MAX_FREETEXT_SUMMARY_LENGTH's
 # own ~4-chars/token margin rule above.
-MAX_FREETEXT_SUMMARY_LENGTH = 1000  # max_tokens=200 below
+#
+# Resized again 2026-07-24 (Plan 14: split into three ~30-word summaries —
+# male adults / female adults / children — returned as one JSON object
+# instead of one paragraph). Three 30-word summaries (~90 words, ~500 chars)
+# plus JSON punctuation/keys (~90 chars) comes to roughly 600 chars of
+# expected content (~150 tokens at ~4 chars/token) — max_tokens raised to
+# 300 for headroom, and MAX_FREETEXT_SUMMARY_LENGTH to 1500, keeping the
+# same ~1.25x-over-max_tokens margin the 2026-07-24 loosening above used.
+MAX_FREETEXT_SUMMARY_LENGTH = 1500  # max_tokens=300 below
 MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 
 # Tightened 2026-07-23 (Plan 11 Track B11, maintainer decision): the
@@ -379,52 +392,77 @@ MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 # (`_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT` below), and repeating it here would
 # spend a meaningful fraction of a 50-word budget on information the page
 # already states in its own section.
+# Restructured 2026-07-24 (Plan 14, maintainer decision): split into three
+# per-category summaries (male adults / female adults / children) instead of
+# one blended paragraph, each capped at 30 words instead of the old 50-word
+# whole-day cap. Mirrors `_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT` below in asking
+# for a JSON object instead of prose — the "cleaner fix" over parsing three
+# labelled paragraphs back out of free text, same reasoning as B12's JSON
+# array for the empty-columns flag. All of B10/B11/B12's safety constraints
+# (no markup, no exact duration, no fingerprinting combination, no invented
+# patient attribution) carry over unchanged onto each category's value.
 _FREETEXT_SUMMARY_SYSTEM_PROMPT = (
-    "You write a short summary, for a clinic's public daily report page, of "
-    "that clinic's free-text clinical notes for one day. You are given, for "
-    "each listed column, every non-blank entry recorded that day. Write a "
-    "single short paragraph, no more than 50 words, giving a factual "
-    "summary of common themes across entries, using frequency or thematic "
-    "language (for example 'several patients presented with...' or 'a "
-    "common theme was...') rather than narrative sentences that read like a "
-    "description of one visit. Never state an exact duration (for example "
-    "'5 days' or 'two weeks') — drop it or generalize it (for example 'a "
-    "recent onset' or 'an ongoing issue') instead of quoting it. Never "
-    "combine a specific condition, an exact duration, and a specific "
-    "circumstance in the same sentence — that combination can make a "
-    "single visit recognisable even with no direct identifier attached, so "
-    "it is forbidden even if every individual detail seems harmless on its "
-    "own. Do not use headings, bullet points, or any other markup — plain "
-    "prose only. Do not invent, estimate, or attribute anything to a "
-    "specific patient — you are not given any patient identifier and must "
-    "not imply one."
+    "You write short summaries, for a clinic's public daily report page, of "
+    "that clinic's free-text clinical notes for one day, split into three "
+    "patient categories: male adults, female adults, and children. You are "
+    "given, for each category, every non-blank entry recorded that day for "
+    "patients in that category, per free-text column. Respond with a JSON "
+    'object with exactly these three keys — "male_adults", "female_adults", '
+    '"children" — and nothing else: no prose, no markdown, no explanation '
+    "outside the JSON. Each key's value is a single short factual summary of "
+    "common themes across that category's entries, no more than 30 words, "
+    "using frequency or thematic language (for example 'several patients "
+    "presented with...' or 'a common theme was...') rather than narrative "
+    "sentences that read like a description of one visit. If a category has "
+    "no entries at all, its value is an empty string — never invent a "
+    "summary for it. Never state an exact duration (for example '5 days' or "
+    "'two weeks') — drop it or generalize it (for example 'a recent onset' "
+    "or 'an ongoing issue') instead of quoting it. Never combine a specific "
+    "condition, an exact duration, and a specific circumstance in the same "
+    "sentence — that combination can make a single visit recognisable even "
+    "with no direct identifier attached, so it is forbidden even if every "
+    "individual detail seems harmless on its own. Do not invent, estimate, "
+    "or attribute anything to a specific patient — you are not given any "
+    "patient identifier and must not imply one."
 )
 
 
 def build_freetext_summary_payload(
-    clinic_date: datetime.date, columns: dict[str, list[str]]
+    clinic_date: datetime.date, groups: dict[str, dict[str, list[str]]]
 ) -> dict[str, Any]:
     """Build the exact payload for the B8 free-text-summary call.
 
-    ``columns`` is built by
-    :func:`apps.pipeline.freetext.collect_freetext_entries` from that date's
-    ``DeidentifiedVisit`` rows — every value is one of the seven named
-    free-text columns the maintainer confirmed (2026-07-23) are structurally
-    free of patient identifiers by construction. Nothing else about a visit —
-    no age band, sex, location, or any identifying field — is included.
+    ``groups`` is built by
+    :func:`apps.pipeline.freetext.collect_freetext_entries_by_group` from
+    that date's ``DeidentifiedVisit`` rows — every value under every group is
+    one of the seven named free-text columns the maintainer confirmed
+    (2026-07-23) are structurally free of patient identifiers by
+    construction. The only other fact about a visit that reaches this
+    payload is *which of the three groups* (see
+    ``apps.pipeline.freetext.FREETEXT_SUMMARY_GROUPS``) its entries were
+    bucketed into — a derived category label, not an exact age, location, or
+    any other identifying field (Plan 14, 2026-07-24 — see CLAUDE.md
+    invariant #2's dated note and this repo's freetext.py Plan 14 grounding
+    note for why that's still within bounds).
     """
-    body = {FREETEXT_COLUMN_LABELS[name]: values for name, values in columns.items()}
+    body = {
+        group: {
+            FREETEXT_COLUMN_LABELS[name]: values for name, values in columns.items()
+        }
+        for group, columns in groups.items()
+    }
     return {
         "model": FREETEXT_SUMMARY_MODEL,
-        "max_tokens": 200,
+        "max_tokens": 300,
         "system": _FREETEXT_SUMMARY_SYSTEM_PROMPT,
         "messages": [
             {
                 "role": "user",
                 "content": (
                     f"Summarise {clinic_date.isoformat()}'s free-text clinical "
-                    "columns, given as {column label: [every non-blank entry "
-                    "recorded that day]}:\n"
+                    "columns, grouped by patient category, given as "
+                    "{category: {column label: [every non-blank entry "
+                    "recorded that day for that category]}}:\n"
                     # ensure_ascii=False: this is bilingual clinic (CLAUDE.md
                     # "Bilingual") free text, so Urdu entries must reach the
                     # model as real characters, not \uXXXX escapes (found by
@@ -438,22 +476,28 @@ def build_freetext_summary_payload(
 
 def draft_freetext_summary(
     clinic_date: datetime.date,
-    columns: dict[str, list[str]],
+    groups: dict[str, dict[str, list[str]]],
     client: _AnthropicLike | None = None,
 ) -> str | None:
-    """Ask the model to summarise the day's free-text columns, or give up.
+    """Ask the model for the day's three per-category summaries, or give up.
 
-    See :func:`_draft_short_text` for the failure contract. Same auto-publish
-    treatment as :func:`draft_daily_summary_sentence` (CLAUDE.md invariant
-    #4's exception, widened 2026-07-23 to cover this call too) — whatever
-    this returns (or ``""``) is stored directly onto the public page by
-    :func:`apps.pipeline.report_publishing.publish_daily_report`. Logs an
-    ``AiCallLog`` row via ``on_response``, same as
+    See :func:`_draft_short_text` for the failure contract. Returns the raw
+    response text (expected to be the JSON object
+    ``_FREETEXT_SUMMARY_SYSTEM_PROMPT`` asks for) unparsed — parsing into
+    ``{group: text}`` happens in
+    :func:`apps.pipeline.freetext.parse_freetext_summary_by_group`, called
+    from :func:`apps.pipeline.report_publishing.publish_daily_report`, same
+    split-parsing-from-drafting shape as
+    :func:`draft_empty_columns_flag`/``_parse_empty_columns_flag`` below.
+    Same auto-publish treatment as :func:`draft_daily_summary_sentence`
+    (CLAUDE.md invariant #4's exception, widened 2026-07-23 to cover this
+    call too) — whatever this returns (or ``""``) ends up stored onto the
+    public page. Logs an ``AiCallLog`` row via ``on_response``, same as
     :func:`draft_daily_summary_sentence` (found unmetered and fixed, Plan 11
     C2 follow-up).
     """
     return _draft_short_text(
-        lambda: build_freetext_summary_payload(clinic_date, columns),
+        lambda: build_freetext_summary_payload(clinic_date, groups),
         client,
         MAX_FREETEXT_SUMMARY_LENGTH,
         on_response=lambda response: _log_ai_call(

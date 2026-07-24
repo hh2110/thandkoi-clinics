@@ -22,6 +22,14 @@ Redesign vs. the previous version:
     stored JSON array — see DailyReportPage._parse_empty_columns_flag),
     not raw markdown text.
 
+Notes section redesign (Plan 14, 2026-07-24): the single freetext_summary
+paragraph is now three category cards — Male adults / Female adults /
+Children — each independently blank-able (see DailyReportPage's three
+freetext_summary_* fields and apps.pipeline.freetext's Plan 14 grounding
+note for the age-band approximation). Each card is headed by a small glyph
+in the same stroke style as the age icons above (see notes_icons/_*.html;
+"Children" reuses age_icons/_age_0_5.html directly rather than a new file).
+
 All colour is from semantic tokens (tokens.css); component styles live in
 static/css/daily-report.css. `dr` is the page-scoped root class.
 {% endcomment %}
@@ -88,10 +96,42 @@ static/css/daily-report.css. `dr` is the page-scoped root class.
       </div>
     </section>
 
-    {% if page.freetext_summary %}
+    {% if page.freetext_summary_male_adults or page.freetext_summary_female_adults or page.freetext_summary_children %}
       <section class="dr__notes" data-role="freetext-summary">
         <h2 class="dr__notes-title">{% translate "Today's notes, summarised" %}</h2>
-        <p>{{ page.freetext_summary }}</p>
+        <div class="dr__notes-grid">
+
+          {% if page.freetext_summary_male_adults %}
+            <div class="dr__card" data-role="freetext-summary-male-adults">
+              <div class="dr__card-head">
+                <span class="dr__notes-glyph">{% include "pipeline/notes_icons/_male_adult.html" %}</span>
+                <h3 class="dr__card-title">{% translate "Male adults" %}</h3>
+              </div>
+              <p>{{ page.freetext_summary_male_adults }}</p>
+            </div>
+          {% endif %}
+
+          {% if page.freetext_summary_female_adults %}
+            <div class="dr__card" data-role="freetext-summary-female-adults">
+              <div class="dr__card-head">
+                <span class="dr__notes-glyph">{% include "pipeline/notes_icons/_female_adult.html" %}</span>
+                <h3 class="dr__card-title">{% translate "Female adults" %}</h3>
+              </div>
+              <p>{{ page.freetext_summary_female_adults }}</p>
+            </div>
+          {% endif %}
+
+          {% if page.freetext_summary_children %}
+            <div class="dr__card" data-role="freetext-summary-children">
+              <div class="dr__card-head">
+                <span class="dr__notes-glyph">{% include "pipeline/age_icons/_age_0_5.html" %}</span>
+                <h3 class="dr__card-title">{% translate "Children" %}</h3>
+              </div>
+              <p>{{ page.freetext_summary_children }}</p>
+            </div>
+          {% endif %}
+
+        </div>
       </section>
     {% endif %}
 
