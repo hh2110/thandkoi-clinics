@@ -122,6 +122,10 @@ thandkoi-clinics/
 
 - Confirm `.gitignore` blocks `*.xls`, `*.xlsx`, `/uploads/`, `/data/`, `.env`.
 - No analytics or third-party scripts that could leak data by default.
+  > **2026-07-24:** the "by default" always left room for a deliberate,
+  > recorded opt-in later — [Plan 12](12-observability.md) is that decision,
+  > adding a cookieless, aggregate-only traffic analytics script for exactly
+  > that reason. This bullet's intent (no *silent* tracking) still stands.
 - `DEBUG=False` and a locked-down `ALLOWED_HOSTS` in prod settings.
 
 ## Decided (was open questions)
