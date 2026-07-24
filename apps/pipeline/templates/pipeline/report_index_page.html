@@ -53,8 +53,10 @@ archive's own page/URL rather than a second paginated list here).
                 {% for segment in bar.segments %}
                   <path class="{{ segment.css_class }}" d="{{ segment.path }}"></path>
                 {% endfor %}
-                <text class="ri-funding-mix__axis-text" x="{{ bar.label_x }}" y="{{ bar.label_y }}"
-                      text-anchor="middle">{{ bar.date|date:"j M" }}</text>
+                {% if bar.show_label %}
+                  <text class="ri-funding-mix__axis-text" x="{{ bar.label_x }}" y="{{ bar.label_y }}"
+                        text-anchor="middle">{{ bar.date|date:"j M" }}</text>
+                {% endif %}
                 <rect class="ri-funding-mix__hit"
                       data-funding-mix-hit
                       data-date="{{ bar.date|date:'j M' }}" data-zakat="{{ bar.zakat }}"

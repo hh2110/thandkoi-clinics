@@ -389,6 +389,12 @@ class ReportIndexPage(Page):
     _STACK_GAP = 2  # surface gap between stacked segments
     _BAR_CORNER_RADIUS = 4
     _SUNDAY_WEEKDAY = 6  # date.weekday() — the clinic is closed Sundays
+    # Minimum centre-to-centre spacing (viewBox units) between two date
+    # labels. Measured against the widest rendered label ("27 Jun", ~30
+    # units) with headroom for a longer translated month name — Plan 13's
+    # Mon–Sat gap slots (see _funding_mix_slot_dates) mean consecutive-day
+    # runs can now pack bars closer than a label is wide.
+    _MIN_LABEL_SPACING = 40
 
     def get_funding_mix(self) -> dict:
         """Rolling 30-day Zakat-vs-Regular funding mix, as SVG geometry (Plan 13).
@@ -443,15 +449,26 @@ class ReportIndexPage(Page):
         date_label_y = self._CHART_HEIGHT - 8
 
         bars = []
+        last_label_x = None
         for i, slot_date in enumerate(slot_dates):
             row = rows_by_date.get(slot_date)
             if row is None:
                 continue  # Mon–Sat, no report — leave the slot empty (a gap)
-            bars.append(
-                self._funding_mix_bar(
-                    row, i, slot_width, bar_width, baseline, y_for, date_label_y
-                )
+            bar = self._funding_mix_bar(
+                row, i, slot_width, bar_width, baseline, y_for, date_label_y
             )
+            # Gap slots let real bars pack closer together than a date
+            # label is wide (see _MIN_LABEL_SPACING) — thin colliding
+            # labels rather than let them overlap. Every bar still gets
+            # its hit-tooltip and its row in the table below, so no date
+            # is actually hidden, just its always-visible axis text.
+            bar["show_label"] = (
+                last_label_x is None
+                or bar["label_x"] - last_label_x >= self._MIN_LABEL_SPACING
+            )
+            if bar["show_label"]:
+                last_label_x = bar["label_x"]
+            bars.append(bar)
         ticks = [
             {"value": t, "y": y_for(t), "label_y": y_for(t) + 3}
             for t in range(0, max_value + 1, tick_step)
