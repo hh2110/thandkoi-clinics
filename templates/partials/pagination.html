@@ -4,19 +4,24 @@ Minimal prev/next pager for a paginated archive listing (Newsletter and Camp
 Report indexes, Plan 06). Grounded on Django's own Paginator idiom — no
 in-repo precedent existed before these archives.
 
+Every listing this partial serves (reports, camp reports, newsletters,
+gallery) is ordered newest-first, so "next page" moves further back in time.
+Labelled Newer/Older rather than Previous/Next (maintainer feedback,
+2026-07-24) so the direction of travel through the archive is unambiguous.
+
 Context:
   page_obj — a Django ``Page`` object, from ``Paginator.get_page()``.
 {% endcomment %}
 {% if page_obj.paginator.num_pages > 1 %}
   <nav class="pagination" aria-label="{% translate 'Pagination' %}">
     {% if page_obj.has_previous %}
-      <a href="?page={{ page_obj.previous_page_number }}">{% translate "Previous" %}</a>
+      <a href="?page={{ page_obj.previous_page_number }}">{% translate "Newer" %}</a>
     {% endif %}
     <span>
       {% blocktranslate with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktranslate %}
     </span>
     {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}">{% translate "Next" %}</a>
+      <a href="?page={{ page_obj.next_page_number }}">{% translate "Older" %}</a>
     {% endif %}
   </nav>
 {% endif %}
