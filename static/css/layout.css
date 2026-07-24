@@ -185,25 +185,9 @@
   }
 }
 
-/* --- Impact-stat band ------------------------------------------------------
-   A flex row rather than a fixed-column grid: `page.headline_stats` (or the
-   CMS-editable ImpactStatsBlock) can hand this any number of stats, and a
-   short row of `1fr` grid tracks left-justifies instead of centering when
-   there are fewer items than columns. `justify-content: center` on a flex row
-   centers the whole row regardless of count, so a 3-stat report and a 4-stat
-   one both land centered without hard-coding either number. */
-.stat-band__grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-4) var(--space-2);
-  text-align: center;
-}
-
-.stat-band__grid .stat {
-  flex: 0 1 calc(50% - var(--space-2) / 2);
-}
-
+/* --- Inline stats (feature-split's daily-report teaser figures) ------------
+   Distinct from the impact-stat band below: these sit inline beside body
+   copy, not in their own cards. */
 .stat__value {
   font-family: var(--font-heading);
   font-weight: 800;
@@ -228,25 +212,104 @@
   color: var(--color-accent);
 }
 
-.stat-band__caption {
-  text-align: center;
+/* --- Impact-stat band (Plan 11 D13 redesign) --------------------------------
+   Title-left + stat-cards-right layout, from a maintainer-supplied handoff —
+   replaces the old centered number/label row. Mobile-first: stacked column
+   by default, side-by-side from 56rem up (matches this file's convention
+   elsewhere, e.g. .hero__inner), rather than the handoff's own 860px
+   max-width breakpoint. */
+.stat-band__row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.stat-band__title {
+  flex: none;
+}
+
+.stat-band__heading {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-md);
+  margin-block: 0;
+}
+
+.stat-band__updated {
   font-size: var(--font-size-xs);
-  color: var(--color-text-faint);
-  margin-block: var(--space-3) 0;
+  color: var(--color-text-soft);
+  margin-block: var(--space-1) 0 0;
+}
+
+.stat-band__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.stat-band__card {
+  flex: 1 1 9rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: 14px;
+  padding: var(--space-3);
+  box-shadow: var(--card-shadow);
+}
+
+/* Fixed-height baseline box: guarantees every card's number lines up even
+   when one carries a `prefix` span at a different font size (the Zakat-spend
+   card's "PKR"). */
+.stat-band__card-value {
+  height: 2.5rem;
+  display: flex;
+  align-items: flex-end;
+  white-space: nowrap;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+  color: var(--color-stat-value);
+  font-variant-numeric: tabular-nums;
+  margin-block: 0;
+}
+
+.stat-band__card-prefix {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-soft);
+  margin-inline-end: 0.3em;
+}
+
+.stat-band__card-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+  margin-block: var(--space-1) 0 0;
 }
 
 .stat-band__empty {
-  text-align: center;
   margin-block: 0;
 }
 
 @media (min-width: 56rem) {
-  .stat-band__grid {
+  .stat-band__row {
+    flex-direction: row;
+    align-items: center;
     gap: var(--space-4);
   }
 
-  .stat-band__grid .stat {
-    flex: 0 1 calc(25% - var(--space-4) * 3 / 4);
+  .stat-band__title {
+    max-width: 14rem;
+  }
+
+  .stat-band__cards {
+    flex-wrap: nowrap;
+  }
+
+  .stat-band__card {
+    flex: 1;
   }
 }
 

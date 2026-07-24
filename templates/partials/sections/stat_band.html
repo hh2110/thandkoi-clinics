@@ -1,12 +1,20 @@
 {% load i18n %}
 {% comment %}
-Impact-stat band: a responsive row of number/label pairs, figures set in
-Archivo with tabular-nums so columns of digits line up.
+Impact-stat band: a section title + date subtitle on the left, up to three
+equal stat cards on the right (Plan 11 D13 redesign, from a maintainer-
+supplied handoff — was a plain centered row of number/label pairs before).
+Figures set in Archivo with tabular-nums; each card's number sits in a
+fixed-height baseline box so every card's number lines up even when one
+carries a `prefix` (e.g. "PKR").
 
 Context:
-  stats            — a list of {value, label} dicts. Values are strings so the
-                     caller controls formatting ("120/day", "36k+", "100%").
-  caption          — optional small print under the row.
+  stats            — a list of {value, label, prefix} dicts. `prefix` is
+                     optional (e.g. "PKR" on the Zakat-spend card) and
+                     renders smaller, baseline-aligned before `value`.
+                     Values are strings so the caller controls formatting
+                     ("120/day", "36k+", "100%").
+  heading          — the band's title (e.g. "Our impact so far").
+  updated_caption  — optional "Updated <date>" subtitle under the heading.
   section_modifier — background modifier; defaults to "section--tinted
                      section--banded" (Plan 11 D12: full-bleed raised band
                      with a top+bottom hairline).
@@ -15,17 +23,20 @@ Numbers are inputs only — never baked in (they come from the CMS/pipeline).
 Empty state: with no stats it shows a "coming soon" line, not an empty band.
 {% endcomment %}
 <section class="section {{ section_modifier|default:'section--tinted section--banded' }} stat-band">
-  <div class="wrapper">
-    <div class="stat-band__grid">
+  <div class="wrapper stat-band__row">
+    <div class="stat-band__title">
+      {% if heading %}<p class="stat-band__heading">{{ heading }}</p>{% endif %}
+      {% if updated_caption %}<p class="stat-band__updated">{{ updated_caption }}</p>{% endif %}
+    </div>
+    <div class="stat-band__cards">
       {% for stat in stats %}
-        <div class="stat">
-          <p class="stat__value">{{ stat.value }}</p>
-          {% if stat.label %}<p class="stat__label">{{ stat.label }}</p>{% endif %}
+        <div class="stat-band__card">
+          <p class="stat-band__card-value">{% if stat.prefix %}<span class="stat-band__card-prefix">{{ stat.prefix }}</span>{% endif %}{{ stat.value }}</p>
+          {% if stat.label %}<p class="stat-band__card-label">{{ stat.label }}</p>{% endif %}
         </div>
       {% empty %}
         <p class="stat-band__empty text-faint">{% translate "Figures coming soon." %}</p>
       {% endfor %}
     </div>
-    {% if caption %}<p class="stat-band__caption">{{ caption }}</p>{% endif %}
   </div>
 </section>

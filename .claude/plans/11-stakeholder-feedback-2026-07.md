@@ -423,6 +423,81 @@ as D12 below.
   **Priority: P2** across the board for D1–D9 — visible polish and content,
   not functional bugs. D10/D11/D12 carry their own priorities above.
 
+- [x] **D13 (round 3, 2026-07-24).** Two related changes, shipped together
+      on the same branch (D12 is a hard dependency — see below):
+
+      **1. Retired the editorial `ImpactStatsBlock` StreamField block.**
+      Now that the live "Our impact so far" band (Track F2) reads real
+      `DailyAggregate` figures, the hand-typed StreamField equivalent was
+      fully redundant — raised during this session when a screenshot used
+      for D12's visual verification showed the *editorial* block's test-
+      fixture content ("467+ children treated... Figures entered by the
+      admin"), which read as confusingly duplicate alongside the real live
+      band. **Maintainer decision: remove entirely**, not just stop using it
+      in the default test fixture. Removed: `ImpactStatsBlock`/
+      `ImpactStatBlock` (`apps/core/blocks.py`), its template
+      (`templates/blocks/impact_stats_block.html`), its three dedicated
+      tests, its entry in `HomePageStreamBlock` (`apps/core/models.py`,
+      migration `0014_alter_homepage_body`), and its entries in
+      `DEFAULT_HOME_BODY` (`apps/core/factories.py`) and the real
+      `seed_core_content` management command's `HOME_BODY` (a *third*,
+      separate hardcoded copy this session found while sweeping for stale
+      references — the production draft-seeding script, not just a test
+      fixture). Historical/narrative mentions in other planning docs were
+      left as-is (accurate history); "living" docs asserting it as *current*
+      architecture (`docs/architecture-and-ai-brief.md`,
+      `.claude/skills/route-change-request/SKILL.md`,
+      `.claude/plans/11-f2-live-impact-stats-planning.md`'s open question)
+      were updated. **Known limitation:** if any Wagtail page revision
+      (live or historical draft) still has `impact_stats` block JSON in its
+      body, rendering that specific revision will now fail (unknown block
+      type) — confirmed via SSH (D11-era) that the *live* home page doesn't
+      use it, but old draft revisions weren't individually audited. Low risk
+      (revision history is rarely opened), not blocking.
+
+      **2. Impact-bar redesign** — from a second maintainer-supplied handoff
+      (`~/Downloads/impact-bar-redesing.zip` → `design_handoff_impact_bar/`,
+      see its own README), requested explicitly for this same branch/PR
+      rather than stacked separately. Turns the live "Our impact so far"
+      band from a centered number/label row into a **title-left + up to
+      three equal stat cards on the right**, each card a `--card` surface
+      with its number baseline-aligned in a fixed-height box (so the
+      Zakat-spend card's "PKR" prefix, rendered smaller, doesn't throw off
+      the row). **Hard dependency on D12**: the handoff's own README says
+      "if both are being implemented together, the band should use the
+      `--raised` surface and inherit those theme tokens" — it needs D12's
+      `--color-accent-soft-bg`/`--color-surface`/`--color-border-default`
+      dark-mode fixes to render correctly, so this branch merges D12's
+      commit in directly (`git merge plan/11-d12-home-surface-ladder`)
+      rather than being based on plain `main`.
+      - `templates/partials/sections/stat_band.html` redesigned: new
+        `heading`/`updated_caption` context (replacing the old combined
+        `caption` string) and an optional per-stat `prefix`. New markup/CSS
+        (`.stat-band__row`/`__title`/`__cards`/`__card`/`__card-value`/
+        `__card-prefix`/`__card-label`) — the old `.stat__value`/`.stat__label`
+        classes are untouched, since `feature_split.html`'s inline
+        daily-report stats still use them (different visual pattern, same
+        names would have collided in meaning, not markup).
+      - `apps/core/models.py`'s `HomePage.get_live_impact_stats` dropped the
+        "(all time)" suffix from the first two labels (the band's own
+        heading already carries that context, per the handoff) and gives
+        the Zakat-spend figure a separate `prefix: "PKR"` instead of baking
+        it into the value string.
+      - **Decision — `zakat_avg_spend` field convention changed** (maintainer
+        decision, 2026-07-24): was free text formatted by the admin (e.g.
+        "PKR 180/visit"); now a bare number only (e.g. "180"), with "PKR"
+        and the per-visit meaning both fixed in code/label. Chosen over
+        parsing the old free-text convention at render time (fragile for any
+        format the admin might type, and the handoff explicitly warns
+        against rendering the whole string as one baseline-aligned number —
+        that caused a wrapping bug in the prototype). **Operational
+        follow-up needed:** whatever is currently in the production
+        `zakat_avg_spend` field (e.g. "PKR 180/visit") must be manually
+        re-entered as a bare number in the admin after this ships, or the
+        band will show the old formatted string as its huge 40px figure.
+      - Mobile responsive: stacked column below 56rem (this file's existing
+        mobile-first convention), not the handoff's own 860px breakpoint.
+
 ### Track E — Process & tooling
 
 - [x] **E1.** A repo skill that lets the maintainer request a website change and

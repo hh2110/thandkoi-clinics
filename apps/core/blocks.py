@@ -16,25 +16,6 @@ from wagtail.blocks import StructBlockValidationError
 from wagtail.images.blocks import ImageChooserBlock
 
 
-class ImpactStatBlock(blocks.StructBlock):
-    """A single number/label pair for the impact-stat band.
-
-    ``value`` is free text, not a number field, so the admin controls the exact
-    formatting the band renders ("120/day", "36k+", "100%"). Real figures are
-    entered by hand for now; Plan 08's pipeline supplies computed ones later.
-    """
-
-    value = blocks.CharBlock(
-        max_length=16,
-        help_text='The figure, formatted exactly as it should show, e.g. "36k+".',
-    )
-    label = blocks.CharBlock(max_length=80, help_text="Short caption under the figure.")
-
-    class Meta:
-        icon = "form"
-        label = "Impact figure"
-
-
 class HeroBlock(blocks.StructBlock):
     """Two-column hero → ``partials/sections/hero.html``.
 
@@ -74,34 +55,6 @@ class HeroBlock(blocks.StructBlock):
         icon = "home"
         label = "Hero"
         template = "blocks/hero_block.html"
-
-
-class ImpactStatsBlock(blocks.StructBlock):
-    """Impact-stat band → ``partials/sections/stat_band.html``.
-
-    With no figures entered the band shows its own "coming soon" empty state
-    (stat_band.html), so a half-populated Home page never looks broken.
-
-    ``as_of`` is a manual "last updated" marker, not a live computation — the
-    stats above are still hand-typed (see ``ImpactStatBlock``'s docstring), so
-    when an admin updates one they should also bump this date. Plan 11 D2. Live
-    computation from ``DailyAggregate`` rows is a separate future idea (Plan 11
-    candidate Track F, not built here).
-    """
-
-    caption = blocks.CharBlock(required=False, max_length=140)
-    as_of = blocks.DateBlock(
-        required=False,
-        help_text='Optional "updated at" date, appended to the caption, e.g. '
-        '"Our impact so far (updated at 23 Jul 2026)". Set this whenever the '
-        "figures below are updated by hand.",
-    )
-    stats = blocks.ListBlock(ImpactStatBlock())
-
-    class Meta:
-        icon = "table"
-        label = "Impact figures"
-        template = "blocks/impact_stats_block.html"
 
 
 class DonateCTABlock(blocks.StructBlock):

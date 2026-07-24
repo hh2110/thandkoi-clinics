@@ -35,9 +35,12 @@ from apps.core.models import (
 )
 
 # A ready-made StreamField body composing the Plan 03.5 section kit (hero +
-# impact-stat band + the Quality of Care circle + a donate CTA left unlinked,
-# so the band stays hidden — the current pre-Plan-05 state). Numbers/copy here
-# are test fixtures only.
+# the Quality of Care circle + a donate CTA left unlinked, so the band stays
+# hidden — the current pre-Plan-05 state). Numbers/copy here are test
+# fixtures only. The impact-stat band (StreamField's now-removed
+# ``impact_stats`` block, Plan 11 D13) isn't part of this body any more — the
+# home page's real "Our impact so far" band is HomePage.get_live_impact_stats,
+# rendered independently of ``body`` (see HomePage.get_context).
 DEFAULT_HOME_BODY = [
     (
         "hero",
@@ -49,18 +52,6 @@ DEFAULT_HOME_BODY = [
             "tagline": "صحت سب کے لیے",
             "stat_value": "Free",
             "stat_label": "for every Zakat beneficiary",
-        },
-    ),
-    (
-        "impact_stats",
-        {
-            "caption": "Figures entered by the admin.",
-            "stats": [
-                {"value": "467+", "label": "children treated"},
-                {"value": "189", "label": "patients served"},
-                {"value": "426", "label": "welfare (free) patients"},
-                {"value": "100%", "label": "donor-funded, no fees"},
-            ],
         },
     ),
     (

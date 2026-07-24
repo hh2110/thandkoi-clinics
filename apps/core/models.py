@@ -68,10 +68,17 @@ class HomePage(Page):
     body = StreamField(
         [
             ("hero", core_blocks.HeroBlock()),
-            ("impact_stats", core_blocks.ImpactStatsBlock()),
             ("circle_of_care", core_blocks.CircleOfCareBlock()),
             ("donate_cta", core_blocks.DonateCTABlock()),
         ],
+        # 2026-07-24 (Plan 11 D13): dropped the hand-typed "impact_stats"
+        # block (``ImpactStatsBlock``) — fully superseded by the live
+        # "Our impact so far" band (``get_live_impact_stats`` below, Track
+        # F2), which reads real ``DailyAggregate`` figures instead of an
+        # editor re-typing numbers by hand. Confirmed via SSH (Plan 11 D12
+        # era) that no live production page actually used this block, so
+        # removing it from the block set doesn't orphan any real content.
+        #
         # The circle-of-care partial's hub uses a page-wide-unique id
         # (``coc-hub-detail``) for its aria-controls target, so a second copy
         # on the same page would collide — capped to one rather than relying
@@ -96,11 +103,15 @@ class HomePage(Page):
         max_length=16,
         blank=True,
         help_text="Third figure in the live 'Our impact so far' band: average "
-        "spend per Zakat-funded visit, formatted exactly as it should show "
-        '(e.g. "PKR 180/visit"). Hand-typed and hand-updated — the pipeline '
-        "never ingests fee/expenditure data (Plan 11 Track F3), so unlike the "
-        "other two figures in the band this one can't be computed live. Left "
-        "blank, the band shows only the two live stats.",
+        "spend per Zakat-funded visit, as a bare number only "
+        '(e.g. "180", not "PKR 180/visit") — the band renders "PKR" as a '
+        "fixed prefix and the per-visit meaning is in the figure's label, "
+        "not typed here (Plan 11 D13 redesign — a hand-typed currency "
+        "string used to break the band's number-baseline alignment). "
+        "Hand-typed and hand-updated — the pipeline never ingests fee/"
+        "expenditure data (Plan 11 Track F3), so unlike the other two "
+        "figures in the band this one can't be computed live. Left blank, "
+        "the band shows only the two live stats.",
     )
 
     content_panels = [
@@ -170,14 +181,20 @@ class HomePage(Page):
         ``DailyAggregate`` on every request, never cached onto this page. See
         ``apps.pipeline.impact_stats.compute_alltime_impact_stats`` for why
         F2 shipped only these two, not the three its planning doc originally
-        proposed.
+        proposed. Labels dropped their "(all time)" suffix in the Plan 11
+        D13 redesign — the band's own "Our impact so far" heading (rendered
+        separately by stat_band.html, not part of this dict) already carries
+        that context.
 
         A third, hand-typed figure (``zakat_avg_spend``) is appended when set
         (Plan 11 Track F3) — average spend per Zakat-funded visit can't be
         computed live because ``DailyAggregate`` carries no fee/expenditure
         data at all, so this one is maintainer-entered in the admin rather
         than queried. Blank stays a two-stat band, matching the section's
-        existing "no half-broken state" convention.
+        existing "no half-broken state" convention. Its ``prefix`` ("PKR")
+        is separate from ``value`` (Plan 11 D13) so stat_band.html can render
+        it smaller and baseline-aligned, rather than as part of one string
+        that broke the cards' number alignment.
         """
         from apps.pipeline.impact_stats import compute_alltime_impact_stats
 
@@ -185,18 +202,19 @@ class HomePage(Page):
         result = [
             {
                 "value": str(stats.total_visits),
-                "label": _("Clinic patients (all time)"),
+                "label": _("Clinic patients"),
             },
             {
                 "value": str(stats.zakat_beneficiary_patients),
-                "label": _("Zakat beneficiaries (all time)"),
+                "label": _("Zakat beneficiaries"),
             },
         ]
         if self.zakat_avg_spend:
             result.append(
                 {
                     "value": self.zakat_avg_spend,
-                    "label": _("Average spend per Zakat-funded visit"),
+                    "prefix": "PKR",
+                    "label": _("Avg spend per Zakat visit"),
                 }
             )
         return result
