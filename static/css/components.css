@@ -40,6 +40,24 @@
   .primary-nav {
     flex-basis: 100%;
   }
+
+  /* Mobile toggle-float fix (2026-07-24, design handoff): nav spans the
+     full row so the menu + "Menu" summary align to the edge instead of
+     being pushed right by margin-inline-start:auto (above). */
+  .site-header__nav {
+    flex-basis: 100%;
+    margin-inline-start: 0;
+  }
+
+  /* The toggle now sits inside the <details> as the open menu's last row
+     (see nav.html) — indented to match .primary-nav__list, with a hairline
+     separating it from the Donate button above. It's hidden automatically
+     when the menu is closed, since it's inside the collapsed <details>. */
+  .site-header__controls {
+    padding: var(--space-2);
+    margin-block-start: var(--space-1);
+    border-block-start: 1px solid var(--color-border-default);
+  }
 }
 
 .site-header__brand {
@@ -225,9 +243,23 @@
      participate in layout even though the <details> is closed. Modern browsers
      collapse a closed <details>'s ::details-content wrapper to zero height, so
      display:flex on the list alone isn't enough — without this the inline nav
-     overflows a 0-height box and disappears behind the hero below. */
+     overflows a 0-height box and disappears behind the hero below.
+     Mobile toggle-float fix (2026-07-24, design handoff) added display/
+     align-items/gap here: the toggle moved inside <details> (see nav.html)
+     so it's now part of this disclosed content — laying it out as a row,
+     toggle at the end, keeps desktop reading exactly as before the move. */
   .primary-nav::details-content {
     content-visibility: visible;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* No mobile padding/border on the toggle at desktop width. */
+  .site-header__controls {
+    padding: 0;
+    margin-block-start: 0;
+    border-block-start: 0;
   }
 
   /* Single-row header (2026-07-23): this list now sits inline inside

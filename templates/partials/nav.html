@@ -40,6 +40,15 @@ Single-row layout (2026-07-23): this whole <nav> now renders inside
 margin-inline-start:auto on .site-header__nav, rather than as its own
 full-width band under the logo. The theme toggle moves in here too, as the
 last item in the same row, per the handoff.
+
+Mobile toggle-float fix (2026-07-24, design handoff): on mobile the toggle
+sat as a flex sibling of the <details>, centre-aligned on the row — when the
+menu opened the toggle floated mid-height against the now-tall open menu,
+detached from any content. Moved .site-header__controls to be the last
+child *inside* <details> so it becomes the open menu's final row instead
+(hidden automatically while closed). Desktop is unaffected: components.css
+lays the disclosed content out as a row at 56rem+, so the toggle still reads
+as inline-at-the-end, same as before.
 {% endcomment %}
 {% with lang=LANGUAGE_CODE|default:"en" %}
 <nav class="site-header__nav" aria-label="{% translate 'Primary' %}">
@@ -70,9 +79,9 @@ last item in the same row, per the handoff.
         <a class="button button--donate" href="/{{ lang }}/donate/">{% translate "Donate" %}</a>
       </li>
     </ul>
+    <div class="site-header__controls">
+      {% include "partials/theme_toggle.html" %}
+    </div>
   </details>
-  <div class="site-header__controls">
-    {% include "partials/theme_toggle.html" %}
-  </div>
 </nav>
 {% endwith %}
