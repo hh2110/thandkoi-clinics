@@ -1,0 +1,23 @@
+# Groups auto-generated GitHub Release notes (`gh release create --generate-notes`,
+# used by scripts/release.sh — see docs/deploying.md) by PR label instead of one
+# flat "What's Changed" list. GitHub's release-notes generator only categorizes
+# by label, never by commit message or PR title, so this depends on every PR
+# carrying the matching label — see CLAUDE.md's "PR flow" note on labeling PRs
+# by their Conventional-Commit type as part of opening them.
+changelog:
+  categories:
+    - title: Features
+      labels:
+        - enhancement
+    - title: Fixes
+      labels:
+        - bug
+    - title: Docs & Planning
+      labels:
+        - documentation
+    - title: Chores
+      labels:
+        - chore
+    - title: Other Changes
+      labels:
+        - "*"

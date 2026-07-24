@@ -65,6 +65,13 @@ inspectable script over an agent-driven one) does the whole runbook:
    failure to publish the Release is a warning, not a script failure — the
    deploy itself already succeeded by this point.
 
+   [`.github/release.yml`](../.github/release.yml) groups these notes by PR
+   label (Features / Fixes / Docs & Planning / Chores / Other Changes)
+   instead of one flat list — GitHub's release-notes generator reads only PR
+   labels, never commit messages or titles, so this depends on every PR
+   being labeled by its Conventional-Commit type when it's opened (see
+   CLAUDE.md's "PR flow").
+
 > **2026-07-23 observed gap:** `/healthz: 200` confirms *a* healthy instance
 > is responding, not that *every* access path is already on the new build.
 > After a real release (`v2026.07.23-4`, adding `CampReportPage.report_document`),
