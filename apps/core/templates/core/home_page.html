@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags wagtailimages_tags i18n %}
+{% load wagtailcore_tags wagtailimages_tags i18n static %}
 {% comment %}
 Home page — composed entirely from the Plan 03.5 layout kit. The StreamField
 body renders through the block templates (each of which includes a 03.5 section
@@ -27,8 +27,21 @@ headline as a smaller sub-line beneath it — see templates/blocks/hero_block.ht
 raised band (section_modifier="section--tinted section--snug
 section--banded"), matching the live impact-stats band above, so it stops
 floating on bare page background — plus the amber lead-stat/link highlight
-(cta_accent, lead_stat_accent). The newsletter teaser below it is
-deliberately left plain — only the report section was in scope for this fix.
+(cta_accent, lead_stat_accent). The newsletter teaser below it was
+deliberately left plain at the time — only the report section was in scope
+for that fix.
+
+2026-07-24 (maintainer follow-up): the newsletter teaser no longer renders
+the generic "photo coming soon" placeholder. Unlike the report teaser (a
+per-HomePage ``report_teaser_image`` FK the admin curates by hand, since
+daily reports auto-publish with no per-instance photo), every newsletter
+issue already shares one fixed brand identity photo — the same lit-diya
+"beacon" image used in the newsletter's own masthead
+(``static/images/newsletter-beacon.png``, see newsletter_page.html) — so
+that asset is wired in directly here rather than adding another editable
+image field. (``static/images/og-newsletter.png``, the OG/link-preview
+card, was considered and rejected for this slot: it has per-issue text and
+the retired "چراغ شفا" tagline baked into the PNG.)
 
 2026-07-24 (Plan 11 D13): the live impact-stats band's caption is now a
 separate heading ("Our impact so far") + an optional "Updated <date>"
@@ -61,6 +74,7 @@ different places in that layout.
   {% endif %}
 
   {% if latest_newsletter %}
-    {% include "partials/sections/feature_split.html" with eyebrow=_("Latest newsletter") heading=latest_newsletter.title body=latest_newsletter.summary cta_label=_("Read the newsletter →") cta_url=latest_newsletter.url %}
+    {% static "images/newsletter-beacon.png" as newsletter_teaser_image %}
+    {% include "partials/sections/feature_split.html" with eyebrow=_("Latest newsletter") heading=latest_newsletter.title body=latest_newsletter.summary cta_label=_("Read the newsletter →") cta_url=latest_newsletter.url media_image=newsletter_teaser_image media_alt=_("A lit clay diya — a beacon of light") %}
   {% endif %}
 {% endblock %}
