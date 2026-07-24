@@ -46,7 +46,7 @@ plan from 03.5 onward carries three lifecycle sections:
 | 11 | [Stakeholder feedback triage (July 2026)](11-stakeholder-feedback-2026-07.md) — backlog of report/admin/content/process items from the maintainer's review round, sorted into tracks and priorities, to be sliced into follow-up plans. Track E's options review: [E1/E2 research](11-e1-e2-research-2026-07.md). Track F2's planning pass: [live impact-stats planning](11-f2-live-impact-stats-planning.md) | 🚧 In progress |
 | 12 | [Observability](12-observability.md) — Sentry error tracking + uptime alerting on `/healthz` (Track A), Umami Cloud traffic analytics (Track B); the "monitoring" item deferred below, now being addressed. Track B merged (PR #116, maintainer account/website-ID setup still pending); Track A in progress | 🚧 In progress |
 | 13 | [Reports index: funding-mix trend chart](13-reports-funding-mix-chart.md) — rolling 30-day Zakat-vs-Regular stacked bar chart on `/reports/`, server-rendered SVG, no daily-page chart, no department/diagnosis breakdown | 🚧 In progress |
-| 14 | [Freetext summary split by demographic group](14-freetext-summary-by-demographic-group.md) — daily report's free-text summary split into male adults / female adults / children, 30 words each, approximate age-band cutoff, three-column layout | 🚧 In progress |
+| 14 | [Freetext summary split by demographic group](14-freetext-summary-by-demographic-group.md) — daily report's free-text summary split into male adults / female adults / children, 30 words each, approximate age-band cutoff, three-column layout | ✅ Done |
 
 **Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ⏸ Paused/parked (work stopped, not abandoned) · ✅ Done
 
