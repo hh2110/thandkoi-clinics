@@ -24,6 +24,12 @@ WhiteNoise for static files. Dependencies are managed with
 [ruff](https://docs.astral.sh/ruff/); tests with pytest + pytest-django. Config
 comes from the environment via `django-environ`.
 
+**Observability:** production error tracking via [Sentry](https://sentry.io/)
+(optional — soft-fail if unconfigured, never blocks a boot) and
+privacy-friendly traffic analytics via [Umami Cloud](https://umami.is/)
+(cookieless, no consent banner needed). See
+[docs/deploying.md](docs/deploying.md) → Secrets for the env vars.
+
 ## Local development
 
 ### Prerequisites
