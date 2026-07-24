@@ -33,6 +33,7 @@ from __future__ import annotations
 import logging
 from zipfile import BadZipFile
 
+import sentry_sdk
 from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
@@ -112,6 +113,7 @@ def upload_export(request):
                     type(exc).__name__,
                     exc,
                 )
+                sentry_sdk.capture_exception()
                 error = (
                     "That file doesn't look like a valid Excel export "
                     "(.xls or .xlsx). Nothing was saved."
@@ -138,6 +140,7 @@ def upload_export(request):
                     # Raised by a parser before anything is persisted, with a
                     # message written to be shown to the admin verbatim.
                     logger.warning("Export upload failed to parse: %s", exc)
+                    sentry_sdk.capture_exception()
                     error = f"{exc} Nothing was saved."
         else:
             error = "; ".join(

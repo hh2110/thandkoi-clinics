@@ -27,6 +27,8 @@ import logging
 from collections.abc import Callable
 from typing import Any, Protocol
 
+import sentry_sdk
+
 from apps.pipeline.aggregation import ClinicAggregate
 from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
 from apps.pipeline.models import AiCallLog, DailyAggregate
@@ -103,6 +105,7 @@ def _log_ai_call(call_site: str, model: str, response: Any) -> None:
         )
     except Exception:  # noqa: BLE001 - logging must never discard a good response
         logger.warning("Failed to log AiCallLog for %s (%s)", call_site, model)
+        sentry_sdk.capture_exception()
 
 
 def build_prompt_payload(aggregate: ClinicAggregate) -> dict[str, Any]:
@@ -259,6 +262,7 @@ def _draft_short_text(
             return None
         text = response.content[0].text.strip()
     except Exception:  # noqa: BLE001 - any failure means "no text this run"
+        sentry_sdk.capture_exception()
         return None
 
     if not text or len(text) > max_length:
@@ -796,6 +800,7 @@ def draft_monthly_newsletter_body(
         else:
             return None  # exceeded MAX_NEWSLETTER_TOOL_TURNS without an answer
     except Exception:  # noqa: BLE001 - any failure means "no draft", never raise
+        sentry_sdk.capture_exception()
         return None
 
     if not text or len(text) > MAX_MONTHLY_NEWSLETTER_LENGTH:

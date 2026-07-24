@@ -5,6 +5,8 @@ Everything sensitive comes from the environment — the process must fail loudly
 if a required secret is missing, rather than fall back to an insecure default.
 """
 
+import sentry_sdk
+
 from .base import *  # noqa: F403
 from .base import STORAGES, env
 
@@ -110,3 +112,24 @@ LOGGING = {
         "level": env("DJANGO_LOG_LEVEL", default="INFO"),
     },
 }
+
+# --- Error tracking (Plan 12 Track A) ---------------------------------------
+
+# Deliberately soft-fail, unlike every setting above: SENTRY_DSN is read with
+# a blank default and the SDK is only initialized if it's non-empty, so a
+# missing or revoked DSN degrades to "no error tracking," never a boot
+# failure or a 500 (Plan 12 Decisions — observability must never become a new
+# reason the site goes down).
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    # No release-tag env var is wired to the app yet (the Deploy workflow
+    # passes the release commit to Render's deploy hook as a query param, not
+    # as an env var — see .github/workflows/deploy.yml and scripts/release.sh).
+    # RENDER_GIT_COMMIT is set automatically by Render for every build and is
+    # the exact commit the deploying release tag points at, so it stands in
+    # as the release identifier until a friendlier one is wired up.
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        release=env.str("RENDER_GIT_COMMIT", default="") or None,
+        environment="production",
+    )

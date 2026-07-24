@@ -176,16 +176,34 @@ site-wide script include with no partial user-facing behavior to gate
 ## Tasks
 
 **Track A — operational monitoring**
-- [ ] Add `sentry-sdk` to `pyproject.toml`; refresh `uv.lock`.
-- [ ] Initialize Sentry in `config/settings/prod.py`, reading `SENTRY_DSN`
+- [x] Add `sentry-sdk` to `pyproject.toml`; refresh `uv.lock`. (PR #118)
+- [x] Initialize Sentry in `config/settings/prod.py`, reading `SENTRY_DSN`
       with a blank default; pass the current release tag if available.
-- [ ] Add `capture_exception()` calls at the existing except sites in
-      `apps/pipeline/ai.py` and `apps/pipeline/admin_views.py`.
-- [ ] Declare `SENTRY_DSN` in `render.yaml` (`sync: false`); document it in
-      `docs/deploying.md` → Secrets.
+      (PR #118 — see 2026-07-24 divergence note below on what "release tag"
+      resolved to.)
+- [x] Add `capture_exception()` calls at the existing except sites in
+      `apps/pipeline/ai.py` and `apps/pipeline/admin_views.py`. (PR #118)
+- [x] Declare `SENTRY_DSN` in `render.yaml` (`sync: false`); document it in
+      `docs/deploying.md` → Secrets. (PR #118)
 - [ ] Maintainer: create the Sentry project, set the secret, wire up the
       external uptime monitor (docs-only, no code).
 - [ ] Deploy a new tag; run both Track A gating checks.
+
+> **2026-07-24 — precedent-map divergence, found during implementation
+> (PR #118).** The precedent map above cites existing `logger.warning(...)`
+> calls at `ai.py:261` and `ai.py:798` as the pattern to follow. On inspection
+> only `ai.py:104` actually has one — the other two `except Exception:` blocks
+> just `return None` with no logging at all. Added `capture_exception()` to
+> all three sites regardless (that's precisely the "swallowed-by-design
+> failure should still surface" gap Track A exists to close), verified
+> against the real code rather than this plan's description.
+>
+> Also: no release-tag env var exists anywhere in this repo (the Deploy
+> workflow passes the release commit to Render's deploy hook as a query
+> param, not an env var). `sentry_sdk.init()` uses Render's own
+> auto-injected `RENDER_GIT_COMMIT` instead — the exact commit the deploying
+> tag points at, so it serves the same attribution purpose without adding
+> any new wiring.
 
 **Track B — traffic analytics**
 - [x] Add the Umami script tag to `templates/base.html`, replacing the
