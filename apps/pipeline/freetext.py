@@ -44,6 +44,7 @@ why that's still within bounds.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable
 
 from apps.pipeline.models import DeidentifiedVisit
@@ -151,6 +152,21 @@ def collect_freetext_entries_by_group(
     }
 
 
+#: Same tolerance as ``apps.pipeline.models._strip_markdown_fence`` (see that
+#: function's docstring — found in production 2026-07-25 on the sibling B9
+#: call using the same model and the same "no markdown" instruction it
+#: ignored 7/7 times). Duplicated rather than shared to avoid a models.py
+#: <-> freetext.py import cycle (this module already imports
+#: ``DeidentifiedVisit`` from ``apps.pipeline.models``).
+_MARKDOWN_FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```$", re.DOTALL)
+
+
+def _strip_markdown_fence(raw: str) -> str:
+    """Unwrap a ```json ... ``` (or bare ``` ... ```) fence, if present."""
+    match = _MARKDOWN_FENCE_RE.match(raw.strip())
+    return match.group(1) if match else raw
+
+
 def parse_freetext_summary_by_group(raw: str) -> dict[str, str]:
     """Parse the B8 group-summary AI response into ``{group: text}``.
 
@@ -163,12 +179,13 @@ def parse_freetext_summary_by_group(raw: str) -> dict[str, str]:
     ``apps.pipeline.report_publishing.publish_daily_report`` treats a
     missing/blank group exactly like a failed call for that group alone
     (leaves the corresponding field untouched on a re-ingest, blank on a new
-    page), never as a reason to reject the whole response.
+    page), never as a reason to reject the whole response. Also tolerates a
+    markdown code fence around the JSON — see :func:`_strip_markdown_fence`.
     """
     if not raw:
         return {}
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(_strip_markdown_fence(raw))
     except (json.JSONDecodeError, ValueError):
         return {}
     if not isinstance(parsed, dict):

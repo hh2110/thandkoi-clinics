@@ -1538,6 +1538,20 @@ def test_parse_freetext_summary_by_group_falls_back_to_empty_on_malformed_input(
     assert freetext.parse_freetext_summary_by_group(non_string_value) == {}
 
 
+def test_parse_freetext_summary_by_group_tolerates_a_markdown_code_fence():
+    """Same real-world failure mode as `_parse_empty_columns_flag` (see its
+    2026-07-25 production-fix test): the sibling B9 call using the same
+    model and the same "no prose, no markdown" instruction came back
+    wrapped in a ```json fence 7/7 times in production. B8 shares the model
+    and the instruction style, so it gets the same tolerance pre-emptively
+    rather than waiting to observe the identical failure in production."""
+    fenced = '```json\n{"male_adults": "M draft.", "children": "C draft."}\n```'
+    assert freetext.parse_freetext_summary_by_group(fenced) == {
+        "male_adults": "M draft.",
+        "children": "C draft.",
+    }
+
+
 def test_freetext_summary_payload_contains_only_freetext_columns(
     home_page, mock_anthropic_client
 ):
@@ -2188,6 +2202,38 @@ def test_parse_empty_columns_flag_falls_back_to_empty_list_on_malformed_data():
         "Investigation",
         "Plan",
     ]
+
+
+def test_parse_empty_columns_flag_tolerates_a_markdown_code_fence():
+    """Found in production 2026-07-25: every sampled `empty_columns_flag`
+    (7/7 checked, real `claude-haiku-4-5` responses) came back wrapped in a
+    ```json fence despite `_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT` saying "no
+    prose, no markdown" — the old strict `json.loads` raised on every one
+    of them, silently zeroing the widget on every live report page. These
+    two exact strings are real (redacted-safe, no patient data) production
+    values, single-line and pretty-printed."""
+    single_line = (
+        '```json\n["Diet & Drug Compliance", "Investigation", "Plan", '
+        '"Provisional Diagnosis"]\n```'
+    )
+    assert _parse_empty_columns_flag(single_line) == [
+        "Diet & Drug Compliance",
+        "Investigation",
+        "Plan",
+        "Provisional Diagnosis",
+    ]
+
+    pretty_printed = (
+        '```json\n[\n  "Diet & Drug Compliance",\n  "Investigation",\n  "Plan"\n]\n```'
+    )
+    assert _parse_empty_columns_flag(pretty_printed) == [
+        "Diet & Drug Compliance",
+        "Investigation",
+        "Plan",
+    ]
+
+    # Bare ``` fence (no "json" language tag) tolerated the same way.
+    assert _parse_empty_columns_flag('```\n["Plan"]\n```') == ["Plan"]
 
 
 def test_report_index_page_renders_intro_when_set(client, home_page):
