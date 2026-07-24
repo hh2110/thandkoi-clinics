@@ -57,6 +57,13 @@ inspectable script over an agent-driven one) does the whole runbook:
    second release the same day).
 5. Triggers the Deploy workflow for that tag and watches it to completion.
 6. Health-checks production (`/healthz`) with a few retries.
+7. Once the health check passes, publishes a [GitHub Release](https://github.com/hh2110/thandkoi-clinics/releases)
+   for the tag with auto-generated notes (added 2026-07-24) — skipped if a
+   Release for that tag already exists (the `--ref` rollback/redeploy path
+   targets a tag that was already released when it first shipped, and a
+   redeploy doesn't change the code, so that Release is left untouched). A
+   failure to publish the Release is a warning, not a script failure — the
+   deploy itself already succeeded by this point.
 
 > **2026-07-23 observed gap:** `/healthz: 200` confirms *a* healthy instance
 > is responding, not that *every* access path is already on the new build.
@@ -82,10 +89,6 @@ usage note.
 Tags are **lightweight and date-based** (`v2026.07.20`), not semver — a CMS
 website has no API consumers for "breaking change" semantics to describe; a tag
 just answers "when was this cut and what commit is it."
-
-Optionally, publish a [GitHub Release](https://github.com/hh2110/thandkoi-clinics/releases)
-from the tag with auto-generated notes — a free, human-readable "what shipped
-and when" log.
 
 Under the hood, this drives the Deploy workflow (`.github/workflows/deploy.yml`),
 which is `workflow_dispatch`-only and takes a **required `ref` input** — the
