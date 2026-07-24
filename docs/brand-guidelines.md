@@ -59,6 +59,20 @@ elsewhere on every page (site-footer's copyright line, and the page
 `<title>`/OG tags), so this doesn't remove the only on-page name text —
 it moves it out of the header specifically.
 
+2026-07-24 re-scope: the wordmark is back next to the mark in the header
+(maintainer request, comparing production against a reference screenshot).
+This doesn't reopen the theme-contrast problem above — that problem was
+specifically the wordmark's colour being a hard-coded literal hex with no
+dark-theme value, not the presence of a wordmark. The reinstated wordmark
+is rendered as real HTML text styled with the site's existing colour
+tokens (`--color-text-soft` / `--color-text` / `--color-brand` — see
+`.site-header__wordmark-line--*` in `static/css/components.css`), each of
+which already has its own dark-theme value in `tokens.css`, rather than
+image-baked or literal-hex text. The mark itself shrinks from 9.375rem to
+4.48rem alongside it (7rem first, then two more 20% trims after live
+follow-up looks), since it no longer needs to carry the full lockup's
+"~140px so the illustration stays legible" floor on its own.
+
 | File | Use |
 |---|---|
 | [`brand/logo-dark.png`](../brand/logo-dark.png) | Dark theme. A crop of `logo-reversed.png` with the wordmark rows removed — the same approved illustration, just less of the canvas. |

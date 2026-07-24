@@ -50,30 +50,64 @@
 }
 
 .site-header__logo {
-  /* Sized up from the old 2.5rem per maintainer feedback ("tiny").
-     .site-header__bar's padding-block (--space-2, 1rem) grows the bar to
-     accommodate rather than the logo overflowing the bar's edges.
+  /* Plan 11 D11 / 2026-07-23 re-scope (see header.html's comment for the
+     full history): header.html renders both logo-light.svg (`--light`)
+     and logo-dark.png (`--dark`) as two always-in-DOM <img>s, and the
+     rules below toggle which one is `display`ed via the same
+     :root[data-theme] / prefers-color-scheme cascade the rest of the site
+     uses for colour — no JS, no FOUC. The two lockups have different
+     intrinsic ratios (logo-light.svg ~1.07, logo-dark.png ~1.24 — see
+     header.html's comment for why), so sizing by a shared width rather
+     than height is what keeps them the same visual size. height:auto lets
+     each <img>'s width/height attributes drive its own ratio so the
+     browser doesn't distort either image.
 
-     Plan 11 D11 / 2026-07-23 re-scope (see header.html's comment for the
-     full history, including why the header now uses a mark-only lockup —
-     no wordmark — rather than the full mark + wordmark lockup
-     docs/brand-guidelines.md originally specified for header/footer/print;
-     that doc has been updated to match): header.html renders both
-     logo-light.svg (`--light`) and logo-dark.png (`--dark`) as two
-     always-in-DOM <img>s, and the rules below toggle which one is
-     `display`ed via the same :root[data-theme] / prefers-color-scheme
-     cascade the rest of the site uses for colour — no JS, no FOUC.
-     The two lockups have different intrinsic ratios (logo-light.svg
-     ~1.07, logo-dark.png ~1.24 — see header.html's comment for why), so
-     sizing by a shared width rather than height is what keeps them the
-     same visual size. width:9.375rem (150px) clears brand-guidelines.md's
-     "~140px wide... so the illustration stays legible" floor directly
-     (the rendered heights differ — ~140px for the light lockup, ~121px
-     for the dark one — but the width both are judged legible at is the
-     same). height:auto lets each <img>'s width/height attributes drive
-     its own ratio so the browser doesn't distort either image. */
-  width: 9.375rem;
+     2026-07-24 re-scope: shrunk from 9.375rem to 7rem — with the wordmark
+     back next to it (below), the mark reads as an icon alongside a name
+     rather than needing to carry the name-legibility floor on its own, so
+     brand-guidelines.md's "~140px... full lockup" minimum no longer
+     applies to this mark-only image by itself. Sized against a maintainer-
+     supplied reference screenshot of the target lockup, not a guess.
+     Trimmed a further 20% same day (maintainer follow-up, after viewing it
+     live) to 5.6rem, then another 20% to 4.48rem after a second look. */
+  width: 4.48rem;
   height: auto;
+}
+
+/* Wordmark ("THE / THANDKOI / CLINICS" text stack) reinstated 2026-07-24
+   next to the mark — see header.html's comment for why this is safe to
+   bring back where the 2026-07-23 attempt wasn't: every line below reads
+   a colour token with its own dark-theme value (tokens.css), never a
+   literal hex, so there's nothing to go invisible on a theme switch. */
+.site-header__wordmark {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.site-header__wordmark-line {
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+}
+
+.site-header__wordmark-line--eyebrow {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--color-text-soft);
+}
+
+.site-header__wordmark-line--name {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.site-header__wordmark-line--sub {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--color-brand);
 }
 
 /* Default (light): show light lockup, hide reversed. */
