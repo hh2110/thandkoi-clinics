@@ -498,6 +498,108 @@ as D12 below.
       - Mobile responsive: stacked column below 56rem (this file's existing
         mobile-first convention), not the handoff's own 860px breakpoint.
 
+- [ ] **D14 (round 4, 2026-07-24).** Newsletter redesign — recreate "The
+      Thandkoi Beacon" issue page + archive tile from a maintainer-supplied
+      design handoff (`~/Downloads/newsletter.zip` →
+      `design_handoff_newsletter/`, see its own README). Answers open
+      question #3 ("How do I upload a newsletter?") by splitting it in two:
+      build the redesign as code once, then every issue after that —
+      including the first — is content-only (Wagtail admin or agent-driven
+      SSH per `docs/content-operations.md`), no branch/PR per issue.
+
+      **Grounding — confirmed against the real code before building.**
+      `NewsletterPage.body` (Plan 06) today only has `paragraph`
+      (`RichTextBlock`) and `photo` (`ConsentedImageBlock`). Plan 09's AI
+      monthly-drafting flow (`apps/pipeline/newsletter_drafting.py`) only
+      ever writes those two block types, so adding new block types alongside
+      them is additive and doesn't touch that code path. Two existing Plan
+      11 D12/D13 partials already match the handoff's shapes exactly:
+      `templates/partials/sections/stat_band.html` is already the
+      "title-left + up to 3 stat cards" layout the handoff's `.nl-stats`
+      wants (built for Home's live impact band, but it's just a
+      `{stats, heading, updated_caption, section_modifier}` context — no
+      code changes needed there), and `.feature-split`/`.stat__value`/
+      `.stat__label` (`static/css/layout.css`) already give the "In focus"
+      photo+text+pull-stat shape.
+
+      **Decision — Option A (handoff's own recommendation): fixed masthead,
+      structured content blocks, no new model.** "The Thandkoi Beacon" /
+      "چراغِ شفا" masthead text is a fixed template string (not a model
+      field) — this repo runs one newsletter series, so Option B's
+      per-issue-editable series name/logo fields would be speculative. Added
+      to `NewsletterPage`: an optional `issue_label` CharField (e.g.
+      "Inaugural Issue") shown after the formatted issue date in the
+      masthead meta line. Added to `body`'s block list: `stat_band`
+      (wraps `stat_band.html`, capped `max_num: 1` via `block_counts`,
+      mirroring how `HomePage` caps `circle_of_care`), `highlights` (a
+      heading + a list of short rich-text items, bold-only, rendered with
+      the coral medical-cross bullet), and `feature_split` (heading +
+      rich text + a `ConsentedImageBlock` photo + optional reverse flag +
+      up to 2 pull-stats) for the "In focus" sections — the handoff called
+      this last one optional ("just paragraph + photo blocks... optionally
+      add a feature_split block for the exact look"); built it since the
+      pull-stats and 4:3 photo treatment aren't reachable from bare
+      paragraph/photo blocks.
+
+      **Deliberate simplification — the masthead meta line's date, not a
+      free-text override.** The handoff's example reads "MAY–JUNE 2026 ·
+      INAUGURAL ISSUE", but `issue_date` is a single `DateField` (Plan 06),
+      not a range. Rather than adding a second date field or an
+      unstructured override string, the meta line derives from
+      `issue_date|date:"F Y"` (e.g. "MAY 2026") plus the optional
+      `issue_label`. For this first issue specifically, `issue_date` is set
+      to the issue's later month so the meta line reads "JUNE 2026 ·
+      INAUGURAL ISSUE" — a one-month label standing in for the PDF's
+      two-month range. Not a fidelity requirement (the handoff's fidelity
+      note is about colours/type/spacing/layout, not about supporting
+      arbitrary date-range strings); revisit only if a future issue
+      actually needs a stated range.
+
+      **Precedent map.**
+
+      | Element | Precedent |
+      |---|---|
+      | Impact stat band | `templates/partials/sections/stat_band.html` (Plan 11 D13) — reused via context, no new markup |
+      | "In focus" photo+text+stat | `.feature-split`/`.stat__value`/`.stat__label` (`static/css/layout.css`, Plan 03.5/D12) |
+      | New StreamField blocks, `{% include %}`-to-partial block templates | `HeroBlock`/`CircleOfCareBlock` (`apps/core/blocks.py`, Plan 04) |
+      | `block_counts` capping a block to one per page | `HomePage`'s `circle_of_care` cap (`apps/core/models.py`) |
+      | Archive tile restyle (`.newsletter-card`) | `.card--interactive` (`static/css/components.css`) for the hover-lift convention, adapted per the handoff's own reference markup |
+      | New page-scoped stylesheet | `static/css/daily-report.css`/`hero-lockup.css`, linked sitewide in `base.html` (no per-page `{% block %}` exists yet) |
+
+      **Feature flag: none** — same reasoning as every Track D content/design
+      change: Wagtail's own draft/publish gate is the only gate that
+      matters, and this is a template/model redesign of an existing content
+      type, not a new user-facing surface.
+
+      **Content entry (post-merge, not part of this PR):** the first real
+      issue — May–June 2026, "A new chapter begins" — gets entered via the
+      agent-driven SSH path (`docs/content-operations.md`), using the
+      handoff's own copy/figures/photos as the source, once this branch is
+      merged and deployed.
+
+      **Follow-up handoff, same day (`~/Downloads/update.zip` →
+      `design_handoff_newsletter_update/`).** A delta on the masthead only,
+      applied on top of the above before this branch's PR opened: adds a
+      "beacon of light" (lit clay diya) photo as a rounded corner card
+      (`.nl-masthead__beacon`, top-right, `inset-inline-end` so it flips
+      correctly under RTL) and moves the Urdu motif from beside the title to
+      directly below it. Per the handoff's own recommendation, the photo is
+      a **fixed series asset** (`static/images/newsletter-beacon.png`,
+      referenced with `{% static %}`), not a per-issue `ConsentedImageBlock`
+      field — same reasoning as the masthead text itself (Option A: series
+      identity is fixed, not per-issue editorial content), and it shows no
+      identifiable person so the consent gate doesn't apply. Also swaps in a
+      replacement inauguration photo (the original crop cut off one of the
+      three men) — a content-entry detail for the SSH step above, not a code
+      change.
+
+      **Open item, not resolved by this PR:** the handoff's own README flags
+      `photo-beacon.png` as "appears to be a stock photo... confirm you have
+      a licence before production." Committed to the branch as-is (it's the
+      maintainer's own supplied asset) but flagged here and in the PR
+      description — needs a maintainer licence confirmation before this
+      branch is taken out of draft/merged to production.
+
 ### Track E — Process & tooling
 
 - [x] **E1.** A repo skill that lets the maintainer request a website change and

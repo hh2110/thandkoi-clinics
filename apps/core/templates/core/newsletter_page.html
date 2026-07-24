@@ -1,26 +1,58 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags i18n %}
+{% load wagtailcore_tags static i18n %}
 {% comment %}
-One newsletter issue — Plan 06. The body composes rich-text paragraphs and
-consent-gated photos in sequence (ConsentedImageBlock, reused from Plan 04);
-consent is already enforced at save time by that block's own `clean()`, so
-this template only ever renders images that passed that gate.
+One newsletter issue — Plan 06, redesigned Plan 11 D14 ("The Thandkoi
+Beacon", from a maintainer design handoff, updated by a follow-up handoff
+adding the masthead's "beacon of light" corner photo). The masthead's "The
+Thandkoi Beacon"/"چراغِ شفا" is the fixed series identity (Option A, D14's
+decision note) and doubles as the page's one <h1>; the issue's own title
+(`page.title`) still appears in <title>/og:title (base.html) and the
+archive tile, matching the handoff's own reference markup. The lede
+(page.summary) and body loop (impact stat band, highlights, "In focus"
+splits, and any legacy paragraph/photo blocks) sit below it.
+
+The beacon photo is a fixed series asset (static/images/newsletter-beacon.png),
+not per-issue editorial content — same reasoning as the masthead text itself
+being a fixed template string rather than a model field (D14's Option A).
 {% endcomment %}
 
 {% block content %}
-  <section class="section">
-    <div class="wrapper prose">
-      <p class="eyebrow">{{ page.issue_date }}</p>
-      <h1>{{ page.title }}</h1>
-      {% if page.summary %}<p class="intro">{{ page.summary }}</p>{% endif %}
+  <header class="nl-masthead">
+    <div class="wrapper">
+      <div class="nl-masthead__main">
+        <p class="eyebrow">{% translate "The Thandkoi Clinics · Newsletter" %}</p>
+        <h1 class="nl-masthead__title">{% translate "The Thandkoi" %}<br>{% translate "Beacon" %}</h1>
+        <p class="nl-masthead__urdu" dir="rtl" lang="ur">چراغِ شفا</p>
+        <div class="nl-masthead__meta">
+          <span class="nl-masthead__rule" aria-hidden="true"></span>
+          <span class="nl-masthead__meta-text">
+            {{ page.issue_date|date:"F Y"|upper }}{% if page.issue_label %} · {{ page.issue_label|upper }}{% endif %}
+          </span>
+        </div>
+      </div>
+      <figure class="nl-masthead__beacon">
+        <img src="{% static 'images/newsletter-beacon.png' %}" alt="{% translate 'A lit clay diya — a beacon of light' %}">
+      </figure>
     </div>
-  </section>
+  </header>
 
-  <section class="section">
-    <div class="wrapper prose">
-      {% for block in page.body %}
-        {% include_block block %}
-      {% endfor %}
-    </div>
-  </section>
+  {% if page.summary %}
+    <section class="section section--snug">
+      <div class="wrapper">
+        <p class="nl-lede">{{ page.summary }}</p>
+      </div>
+    </section>
+  {% endif %}
+
+  {% for section in page.get_body_sections %}
+    {% if section.type == "prose" %}
+      <section class="section section--snug">
+        <div class="wrapper prose">
+          {% for block in section.blocks %}{% include_block block %}{% endfor %}
+        </div>
+      </section>
+    {% else %}
+      {% for block in section.blocks %}{% include_block block %}{% endfor %}
+    {% endif %}
+  {% endfor %}
 {% endblock %}

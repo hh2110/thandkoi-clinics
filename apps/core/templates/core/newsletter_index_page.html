@@ -1,25 +1,28 @@
 {% extends "base.html" %}
-{% load wagtailcore_tags i18n %}
+{% load wagtailcore_tags wagtailimages_tags i18n %}
 {% comment %}
-Newsletter archive — Plan 06. Wagtail's standard index + child-page pattern
-(new to this repo; grounded against Wagtail's own idiom, no in-repo precedent
-existed before this plan). Lists only published issues, newest first — drafts
-stay invisible (NewsletterIndexPage.get_newsletters queries `.live()`).
-Paginated so a growing archive doesn't turn into one long list.
+Newsletter archive — Plan 06, tile restyled Plan 11 D14 ("The Thandkoi
+Beacon"). Wagtail's standard index + child-page pattern (Plan 06; no in-repo
+precedent existed before it, grounded against Wagtail's own idiom). Lists
+only published issues, newest first — drafts stay invisible
+(NewsletterIndexPage.get_newsletters queries `.live()`). Paginated so a
+growing archive doesn't turn into one long list.
 
-Newsletter branding (Plan 11 D4): a clay-lamp ("chiragh") motif marks this as
-the newsletter masthead. No asset exists yet (maintainer-confirmed, no image
-files provided), so it shows the shared media placeholder for now — same
-"placeholder only, no logo files yet" pattern as the Donors & Partners page
-(`core/donors_partners_page.html`), not a bespoke one.
+Each tile carries the Beacon masthead strip (series identity) regardless of
+content, an optional 16:9 thumbnail (the issue's first `feature_split` or
+legacy `photo` block with a consent-confirmed image — omitted entirely when
+none exists, per the handoff's own "strip carries the identity alone"
+fallback), and the date/title/summary body pinned to a uniform tile height.
+
+The Plan 11 D4 "chiragh motif" placeholder (no asset yet) is dropped here:
+D14's masthead strip is now the newsletter series' own visual identity, so
+the pending-asset placeholder above the intro would have duplicated it.
 {% endcomment %}
 
 {% block content %}
   <section class="section">
     <div class="wrapper prose">
-      <div style="max-width: 9rem; margin-block-end: var(--space-3);">
-        {% include "partials/sections/_media_placeholder.html" with caption=_("Chiragh motif — asset pending") ratio="1 / 1" %}
-      </div>
+      <p class="eyebrow">{% translate "The Thandkoi Clinics" %}</p>
       <h1>{{ page.title }}</h1>
       {% if page.intro %}<div class="intro">{{ page.intro|richtext }}</div>{% endif %}
     </div>
@@ -29,11 +32,28 @@ files provided), so it shows the shared media placeholder for now — same
     <div class="wrapper">
       <div class="card-grid card-grid--3">
         {% for newsletter in newsletters %}
-          <article class="card card--interactive">
-            <p class="eyebrow">{{ newsletter.issue_date }}</p>
-            <h3 class="card__title"><a href="{{ newsletter.url }}">{{ newsletter.title }}</a></h3>
-            {% if newsletter.summary %}<p class="card__body">{{ newsletter.summary }}</p>{% endif %}
-          </article>
+          {% with thumb=newsletter.get_thumbnail %}
+            <article class="newsletter-card">
+              <a class="newsletter-card__link" href="{{ newsletter.url }}">
+                <div class="newsletter-card__masthead">
+                  <p class="newsletter-card__series">{% translate "The Thandkoi Beacon" %}</p>
+                  <p class="newsletter-card__urdu" dir="rtl" lang="ur">چراغِ شفا</p>
+                </div>
+                {% if thumb %}
+                  <div class="newsletter-card__thumb">
+                    {% image thumb.image fill-640x360 as thumb_rendition %}
+                    <img src="{{ thumb_rendition.url }}" alt="{{ thumb.alt_text|default:thumb.image.title }}" />
+                  </div>
+                {% endif %}
+                <div class="newsletter-card__body">
+                  <p class="newsletter-card__date">{{ newsletter.issue_date|date:"F Y"|upper }}</p>
+                  <h2 class="newsletter-card__title">{{ newsletter.title }}</h2>
+                  {% if newsletter.summary %}<p class="newsletter-card__summary">{{ newsletter.summary }}</p>{% endif %}
+                  <span class="newsletter-card__read">{% translate "Read the issue →" %}</span>
+                </div>
+              </a>
+            </article>
+          {% endwith %}
         {% empty %}
           <p class="card-grid__empty text-faint">{% translate "Newsletters coming soon." %}</p>
         {% endfor %}

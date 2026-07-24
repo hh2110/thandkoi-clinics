@@ -1,0 +1,27 @@
+{% load wagtailcore_tags %}
+{% comment %}
+NewsletterHighlightsBlock → a short "highlights this issue" list with a
+coral medical-cross bullet per item (brand-guidelines.md §2's cross/heart
+motif, the only sanctioned coral use outside the masthead rule). `value.items`
+is a list of RichTextBlock values (bold-only) so an editor can bold the lead
+phrase inline rather than the block splitting "lead" and "detail" into two
+fields for no real benefit.
+{% endcomment %}
+<section class="section section--snug">
+  <div class="wrapper">
+    <div class="nl-highlights">
+      {% if value.heading %}<p class="eyebrow">{{ value.heading }}</p>{% endif %}
+      <ul class="nl-highlights__list">
+        {% for item in value.items %}
+          <li class="nl-highlights__item">
+            <svg class="nl-highlights__cross" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="9.5" y="3" width="5" height="18" rx="1.5" fill="var(--color-coral)" />
+              <rect x="3" y="9.5" width="18" height="5" rx="1.5" fill="var(--color-coral)" />
+            </svg>
+            {{ item|richtext }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>

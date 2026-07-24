@@ -191,3 +191,95 @@ class ConsentedImageBlock(blocks.StructBlock):
         icon = "image"
         label = "Photo (consent required)"
         template = "blocks/consented_image_block.html"
+
+
+# --- Plan 11 D14: Newsletter redesign ("The Thandkoi Beacon") ---------------
+
+
+class NewsletterStatBlock(blocks.StructBlock):
+    """One card in a newsletter issue's impact-stat band."""
+
+    value = blocks.CharBlock(max_length=16, help_text='e.g. "763" or "64%"')
+    label = blocks.CharBlock(max_length=90)
+
+    class Meta:
+        icon = "chart-line"
+        label = "Stat"
+
+
+class NewsletterStatBandBlock(blocks.StructBlock):
+    """The issue's impact numbers, at a glance.
+
+    Renders through the same ``stat_band.html`` partial Home's live impact
+    band uses (Plan 11 D13) — here fed CMS-entered per-issue figures rather
+    than a live ``DailyAggregate`` query, since a past issue's numbers are a
+    fixed historical snapshot, not something to recompute on every render.
+    """
+
+    heading = blocks.CharBlock(default="Our impact, at a glance", max_length=120)
+    updated = blocks.CharBlock(
+        required=False, max_length=60, help_text='e.g. "May–June 2026"'
+    )
+    stats = blocks.ListBlock(NewsletterStatBlock(), max_num=3)
+
+    class Meta:
+        icon = "table"
+        label = "Impact stat band"
+        template = "blocks/newsletter_stat_band_block.html"
+
+
+class NewsletterHighlightsBlock(blocks.StructBlock):
+    """A short bulleted "highlights this issue" list, coral cross bullets."""
+
+    heading = blocks.CharBlock(default="Highlights this issue", max_length=90)
+    items = blocks.ListBlock(
+        blocks.RichTextBlock(
+            features=["bold"], help_text="Keep it to a sentence; bold the lead phrase."
+        ),
+        max_num=6,
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = "Highlights"
+        template = "blocks/newsletter_highlights_block.html"
+
+
+class NewsletterPullStatBlock(blocks.StructBlock):
+    """A small inline stat beside an "In focus" split's body text."""
+
+    value = blocks.CharBlock(max_length=16)
+    label = blocks.CharBlock(max_length=90)
+
+    class Meta:
+        icon = "chart-line"
+        label = "Pull stat"
+
+
+class NewsletterFeatureSplitBlock(blocks.StructBlock):
+    """An "In focus" photo + text split — the redesign's story sections.
+
+    Distinct from ``partials/sections/feature_split.html`` (which a page
+    template calls directly with context vars, and wraps its own
+    ``<section>``): this is a StreamField block an editor repeats, so its own
+    template renders standalone, matching how ``HeroBlock``/``CircleOfCareBlock``
+    each render a full section from block data.
+    """
+
+    eyebrow = blocks.CharBlock(
+        required=False,
+        max_length=60,
+        help_text='Optional, e.g. "In focus" — set on the first split only if wanted.',
+    )
+    heading = blocks.CharBlock(max_length=90)
+    text = blocks.RichTextBlock(features=["bold", "italic", "link"])
+    photo = ConsentedImageBlock()
+    reverse = blocks.BooleanBlock(
+        required=False, help_text="Show the photo on the right instead of the left."
+    )
+    pull_stats = blocks.ListBlock(NewsletterPullStatBlock(), max_num=2)
+
+    class Meta:
+        icon = "image"
+        label = "In-focus split"
+        template = "blocks/newsletter_feature_split_block.html"

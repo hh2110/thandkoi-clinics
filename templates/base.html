@@ -77,6 +77,13 @@
     block, since no page-scoped CSS block exists yet in this base.
     {% endcomment %}
     <link rel="stylesheet" href="{% static 'css/hero-lockup.css' %}" />
+    {% comment %}
+    Newsletter redesign, "The Thandkoi Beacon" (Plan 11 D14) — reads
+    tokens.css only. Sitewide like daily-report.css/hero-lockup.css rather
+    than a per-page block, since no page-scoped CSS block exists yet in this
+    base.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/newsletter.css' %}" />
     {% block extra_head %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">
