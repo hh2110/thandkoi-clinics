@@ -176,6 +176,13 @@ Production secrets live in two places, never in the repo:
 > will fail to boot until they are set. Create the R2 bucket and set them
 > **before** the next deploy — see the Plan 10 first-time-setup steps.
 
+`UMAMI_WEBSITE_ID` ([Plan 12](../.claude/plans/12-observability.md) Track B)
+is set in the Render dashboard too, but isn't a secret — it's a public value
+that ships in every page's HTML source regardless, so unlike the vars above
+it doesn't need Render's secret handling. It's blank by default, and
+`base.html` renders no analytics script at all until it's set — the app boots
+and behaves identically either way.
+
 ## First-time setup (manual, one-off)
 
 These require account/billing access and are done by the maintainer:

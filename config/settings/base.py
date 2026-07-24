@@ -113,6 +113,9 @@ TEMPLATES = [
                 # The footer and Contact page read the shared setting from here,
                 # so editing it in /admin/ updates both with no redeploy.
                 "wagtail.contrib.settings.context_processors.settings",
+                # Exposes UMAMI_WEBSITE_ID (Plan 12 Track B) to every template —
+                # base.html's analytics script tag reads it directly.
+                "apps.core.context_processors.analytics",
             ],
         },
     },
@@ -206,6 +209,14 @@ WAGTAILADMIN_BASE_URL = env("WAGTAILADMIN_BASE_URL", default="http://localhost:8
 
 # Restrict document file types to a safe set (no Excel exports, ever).
 WAGTAILDOCS_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "gif", "webp"]
+
+# --- Traffic analytics (Plan 12 Track B) ------------------------------------
+# Umami Cloud website ID. Blank by default — with no value set, base.html
+# renders no script tag at all, so a fresh checkout, local dev, and CI behave
+# identically to before this existed. This is a public, non-sensitive value
+# (it ships in every page's HTML source either way), unlike SENTRY_DSN, so it
+# doesn't need Render's secret handling — a plain env var is enough.
+UMAMI_WEBSITE_ID = env("UMAMI_WEBSITE_ID", default="")
 
 # --- Org contact / bank / socials ------------------------------------------
 # "Contact and bank details are configured in the running application, not
