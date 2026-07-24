@@ -57,7 +57,23 @@
     <link rel="icon" href="{% static 'favicons/favicon-32.png' %}" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="{% static 'favicons/favicon-180.png' %}" />
     <link rel="icon" href="{% static 'favicons/favicon-512.png' %}" sizes="512x512" type="image/png" />
-    {# No analytics or third-party scripts by default (privacy invariant). #}
+    {% comment %}
+    Traffic analytics (Plan 12 Track B, 2026-07-24) — a deliberate, recorded
+    reversal of this project's original "no analytics by default" guardrail
+    (see Plan 01's dated addendum). Umami Cloud was chosen specifically
+    because it's cookieless and aggregate-only — no visitor is ever
+    identified, matching the same shape CLAUDE.md requires of clinic data
+    elsewhere. Renders nothing at all when UMAMI_WEBSITE_ID is unset (local
+    dev, CI, and any deploy before the maintainer registers a site), so this
+    can never become a new way for the page to break.
+    {% endcomment %}
+    {% if UMAMI_WEBSITE_ID %}
+    <script
+      defer
+      src="https://cloud.umami.is/script.js"
+      data-website-id="{{ UMAMI_WEBSITE_ID }}"
+    ></script>
+    {% endif %}
     <link rel="stylesheet" href="{% static 'css/tokens.css' %}" />
     <link rel="stylesheet" href="{% static 'css/fonts.css' %}" />
     <link rel="stylesheet" href="{% static 'css/base.css' %}" />
