@@ -19,6 +19,7 @@ is an audit trail only — who/when/parser/row-count/content-hash, never data.
 from __future__ import annotations
 
 import json
+import re
 from datetime import timedelta
 
 from django.conf import settings
@@ -32,6 +33,25 @@ from wagtail.models import Page
 from apps.core.models import CampReportIndexPage, paginate_archive
 from apps.pipeline.ai_pricing import compute_cost_usd
 
+#: Matches a response wrapped in a markdown code fence, with or without a
+#: leading language tag (` ```json ` or bare ` ``` `) — group(1) is the
+#: fenced content. Found in production 2026-07-25: every sampled
+#: ``empty_columns_flag`` (7/7 checked) was stored as
+#: ``'```json\n[...]\n```'`` even though ``_EMPTY_COLUMNS_FLAG_SYSTEM_PROMPT``
+#: explicitly says "no prose, no markdown" — real ``claude-haiku-4-5``
+#: responses to a "respond with JSON only" instruction routinely add the
+#: fence anyway. Duplicated in ``apps.pipeline.freetext``'s
+#: ``_strip_markdown_fence`` (same few lines) rather than shared, to avoid a
+#: models.py <-> freetext.py import cycle (freetext.py already imports
+#: ``DeidentifiedVisit`` from here).
+_MARKDOWN_FENCE_RE = re.compile(r"^```(?:json)?\s*\n?(.*?)\n?```$", re.DOTALL)
+
+
+def _strip_markdown_fence(raw: str) -> str:
+    """Unwrap a ```json ... ``` (or bare ``` ... ```) fence, if present."""
+    match = _MARKDOWN_FENCE_RE.match(raw.strip())
+    return match.group(1) if match else raw
+
 
 def _parse_empty_columns_flag(raw: str) -> list[str]:
     """Parse ``DailyReportPage.empty_columns_flag`` into a list of column names.
@@ -42,11 +62,16 @@ def _parse_empty_columns_flag(raw: str) -> list[str]:
     (no chips render) for a blank field or anything that isn't a JSON array
     of strings, rather than raising — this includes pre-B12 pages whose
     field still holds the old free-form sentence, until they're republished.
+
+    Tolerates a markdown code fence around the JSON (see
+    :func:`_strip_markdown_fence`'s docstring — found in production
+    2026-07-25: every real response came back fenced despite the prompt
+    saying not to, which silently zeroed this widget on every page).
     """
     if not raw:
         return []
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(_strip_markdown_fence(raw))
     except (json.JSONDecodeError, ValueError):
         return []
     if not isinstance(parsed, list):
