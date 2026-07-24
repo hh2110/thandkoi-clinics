@@ -1,6 +1,6 @@
 # Thandkoi Clinics — Brand Guidelines
 
-_Last updated: 2026-07-23 · Status: draft for sign-off_
+_Last updated: 2026-07-24 · Status: draft for sign-off_
 
 These guidelines define the visual identity for the website and all digital
 material. **The logo is the authority** — all colours below are sampled from the
@@ -10,9 +10,10 @@ official logo (see [`brand/`](../brand/)).
 > pine-teal + mint + amber as general brand colours. The logo corrects this: the
 > brand is a **mid teal-cyan** with a **coral-red** accent (cross/heart motif
 > only) and a **pale-aqua** secondary. This document is now aligned to the logo.
-> Amber reappears once, deliberately, as the Donate button colour (§2) — coral
-> read as alarming for a donation ask; it is not a return to the earlier
-> inferred palette.
+> Amber reappears deliberately, as the Donate button colour and a short named
+> list of homepage highlights (§2, widened 2026-07-24) — coral read as
+> alarming for a donation ask; it is not a return to the earlier inferred
+> palette.
 
 ## 1. Logo
 
@@ -112,7 +113,7 @@ All values sampled from `brand/logo-primary.jpg`.
 | Coral Deep | `#D83A30` | Coral fills / hover, where coral is used decoratively |
 | Peach | `#F0B878` | Illustration warmth; optional soft wash. Decorative only |
 
-### Accent — amber (Donate call-to-action)
+### Accent — amber (Donate call-to-action, plus scoped highlights)
 
 Coral read as alarming/negative for a donation ask, so Donate gets its own warm,
 welcoming accent instead — coral stays reserved for the cross/heart motif.
@@ -121,6 +122,16 @@ welcoming accent instead — coral stays reserved for the cross/heart motif.
 |---|---|---|
 | Amber (light) | `#CE8A2C` | **Primary Donate CTA** on light backgrounds |
 | Amber (dark) | `#E8B04A` | **Primary Donate CTA** on dark backgrounds — lighter for contrast |
+
+> **2026-07-24 (Plan 11 D12):** widened from Donate-only to a short, named
+> list of homepage highlights (source: maintainer-supplied handoff
+> `home-page-redesign.zip`, "Accent-color consistency"): the hero's "100%"
+> donor-funded chip figure (was teal-on-`--color-surface` in dark mode,
+> near-invisible — a genuine contrast bug, not just preference), the
+> daily-report teaser's lead stat ("Patients seen"), and its "Read the full
+> report →" link. Everything else (other stat figures, nav, eyebrows) stays
+> teal — this is still a scoped exception, just a longer list than one. See
+> §7's updated Do/Don't.
 
 ### Neutrals — light theme (cyan-teal biased, so they read as chosen)
 
@@ -146,8 +157,22 @@ still reads as this brand and not a default inverted theme.
 | Ink Soft Dark | `#ABB4B6` | Secondary text on dark | Lightened **Ink Soft** |
 | Ink Faint Dark | `#9EA0A1` | Captions, meta on dark | Lightened **Ink Faint** |
 | Border Dark | `#195A67` | Hairlines, card edges on dark | Lightened + desaturated **Teal Deep** |
-| Page Dark | `#0A3E48` | Page background (dark) | Reuses **Teal Deep** — the same colour already used for the footer, so dark mode and the footer are visually one family |
+| Page Dark | `#0A3E48` | Page background (dark) | Reuses **Teal Deep** |
+| Raised Dark | `#0B4753` | Full-bleed tinted bands (dark) — stat band, daily-report band | Between Page Dark and Card Dark |
 | Card Dark | `#0D4F5C` | Cards, panels (dark) | Slightly lightened **Teal Deep**, for elevation contrast against Page Dark |
+| Footer Dark | `#082D35` | Footer background (dark) | Darkened **Teal Deep** |
+
+> **2026-07-24 (Plan 11 D12):** Page Dark, Raised Dark, and Card Dark were
+> flat — `--color-accent-soft-bg` (Raised) resolved to the *same* value as
+> Page Dark, so every "raised" band sat flush with the page background (the
+> "everything collapses to one flat teal" bug the maintainer reported).
+> Raised Dark is a new, genuinely-distinct value so the ladder (Footer <
+> Page < Raised < Card) is monotonic. Footer Dark also used to reuse Page
+> Dark outright ("the footer is visually one family" with the page,
+> previous wording of this row) — now strictly darker, so the footer reads
+> as the page's deepest anchor in dark mode too, matching what light mode
+> already did (Footer `#0F3038` vs. Page `#F2F6F6`). Source: maintainer-
+> supplied handoff `home-page-redesign.zip`.
 
 Accent colours carry over largely as-is: Teal Brand, Pale Aqua, and Amber
 (dark) `#E8B04A` were already designed to sit on a dark ground. Coral stays
@@ -218,13 +243,15 @@ _Serif is optional for long-form editorial only; the default UI is sans._
 
 ## 7. Do / Don't
 
-- ✅ Anchor on Teal Brand; use Amber for the donate action, Coral only for the
-  cross/heart motif.
+- ✅ Anchor on Teal Brand; use Amber for the donate action and the short
+  named list of homepage highlights (§2), Coral only for the cross/heart
+  motif.
 - ✅ Let whitespace and type carry the page.
 - ✅ Give Urdu the same care as English (RTL, proper Nastaliq).
 - ❌ Don't reintroduce navy/mint — they aren't in the logo.
-- ❌ Don't use Amber anywhere except the Donate CTA — it's a deliberate, scoped
-  exception, not a general brand colour.
+- ❌ Don't use Amber beyond the Donate CTA and the §2 highlight list
+  (2026-07-24, Plan 11 D12) — it's still a deliberate, scoped exception, not
+  a general brand colour, just a longer list than one.
 - ❌ Don't use Coral, Pale Aqua, or Peach for small body text.
 - ❌ Don't add gradients, heavy shadows, or emoji as section markers.
 

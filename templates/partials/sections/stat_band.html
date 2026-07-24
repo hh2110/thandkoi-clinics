@@ -7,12 +7,14 @@ Context:
   stats            — a list of {value, label} dicts. Values are strings so the
                      caller controls formatting ("120/day", "36k+", "100%").
   caption          — optional small print under the row.
-  section_modifier — background modifier; defaults to "section--tinted".
+  section_modifier — background modifier; defaults to "section--tinted
+                     section--banded" (Plan 11 D12: full-bleed raised band
+                     with a top+bottom hairline).
 
 Numbers are inputs only — never baked in (they come from the CMS/pipeline).
 Empty state: with no stats it shows a "coming soon" line, not an empty band.
 {% endcomment %}
-<section class="section {{ section_modifier|default:'section--tinted' }} stat-band">
+<section class="section {{ section_modifier|default:'section--tinted section--banded' }} stat-band">
   <div class="wrapper">
     <div class="stat-band__grid">
       {% for stat in stats %}

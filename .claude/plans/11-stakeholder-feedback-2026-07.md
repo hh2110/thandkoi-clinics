@@ -27,6 +27,13 @@ theme) — not from the doc, but scoped into this plan as the same kind of
 small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
 "point-in-time capture, not re-read" rule as round 1.
 
+**Round 3 (2026-07-24 capture).** Same pattern as D11's logo handoff: the
+maintainer supplied another pre-built handoff bundle
+(`~/Downloads/home-page-redesign.zip`), this time a light+dark surface/theme
+system redesign for the home page (a `.dc.html` interactive prototype +
+README, not production code — see its own README for the full spec). Filed
+as D12 below.
+
 ## Milestones by track
 
 ### Track A — Data pipeline integrity (highest priority)
@@ -341,8 +348,80 @@ small maintainer-reported item. Filed as B10/B11 and D10/D11 below, same
       **Priority: P1** — accessibility/legibility bug, dark theme is a
       first-class supported mode on this site.
 
+- [x] **D12 (round 3, 2026-07-24).** Fix the home page's broken dark-mode
+      surface hierarchy and give the daily-report teaser its own raised band,
+      from a maintainer-supplied handoff (`~/Downloads/home-page-redesign.zip`
+      → `design_handoff_homepage_surfaces/`, see its own README).
+
+      **Grounding (Stage 3) — root cause confirmed against the real code
+      before changing anything (2026-07-24).** The handoff's complaint
+      ("every section collapses to the same mid-teal in dark mode") traced
+      to an exact bug in `static/css/tokens.css`: in dark mode,
+      `--color-accent-soft-bg` (the "raised" background `.section--tinted`
+      reads, e.g. the stat band) and `--color-footer-bg` were **both**
+      `var(--color-teal-deep)` — the *same value* as `--color-paper`, the
+      page background itself. So in dark mode the stat band and the footer
+      were pixel-identical to the body they sit on; only `--color-card`
+      (`.card`) was actually distinct. Confirmed by inspecting
+      `static/css/tokens.css`'s three theme blocks
+      (`:root`/`prefers-color-scheme: dark`/`[data-theme="dark"]`) side by
+      side, not by guessing from the screenshot alone.
+
+      **Decision — adopt the handoff's palette values, not just its layout
+      (maintainer-supplied handoff, treated as the design decision itself,
+      2026-07-24).** Two brand-guidelines.md decisions get superseded, both
+      recorded there with a dated note rather than silently overwritten:
+      1. §"Neutrals — dark theme" said Page Dark reuses Teal Deep "the same
+         colour already used for the footer, so dark mode and the footer
+         are visually one family" — deliberately reversed: the footer is now
+         a new, strictly-darker-than-Page-Dark value (`#082d35`) so it reads
+         as the page's deepest anchor (matching what light mode already did).
+      2. §7 said "Don't use Amber anywhere except the Donate CTA — it's a
+         deliberate, scoped exception" — widened per the handoff's own
+         "Accent-color consistency" section to also cover: the hero's "100%"
+         donor-funded chip figure (which was teal-on-`--color-surface` in
+         dark mode, near-invisible — a real contrast bug, not just a
+         preference), the daily-report teaser's lead stat ("Patients seen"),
+         and its "Read the full report →" link. Everything else (Zakat/
+         Regular figures, nav, eyebrows) stays teal.
+
+      **Implementation, not a straight copy of the prototype markup** (the
+      handoff's own README: "a design reference... not production code to
+      paste in"): `--color-accent-soft-bg` (dark) changed from
+      `var(--color-teal-deep)` to a new `#0b4753` — verified by relative-
+      luminance calculation to sit strictly between Page Dark (`#0a3e48`)
+      and Card Dark (`#0d4f5c`), so the elevation ladder (footer < base <
+      raised < card) is monotonic, not just "looks about right." New
+      `--color-accent` token (amber, decoupled from the Donate button's
+      `--color-donate-bg`/`-text` pairing) drives the three highlight spots
+      above. `feature_split.html` gained optional `section_modifier`,
+      `cta_accent`, `lead_stat_accent` params (default off, so every other
+      caller — the newsletter teaser, any future reuse — is unaffected);
+      the home page's report teaser is the only caller that sets them.
+      `circle_of_care.html`'s wheel is now wrapped in a new `.coc__panel`
+      (a `--card` surface, 20px radius) instead of floating on the bare
+      section background — the existing SVG-path wheel itself (three real
+      teal segments) was already a refinement of the prototype's simpler
+      conic-gradient hack and was left untouched. New `.section--banded`
+      modifier (hairline top+bottom border) applied to the stat band and
+      the new report band, and `.section--snug` (already existing, used by
+      the daily-report *page*) reused for the Quality of Care section and
+      the report band, rather than touching the sitewide `.section` default
+      — the handoff's "reduce large vertical gaps" ask was scoped to these
+      two home-page sections, not a sitewide rhythm change. No header green
+      strip was added (confirmed one doesn't exist in production, matching
+      the handoff's own "not in production, don't add" note).
+
+      **Not done:** the header/hero/footer layout and content stay as-is —
+      only the surface/colour system and the two spacing/framing tweaks
+      above changed, per the handoff's own scope note.
+
+      **Priority: P1** — the dark-mode flat-hierarchy bug is a real,
+      confirmed regression in a first-class supported theme, not cosmetic
+      polish.
+
   **Priority: P2** across the board for D1–D9 — visible polish and content,
-  not functional bugs. D10/D11 carry their own priorities above.
+  not functional bugs. D10/D11/D12 carry their own priorities above.
 
 ### Track E — Process & tooling
 
