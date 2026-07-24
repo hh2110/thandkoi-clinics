@@ -243,22 +243,6 @@ HOME_BODY = [
         },
     ),
     (
-        "impact_stats",
-        {
-            "caption": "Our impact so far",
-            # Plan 11 D2: manual "last updated" marker — bump this whenever the
-            # stats below are next updated by hand (not live-computed yet, see
-            # ImpactStatsBlock's docstring).
-            "as_of": "2026-07-23",
-            "stats": [
-                {"value": "467+", "label": "children treated to date"},
-                {"value": "189", "label": "patients served at the clinic"},
-                {"value": "426", "label": "welfare (free) patients served"},
-                {"value": "379", "label": "seen at our first free camp"},
-            ],
-        },
-    ),
-    (
         "donate_cta",
         {
             "heading": "Your Zakat keeps our doors open",

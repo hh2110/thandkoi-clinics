@@ -29,6 +29,13 @@ section--banded"), matching the live impact-stats band above, so it stops
 floating on bare page background — plus the amber lead-stat/link highlight
 (cta_accent, lead_stat_accent). The newsletter teaser below it is
 deliberately left plain — only the report section was in scope for this fix.
+
+2026-07-24 (Plan 11 D13): the live impact-stats band's caption is now a
+separate heading ("Our impact so far") + an optional "Updated <date>"
+subtitle, instead of one combined string — stat_band.html was redesigned
+from a centered number/label row into a title-left + stat-cards-right
+layout (maintainer-supplied handoff), and the two pieces render in
+different places in that layout.
 {% endcomment %}
 
 {% block content %}
@@ -36,12 +43,11 @@ deliberately left plain — only the report section was in scope for this fix.
     {% include_block block %}
   {% endfor %}
 
+  {% translate "Our impact so far" as live_impact_heading %}
   {% if live_impact_stats_as_of %}
-    {% blocktranslate asvar live_impact_caption with date=live_impact_stats_as_of|date:"d M Y" %}Our impact so far (updated at {{ date }}){% endblocktranslate %}
-  {% else %}
-    {% translate "Our impact so far" as live_impact_caption %}
+    {% blocktranslate asvar live_impact_updated with date=live_impact_stats_as_of|date:"d M Y" %}Updated {{ date }}{% endblocktranslate %}
   {% endif %}
-  {% include "partials/sections/stat_band.html" with stats=live_impact_stats caption=live_impact_caption %}
+  {% include "partials/sections/stat_band.html" with stats=live_impact_stats heading=live_impact_heading updated_caption=live_impact_updated %}
 
   {% for block in body_from_circle_of_care %}
     {% include_block block %}

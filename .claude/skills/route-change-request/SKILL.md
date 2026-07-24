@@ -55,11 +55,14 @@ checking is cheap.
 ## Examples
 
 **"Relabel 'Our impact so far' to include the as-of date."**
-Grep finds `ImpactStatBlock` (`apps/core/blocks.py`) is a `StructBlock` of
-hand-typed `CharBlock` fields, not a page field a draft revision could touch
-on its own — the heading text lives in a template. → **Code change**: edit
-the template, branch `feat/impact-label-date`, tests/lint, `code-review-tc`,
-draft PR.
+Grep finds `HomePage.get_live_impact_stats`/`get_live_impact_stats_as_of`
+(`apps/core/models.py`) compute the figures and date live from
+`DailyAggregate` — not a page field a draft revision could touch on its
+own, and the caption text itself lives in `home_page.html`. → **Code
+change**: edit the template, branch `feat/impact-label-date`, tests/lint,
+`code-review-tc`, draft PR. (Historical note: this used to be the
+hand-typed `ImpactStatsBlock` StreamField block — superseded by the live
+version in Plan 11 Track F2, then removed entirely in Plan 11 D13.)
 
 **"Add a new donor entry for the Ali family — they donated a water cooler."**
 Grep finds `DonorsPartnersPage` (`apps/core/models.py`) is a real Wagtail

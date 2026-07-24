@@ -194,17 +194,13 @@ by construction.
 - ~~Decide whether to retain the optional de-identified row-level table or
   keep aggregates only.~~ Decided — retain the de-identified row-level table
   (see §4).
-- **How is "Our impact so far" (Home page) actually calculated?** (Plan 11 D2,
-  answered 2026-07-23) — **it isn't computed at all.** The stat band is
-  `ImpactStatsBlock` (`apps/core/blocks.py`), a StreamField block whose
-  `value`/`label` pairs are hand-typed by an admin in Wagtail — there is no
-  query against `DailyAggregate` or any other pipeline data behind these
-  numbers today. The block's own docstring already flagged this as interim:
-  "Real figures are entered by hand for now; Plan 08's pipeline supplies
-  computed ones later." As of Plan 11 D2, the block also carries an `as_of`
-  date the admin sets by hand alongside the figures, rendered as "Our impact
-  so far (updated at <date>)" — still a manual marker, not a live one. Wiring
-  this up to a real, live aggregation across `DailyAggregate` rows (including
-  camp uploads) is captured as a **future idea, not yet built**: see
-  `.claude/plans/11-stakeholder-feedback-2026-07.md`, "Candidates from notes",
-  Track F (F2).
+- ~~**How is "Our impact so far" (Home page) actually calculated?**~~ Answered
+  2026-07-23 (Plan 11 D2) as a hand-typed StreamField block with no live
+  query behind it, then **superseded 2026-07-23 (Track F2)**: it's now
+  `HomePage.get_live_impact_stats` (`apps/core/models.py`), computed live
+  from `DailyAggregate` rows on every request via
+  `apps.pipeline.impact_stats.compute_alltime_impact_stats` — no admin
+  hand-typing. The hand-typed StreamField equivalent (`ImpactStatsBlock`) was
+  then **removed entirely 2026-07-24 (Plan 11 D13)**, fully superseded by the
+  live version; a fourth figure (`zakat_avg_spend`, Track F3) is still
+  hand-typed since the pipeline doesn't ingest spend/expenditure data.

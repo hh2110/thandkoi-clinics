@@ -258,7 +258,18 @@ def test_stat_band_renders_supplied_numbers_only():
     )
     assert "128" in html
     assert "patients seen" in html
-    assert 'class="stat__value"' in html
+    assert 'class="stat-band__card-value"' in html
+
+
+def test_stat_band_renders_prefix_on_a_stat(db):
+    """A stat's optional ``prefix`` (Plan 11 D13: the Zakat-spend card's
+    "PKR") renders as its own smaller span before the value, not baked into
+    the value string."""
+    html = render_to_string(
+        "partials/sections/stat_band.html",
+        {"stats": [{"value": "180", "prefix": "PKR", "label": "Avg spend"}]},
+    )
+    assert '<span class="stat-band__card-prefix">PKR</span>180' in html
 
 
 def test_media_placeholder_shows_when_image_absent():
@@ -370,15 +381,16 @@ def test_layout_css_uses_tokens_only_no_hardcoded_colours():
 def test_home_page_composes_layout_kit_sections(client, home_page):
     """Home renders the 03.5 kit sections from its StreamField body.
 
-    The default factory body is hero + impact-stat band + the Quality of Care
-    circle + an unlinked donate CTA, so the composed markup (hero, stat-band,
-    coc-section) is present — the Plan 04 "compose a page from the kit" path,
-    exercised through the real chrome.
+    The default factory body is hero + the Quality of Care circle + an
+    unlinked donate CTA (Plan 11 D13: the StreamField no longer has a
+    hand-typed impact-stat block — see
+    ``test_home_page_renders_live_impact_stats_band`` for the live band,
+    which isn't part of ``body`` at all), so the composed markup (hero,
+    coc-section) is present — the Plan 04 "compose a page from the kit"
+    path, exercised through the real chrome.
     """
     content = client.get("/en/").content.decode()
     assert "hero" in content
-    assert "stat-band" in content
-    assert "467+" in content  # a supplied impact figure renders verbatim
     assert "coc-section" in content
     assert "Triage" in content  # a supplied care-stage label renders verbatim
 
@@ -388,9 +400,8 @@ def test_home_page_composes_layout_kit_sections(client, home_page):
 
 def test_home_page_get_live_impact_stats_sums_dailyaggregate_rows(db):
     """Mirrors ``DailyReportPage.headline_stats``'s ``{value, label}`` shape,
-    read live from ``DailyAggregate`` (not the hand-typed ``ImpactStatsBlock``
-    already covered by ``test_home_page_composes_layout_kit_sections`` above).
-    """
+    read live from ``DailyAggregate`` — the hand-typed StreamField equivalent
+    was removed in Plan 11 D13, fully superseded by this live band."""
     from apps.pipeline.factories import DailyAggregateFactory
 
     home = HomePageFactory()
@@ -408,8 +419,8 @@ def test_home_page_get_live_impact_stats_sums_dailyaggregate_rows(db):
     stats = home.get_live_impact_stats()
 
     assert stats == [
-        {"value": "15", "label": "Clinic patients (all time)"},
-        {"value": "9", "label": "Zakat beneficiaries (all time)"},
+        {"value": "15", "label": "Clinic patients"},
+        {"value": "9", "label": "Zakat beneficiaries"},
     ]
 
 
@@ -417,19 +428,20 @@ def test_home_page_get_live_impact_stats_sums_dailyaggregate_rows(db):
 
 
 def test_home_page_get_live_impact_stats_appends_zakat_avg_spend_when_set(db):
-    """A third, hand-typed figure appends after the two live ones when the
-    admin has filled in ``zakat_avg_spend`` — the value renders verbatim
-    (free text, like ``ImpactStatBlock.value``), not reformatted."""
-    home = HomePageFactory(zakat_avg_spend="PKR 180/visit")
+    """A third figure appends after the two live ones when the admin has
+    filled in ``zakat_avg_spend`` — a bare number (Plan 11 D13), with "PKR"
+    as a separate ``prefix`` rather than baked into the value string."""
+    home = HomePageFactory(zakat_avg_spend="180")
 
     stats = home.get_live_impact_stats()
 
     assert stats == [
-        {"value": "0", "label": "Clinic patients (all time)"},
-        {"value": "0", "label": "Zakat beneficiaries (all time)"},
+        {"value": "0", "label": "Clinic patients"},
+        {"value": "0", "label": "Zakat beneficiaries"},
         {
-            "value": "PKR 180/visit",
-            "label": "Average spend per Zakat-funded visit",
+            "value": "180",
+            "prefix": "PKR",
+            "label": "Avg spend per Zakat visit",
         },
     ]
 
@@ -443,9 +455,7 @@ def test_home_page_get_live_impact_stats_omits_zakat_avg_spend_when_blank(db):
     stats = home.get_live_impact_stats()
 
     assert len(stats) == 2
-    assert all(
-        stat["label"] != "Average spend per Zakat-funded visit" for stat in stats
-    )
+    assert all(stat["label"] != "Avg spend per Zakat visit" for stat in stats)
 
 
 def test_home_page_get_context_includes_live_impact_stats(db):
@@ -461,9 +471,10 @@ def test_home_page_get_context_includes_live_impact_stats(db):
 
 
 def test_home_page_get_live_impact_stats_as_of_is_the_latest_clinic_date(db):
-    """Mirrors ``ImpactStatsBlock``'s ``as_of`` convention (Plan 11 D2), but
-    computed from the latest ``DailyAggregate.clinic_date`` rather than
-    hand-typed by an admin."""
+    """Computed from the latest ``DailyAggregate.clinic_date`` — originally
+    mirrored the hand-typed ``ImpactStatsBlock.as_of`` convention (Plan 11
+    D2), which itself was removed once this live version fully superseded it
+    (Plan 11 D13)."""
     from apps.pipeline.factories import DailyAggregateFactory
 
     home = HomePageFactory()
@@ -494,13 +505,11 @@ def test_home_page_get_body_split_on_circle_of_care_falls_back_to_whole_body(db)
 
 
 def test_home_page_renders_live_impact_stats_band(client, home_page):
-    """The real page shows the live band, separate from the StreamField
-    ``ImpactStatsBlock`` band already asserted by
-    ``test_home_page_composes_layout_kit_sections`` (that one shows "467+";
-    this one shows a real ``DailyAggregate``-derived figure). Asserts on the
-    exact ``<p class="stat__value">…</p>`` markup, not a bare substring — a
-    bare "42" would also match the "426" welfare-patients figure the
-    ImpactStatsBlock teaser already renders on this same page."""
+    """The real page shows the live band with a real ``DailyAggregate``-
+    derived figure. Asserts on the exact
+    ``<p class="stat-band__card-value">…</p>`` markup (Plan 11 D13's card
+    layout), not a bare substring, since a bare "34" would also match inside
+    other numbers on the page."""
     from apps.pipeline.factories import DailyAggregateFactory
 
     DailyAggregateFactory(
@@ -511,11 +520,12 @@ def test_home_page_renders_live_impact_stats_band(client, home_page):
 
     content = client.get("/en/").content.decode()
 
-    assert "Clinic patients (all time)" in content
-    assert "Zakat beneficiaries (all time)" in content
-    assert '<p class="stat__value">1234</p>' in content
-    assert '<p class="stat__value">987</p>' in content
-    assert "Our impact so far (updated at 01 Jul 2026)" in content
+    assert "Clinic patients" in content
+    assert "Zakat beneficiaries" in content
+    assert '<p class="stat-band__card-value">1234</p>' in content
+    assert '<p class="stat-band__card-value">987</p>' in content
+    assert "Our impact so far" in content
+    assert "Updated 01 Jul 2026" in content
 
 
 def test_home_page_renders_live_impact_stats_band_above_circle_of_care(
@@ -536,7 +546,7 @@ def test_home_page_renders_live_impact_stats_band_above_circle_of_care(
 
     content = client.get("/en/").content.decode()
 
-    assert content.index("Clinic patients (all time)") < content.index("coc-section")
+    assert content.index("Clinic patients") < content.index("coc-section")
 
 
 def test_home_page_renders_live_impact_stats_empty_state_with_no_data(
@@ -544,28 +554,29 @@ def test_home_page_renders_live_impact_stats_empty_state_with_no_data(
 ):
     """With no ``DailyAggregate`` rows yet, the band still renders (zeroes,
     not a crash) — ``stat_band.html`` never sees an empty ``stats`` list here
-    since ``get_live_impact_stats`` always returns two entries. No date
-    suffix either, mirroring ``ImpactStatsBlock``'s own as_of-unset caption
-    behaviour (``test_impact_stats_block_caption_unchanged_when_as_of_unset``)."""
+    since ``get_live_impact_stats`` always returns two entries. No "Updated"
+    subtitle either — ``get_live_impact_stats_as_of`` returns ``None`` with
+    no data (see the dedicated test above)."""
     content = client.get("/en/").content.decode()
 
     assert "Our impact so far" in content
-    assert "(updated at" not in content
+    assert "Updated" not in content
     assert "Figures coming soon." not in content
 
 
 def test_home_page_renders_zakat_avg_spend_as_third_stat(client, home_page):
     """With ``zakat_avg_spend`` set in the admin, the live band shows three
-    figures instead of two — the value renders verbatim, unformatted."""
-    home_page.zakat_avg_spend = "PKR 180/visit"
+    figures instead of two — a bare number with "PKR" rendered as a
+    separate, smaller prefix (Plan 11 D13)."""
+    home_page.zakat_avg_spend = "180"
     home_page.save()
 
     content = client.get("/en/").content.decode()
 
-    assert "Clinic patients (all time)" in content
-    assert "Zakat beneficiaries (all time)" in content
-    assert "Average spend per Zakat-funded visit" in content
-    assert '<p class="stat__value">PKR 180/visit</p>' in content
+    assert "Clinic patients" in content
+    assert "Zakat beneficiaries" in content
+    assert "Avg spend per Zakat visit" in content
+    assert '<span class="stat-band__card-prefix">PKR</span>180' in content
 
 
 def test_circle_of_care_block_requires_exactly_six_stages():
@@ -622,84 +633,6 @@ def test_circle_of_care_block_renders_stages_in_the_hub(db):
     assert "Quality of Care" in html  # default heading
     assert "Assessed on arrival." in html
     assert 'data-coc-stage="5"' in html  # 6 stages, zero-indexed
-
-
-def test_impact_stats_block_appends_updated_at_when_as_of_set(db):
-    """Plan 11 D2: with ``as_of`` set, the caption gains "(updated at <date>)".
-
-    Mirrors ``test_circle_of_care_block_renders_stages_in_the_hub``'s pattern
-    for exercising a StreamField block's own render, not just its template.
-    """
-    from wagtail.blocks import StreamValue
-
-    from apps.core.models import HomePage as _HP
-
-    body = _HP().body.stream_block
-    value = StreamValue(
-        body,
-        [
-            (
-                "impact_stats",
-                {
-                    "caption": "Our impact so far",
-                    "as_of": datetime.date(2026, 7, 23),
-                    "stats": [{"value": "467+", "label": "children treated"}],
-                },
-            )
-        ],
-    )
-    html = value.render_as_block()
-    assert "Our impact so far (updated at 23 Jul 2026)" in html
-
-
-def test_impact_stats_block_caption_unchanged_when_as_of_unset(db):
-    """With no ``as_of``, the caption renders exactly as typed — no stray suffix."""
-    from wagtail.blocks import StreamValue
-
-    from apps.core.models import HomePage as _HP
-
-    body = _HP().body.stream_block
-    value = StreamValue(
-        body,
-        [
-            (
-                "impact_stats",
-                {
-                    "caption": "Our impact so far",
-                    "stats": [{"value": "467+", "label": "children treated"}],
-                },
-            )
-        ],
-    )
-    html = value.render_as_block()
-    assert "Our impact so far" in html
-    assert "updated at" not in html
-
-
-def test_impact_stats_block_as_of_without_caption_has_no_stray_prefix(db):
-    """``as_of`` with no ``caption`` set renders "Updated at <date>", not a
-    bare " (updated at <date>)" with no preceding text (both fields are
-    independently optional on ImpactStatsBlock)."""
-    from wagtail.blocks import StreamValue
-
-    from apps.core.models import HomePage as _HP
-
-    body = _HP().body.stream_block
-    value = StreamValue(
-        body,
-        [
-            (
-                "impact_stats",
-                {
-                    "as_of": datetime.date(2026, 7, 23),
-                    "stats": [{"value": "467+", "label": "children treated"}],
-                },
-            )
-        ],
-    )
-    html = value.render_as_block()
-    assert "Updated at 23 Jul 2026" in html
-    assert "(updated at" not in html
 
 
 @pytest.mark.parametrize(

@@ -50,10 +50,13 @@ def test_content_lands_in_draft_not_live():
     assert "healthy community" in draft.vision
     assert "cost-effective" in draft.mission
 
-    # Home body: empty live, three blocks in the draft.
+    # Home body: empty live, two blocks in the draft (Plan 11 D13: the
+    # "impact_stats" block was removed — superseded by the live impact
+    # band, HomePage.get_live_impact_stats — so HOME_BODY is now just
+    # hero + donate_cta).
     home = HomePage.objects.get()
     assert len(home.body) == 0
-    assert len(home.get_latest_revision_as_object().body) == 3
+    assert len(home.get_latest_revision_as_object().body) == 2
 
 
 @pytest.mark.django_db

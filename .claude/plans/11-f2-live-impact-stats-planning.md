@@ -252,8 +252,11 @@ aggregation is correct. They can be built and shipped in either order.
 
 - Final figure/label selection (section 4 above) — a content decision, not
   architectural.
-- Whether to retire `ImpactStatsBlock` from the home page once the live
-  section ships (section 5) — maintainer's call, not required for F2.
+- ~~Whether to retire `ImpactStatsBlock` from the home page once the live
+  section ships (section 5) — maintainer's call, not required for F2.~~
+  **Resolved 2026-07-24 (Plan 11 D13): retired.** The block, its template,
+  and its dedicated tests were removed entirely — see the D13 entry in
+  `11-stakeholder-feedback-2026-07.md`.
 - Exact caption/eyebrow copy for the new section.
 
 ## Reference material
