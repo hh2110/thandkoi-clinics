@@ -54,6 +54,13 @@
   --color-donate-text: #ffffff;
   --color-focus-ring: var(--color-teal-bright);
 
+  /* General-purpose amber highlight (Plan 11 D12, 2026-07-24) — distinct from
+     --color-donate-bg/-text (the Donate *button's* bg+on-amber-text pairing).
+     This is just the amber hue itself, for text/figures that want the same
+     warm accent without the button surface. See brand-guidelines.md §7's
+     updated Do/Don't for the scoped list of what may use it. */
+  --color-accent: var(--color-amber-on-light);
+
   /* Stat-band figures (`.stat__value`, layout.css) sit on
      --color-accent-soft-bg, which becomes the deep-teal ground in dark mode
      (below). --color-brand itself stays the same light-mode teal in dark
@@ -134,11 +141,25 @@
     --color-border-default: var(--color-border);
     --color-donate-bg: var(--color-amber-on-dark);
     --color-donate-text: var(--color-ink);
-    --color-accent-soft-bg: var(--color-teal-deep);
+    --color-accent: var(--color-amber-on-dark);
+    /* Plan 11 D12 (2026-07-24): was var(--color-teal-deep), identical to
+       --color-paper above — every "raised" section (stat band, and now the
+       home daily-report band) sat flush with the page background in dark
+       mode, the reported "everything collapses to one flat teal" bug. This
+       new value sits strictly between Page Dark (#0a3e48) and Card Dark
+       (#0d4f5c) so the elevation ladder actually reads as three steps. See
+       brand-guidelines.md's dark-neutrals table for the recorded decision. */
+    --color-accent-soft-bg: #0b4753;
     --color-stat-value: var(--color-pale-aqua);
     --color-coc-seg-1: var(--color-teal-bright);
     --color-coc-seg-2: #2cb0c4;
     --color-coc-seg-3: #0a6b7c;
+    /* Plan 11 D12: footer was var(--color-teal-deep), same as --color-paper
+       above (brand-guidelines.md's old "one family" rationale) — the footer
+       band was invisible against the body in dark mode. Now strictly darker
+       than Page Dark so it reads as the page's deepest anchor, as it already
+       did in light mode. */
+    --color-footer-bg: #082d35;
   }
 }
 
@@ -159,11 +180,15 @@
   --color-border-default: var(--color-border);
   --color-donate-bg: var(--color-amber-on-dark);
   --color-donate-text: var(--color-ink);
-  --color-accent-soft-bg: var(--color-teal-deep);
+  --color-accent: var(--color-amber-on-dark);
+  /* Plan 11 D12 (2026-07-24) — see the prefers-color-scheme block above for
+     why this is no longer var(--color-teal-deep). */
+  --color-accent-soft-bg: #0b4753;
   --color-stat-value: var(--color-pale-aqua);
   --color-coc-seg-1: var(--color-teal-bright);
   --color-coc-seg-2: #2cb0c4;
   --color-coc-seg-3: #0a6b7c;
+  --color-footer-bg: #082d35;
 }
 
 :root[data-theme="light"] {
@@ -182,9 +207,11 @@
   --color-border-default: var(--color-border);
   --color-donate-bg: var(--color-amber-on-light);
   --color-donate-text: #ffffff;
+  --color-accent: var(--color-amber-on-light);
   --color-accent-soft-bg: var(--color-aqua-tint);
   --color-stat-value: var(--color-brand);
   --color-coc-seg-1: var(--color-teal-brand);
   --color-coc-seg-2: var(--color-teal-bright);
   --color-coc-seg-3: var(--color-teal-deep);
+  --color-footer-bg: var(--color-teal-deep);
 }
