@@ -24,7 +24,7 @@ archive's own page/URL rather than a second paginated list here).
             <h2 class="ri-funding-mix__title">{% translate "Patient footfall — last 30 days" %}</h2>
           </div>
           <p class="ri-funding-mix__caption">
-            {% translate "Zakat-funded vs. regular visits, one bar per day the clinic reported data. Gaps are days with no doctor on duty, including holidays — not missing records." %}
+            {% translate "Zakat-funded vs. regular visits, one bar per day the clinic reported data. Sundays are omitted — the clinic is closed. A gap marks a Monday–Saturday day with nothing reported, including holidays." %}
           </p>
           <div class="ri-funding-mix__legend">
             <span class="ri-funding-mix__legend-item">
@@ -53,8 +53,10 @@ archive's own page/URL rather than a second paginated list here).
                 {% for segment in bar.segments %}
                   <path class="{{ segment.css_class }}" d="{{ segment.path }}"></path>
                 {% endfor %}
-                <text class="ri-funding-mix__axis-text" x="{{ bar.label_x }}" y="{{ bar.label_y }}"
-                      text-anchor="middle">{{ bar.date|date:"j M" }}</text>
+                {% if bar.show_label %}
+                  <text class="ri-funding-mix__axis-text" x="{{ bar.label_x }}" y="{{ bar.label_y }}"
+                        text-anchor="middle">{{ bar.date|date:"j M" }}</text>
+                {% endif %}
                 <rect class="ri-funding-mix__hit"
                       data-funding-mix-hit
                       data-date="{{ bar.date|date:'j M' }}" data-zakat="{{ bar.zakat }}"

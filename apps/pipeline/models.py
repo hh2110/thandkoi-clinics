@@ -388,6 +388,13 @@ class ReportIndexPage(Page):
     _MAX_BAR_WIDTH = 24
     _STACK_GAP = 2  # surface gap between stacked segments
     _BAR_CORNER_RADIUS = 4
+    _SUNDAY_WEEKDAY = 6  # date.weekday() — the clinic is closed Sundays
+    # Minimum centre-to-centre spacing (viewBox units) between two date
+    # labels. Measured against the widest rendered label ("27 Jun", ~30
+    # units) with headroom for a longer translated month name — Plan 13's
+    # Mon–Sat gap slots (see _funding_mix_slot_dates) mean consecutive-day
+    # runs can now pack bars closer than a label is wide.
+    _MIN_LABEL_SPACING = 40
 
     def get_funding_mix(self) -> dict:
         """Rolling 30-day Zakat-vs-Regular funding mix, as SVG geometry (Plan 13).
@@ -402,22 +409,32 @@ class ReportIndexPage(Page):
         Reuses the exact fields ``DailyReportPage.headline_stats`` already
         surfaces under the same labels: ``zakat_beneficiary_patients`` →
         "Zakat", ``paying_patients`` → "Regular" (models.py, above).
+
+        Bars are positioned by each day's slot in the full calendar range
+        (see ``_funding_mix_slot_dates``), not by its position in the query
+        result — so a Monday–Saturday day with no report reserves a blank
+        slot and renders as a visible gap, rather than the timeline
+        silently compressing around it. A Sunday with no report gets no
+        slot at all, since the clinic's closure that day is expected.
         """
         window_start = timezone.localdate() - timedelta(
             days=self.FUNDING_MIX_WINDOW_DAYS
         )
-        rows = list(
-            DailyAggregate.objects.filter(clinic_date__gte=window_start).order_by(
-                "clinic_date"
-            )
-        )
-        if not rows:
+        today = timezone.localdate()
+        rows_by_date = {
+            row.clinic_date: row
+            for row in DailyAggregate.objects.filter(clinic_date__gte=window_start)
+        }
+        if not rows_by_date:
             return {"bars": [], "ticks": []}
+
+        end_date = max([today, *rows_by_date.keys()])
+        slot_dates = self._funding_mix_slot_dates(rows_by_date, window_start, end_date)
 
         plot_width = self._CHART_WIDTH - self._PAD_LEFT - self._PAD_RIGHT
         plot_height = self._CHART_HEIGHT - self._PAD_TOP - self._PAD_BOTTOM
 
-        max_total = max(row.total_visits for row in rows) or 1
+        max_total = max(row.total_visits for row in rows_by_date.values()) or 1
         tick_step = 5 if max_total <= 20 else 10
         max_value = ((max_total // tick_step) + 1) * tick_step
 
@@ -426,17 +443,32 @@ class ReportIndexPage(Page):
             return round(raw, 2)
 
         baseline = y_for(0)
-        slot_width = round(plot_width / len(rows), 2)
+        slot_width = round(plot_width / len(slot_dates), 2)
         bar_width = round(min(self._MAX_BAR_WIDTH, slot_width * 0.6), 2)
 
         date_label_y = self._CHART_HEIGHT - 8
 
-        bars = [
-            self._funding_mix_bar(
+        bars = []
+        last_label_x = None
+        for i, slot_date in enumerate(slot_dates):
+            row = rows_by_date.get(slot_date)
+            if row is None:
+                continue  # Mon–Sat, no report — leave the slot empty (a gap)
+            bar = self._funding_mix_bar(
                 row, i, slot_width, bar_width, baseline, y_for, date_label_y
             )
-            for i, row in enumerate(rows)
-        ]
+            # Gap slots let real bars pack closer together than a date
+            # label is wide (see _MIN_LABEL_SPACING) — thin colliding
+            # labels rather than let them overlap. Every bar still gets
+            # its hit-tooltip and its row in the table below, so no date
+            # is actually hidden, just its always-visible axis text.
+            bar["show_label"] = (
+                last_label_x is None
+                or bar["label_x"] - last_label_x >= self._MIN_LABEL_SPACING
+            )
+            if bar["show_label"]:
+                last_label_x = bar["label_x"]
+            bars.append(bar)
         ticks = [
             {"value": t, "y": y_for(t), "label_y": y_for(t) + 3}
             for t in range(0, max_value + 1, tick_step)
@@ -450,6 +482,26 @@ class ReportIndexPage(Page):
             "grid_x2": self._CHART_WIDTH - self._PAD_RIGHT,
             "axis_label_x": self._PAD_LEFT - 6,
         }
+
+    def _funding_mix_slot_dates(self, rows_by_date, start, end):
+        """Ordered list of dates that get a chart slot between ``start``
+        and ``end`` inclusive.
+
+        A Sunday with no ``DailyAggregate`` row gets no slot at all — the
+        clinic is closed Sundays by design, so its absence is expected, not
+        a gap. Every other day in range gets a slot regardless of whether
+        it has data; the caller renders a bar for slots with data and
+        leaves the rest empty, which is what shows up as a gap in the
+        chart. A Sunday that does have a row (an exceptional open day) is
+        kept, same as any other day with data.
+        """
+        dates = []
+        d = start
+        while d <= end:
+            if d in rows_by_date or d.weekday() != self._SUNDAY_WEEKDAY:
+                dates.append(d)
+            d += timedelta(days=1)
+        return dates
 
     def _funding_mix_bar(
         self, row, index, slot_width, bar_width, baseline, y_for, date_label_y
