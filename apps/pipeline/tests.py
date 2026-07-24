@@ -35,6 +35,7 @@ from django.core.management import call_command
 from django.http import HttpResponse
 from django.test import Client, RequestFactory
 from django.urls import reverse
+from django.utils import timezone
 from openpyxl import Workbook, load_workbook
 from wagtail.models import Site
 
@@ -2015,3 +2016,119 @@ def test_persist_parsed_export_groups_rows_by_visit_date(home_page):
     }
     assert DailyAggregate.objects.filter(clinic_date=datetime.date(2026, 7, 1)).exists()
     assert DailyAggregate.objects.filter(clinic_date=datetime.date(2026, 7, 2)).exists()
+
+
+# --- Reports index funding-mix chart (Plan 13) ------------------------------
+
+
+def test_get_funding_mix_includes_row_exactly_30_days_old(home_page):
+    """The window boundary is inclusive at 30 days, exclusive at 31."""
+    today = timezone.localdate()
+    index = ReportIndexPageFactory(parent=home_page)
+    DailyAggregateFactory(
+        clinic_date=today - datetime.timedelta(days=30),
+        total_visits=5,
+        zakat_beneficiary_patients=3,
+        paying_patients=2,
+    )
+    DailyAggregateFactory(
+        clinic_date=today - datetime.timedelta(days=31),
+        total_visits=9,
+        zakat_beneficiary_patients=9,
+        paying_patients=0,
+    )
+
+    dates = [bar["date"] for bar in index.get_funding_mix()["bars"]]
+
+    assert today - datetime.timedelta(days=30) in dates
+    assert today - datetime.timedelta(days=31) not in dates
+
+
+def test_get_funding_mix_bars_are_ascending_with_correct_figures(home_page):
+    today = timezone.localdate()
+    index = ReportIndexPageFactory(parent=home_page)
+    # Created newest-first, on purpose, to prove the method orders them
+    # ascending rather than relying on insertion order.
+    DailyAggregateFactory(
+        clinic_date=today,
+        total_visits=10,
+        zakat_beneficiary_patients=9,
+        paying_patients=1,
+    )
+    DailyAggregateFactory(
+        clinic_date=today - datetime.timedelta(days=1),
+        total_visits=16,
+        zakat_beneficiary_patients=9,
+        paying_patients=7,
+    )
+
+    bars = index.get_funding_mix()["bars"]
+
+    assert [bar["date"] for bar in bars] == [
+        today - datetime.timedelta(days=1),
+        today,
+    ]
+    assert bars[0]["zakat"] == 9
+    assert bars[0]["regular"] == 7
+    assert bars[0]["total"] == 16
+    assert bars[1]["zakat"] == 9
+    assert bars[1]["regular"] == 1
+    assert bars[1]["total"] == 10
+
+
+def test_get_funding_mix_with_no_rows_in_window_is_empty(home_page):
+    today = timezone.localdate()
+    index = ReportIndexPageFactory(parent=home_page)
+    # Outside the 30-day window entirely — should not appear.
+    DailyAggregateFactory(clinic_date=today - datetime.timedelta(days=90))
+
+    assert index.get_funding_mix() == {"bars": [], "ticks": []}
+
+
+def test_get_funding_mix_solo_zakat_bar_has_one_segment(home_page):
+    """A day with zero paying patients renders as a single rounded segment,
+    not a zero-height second segment stacked on top."""
+    today = timezone.localdate()
+    index = ReportIndexPageFactory(parent=home_page)
+    DailyAggregateFactory(
+        clinic_date=today,
+        total_visits=4,
+        zakat_beneficiary_patients=4,
+        paying_patients=0,
+    )
+
+    bar = index.get_funding_mix()["bars"][0]
+
+    assert len(bar["segments"]) == 1
+    assert bar["segments"][0]["css_class"] == "ri-funding-mix__bar--zakat"
+
+
+def test_reports_index_renders_funding_mix_chart_with_real_figures(client, home_page):
+    today = timezone.localdate()
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    DailyAggregateFactory(
+        clinic_date=today,
+        total_visits=7,
+        zakat_beneficiary_patients=5,
+        paying_patients=2,
+    )
+
+    content = client.get(index.url).content.decode()
+
+    assert "Patient footfall" in content
+    assert "ri-funding-mix__bar--zakat" in content
+    assert "ri-funding-mix__bar--regular" in content
+    # The table fallback carries the exact figures too, not just the SVG.
+    assert "<td>5</td>" in content
+    assert "<td>2</td>" in content
+    assert "<td>7</td>" in content
+
+
+def test_reports_index_omits_funding_mix_section_with_no_data(client, home_page):
+    """No DailyAggregate rows at all — the section is skipped entirely
+    rather than rendering an empty chart."""
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+
+    content = client.get(index.url).content.decode()
+
+    assert "Patient footfall" not in content

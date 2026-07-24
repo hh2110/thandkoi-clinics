@@ -19,9 +19,11 @@ is an audit trail only — who/when/parser/row-count/content-hash, never data.
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
@@ -375,9 +377,136 @@ class ReportIndexPage(Page):
             .order_by("-report_date", "-pk")
         )
 
+    # SVG chart geometry (Plan 13) — fixed marks, not configurable.
+    FUNDING_MIX_WINDOW_DAYS = 30
+    _CHART_WIDTH = 620
+    _CHART_HEIGHT = 220
+    _PAD_LEFT = 30
+    _PAD_RIGHT = 10
+    _PAD_TOP = 14
+    _PAD_BOTTOM = 26
+    _MAX_BAR_WIDTH = 24
+    _STACK_GAP = 2  # surface gap between stacked segments
+    _BAR_CORNER_RADIUS = 4
+
+    def get_funding_mix(self) -> dict:
+        """Rolling 30-day Zakat-vs-Regular funding mix, as SVG geometry (Plan 13).
+
+        Bar coordinates and path data are computed here rather than in the
+        template or client JS, so the chart renders fully without
+        JavaScript — mirrors ``circle-of-care.js``'s documented progressive-
+        enhancement precedent ("the section renders fully without this
+        script; this only adds the reveal"). ``funding-mix-chart.js`` only
+        wires up the hover tooltip on top of this.
+
+        Reuses the exact fields ``DailyReportPage.headline_stats`` already
+        surfaces under the same labels: ``zakat_beneficiary_patients`` →
+        "Zakat", ``paying_patients`` → "Regular" (models.py, above).
+        """
+        window_start = timezone.localdate() - timedelta(
+            days=self.FUNDING_MIX_WINDOW_DAYS
+        )
+        rows = list(
+            DailyAggregate.objects.filter(clinic_date__gte=window_start).order_by(
+                "clinic_date"
+            )
+        )
+        if not rows:
+            return {"bars": [], "ticks": []}
+
+        plot_width = self._CHART_WIDTH - self._PAD_LEFT - self._PAD_RIGHT
+        plot_height = self._CHART_HEIGHT - self._PAD_TOP - self._PAD_BOTTOM
+
+        max_total = max(row.total_visits for row in rows) or 1
+        tick_step = 5 if max_total <= 20 else 10
+        max_value = ((max_total // tick_step) + 1) * tick_step
+
+        def y_for(value):
+            raw = self._PAD_TOP + plot_height - (value / max_value) * plot_height
+            return round(raw, 2)
+
+        baseline = y_for(0)
+        slot_width = round(plot_width / len(rows), 2)
+        bar_width = round(min(self._MAX_BAR_WIDTH, slot_width * 0.6), 2)
+
+        date_label_y = self._CHART_HEIGHT - 8
+
+        bars = [
+            self._funding_mix_bar(
+                row, i, slot_width, bar_width, baseline, y_for, date_label_y
+            )
+            for i, row in enumerate(rows)
+        ]
+        ticks = [
+            {"value": t, "y": y_for(t), "label_y": y_for(t) + 3}
+            for t in range(0, max_value + 1, tick_step)
+        ]
+        return {
+            "bars": bars,
+            "ticks": ticks,
+            "chart_width": self._CHART_WIDTH,
+            "chart_height": self._CHART_HEIGHT,
+            "grid_x1": self._PAD_LEFT,
+            "grid_x2": self._CHART_WIDTH - self._PAD_RIGHT,
+            "axis_label_x": self._PAD_LEFT - 6,
+        }
+
+    def _funding_mix_bar(
+        self, row, index, slot_width, bar_width, baseline, y_for, date_label_y
+    ):
+        cx = round(self._PAD_LEFT + slot_width * index + slot_width / 2, 2)
+        x = round(cx - bar_width / 2, 2)
+        zakat_top = y_for(row.zakat_beneficiary_patients)
+
+        segments = [
+            {
+                "path": self._rounded_top_path(x, zakat_top, bar_width, baseline)
+                if row.paying_patients == 0
+                else self._square_path(x, zakat_top, bar_width, baseline),
+                "css_class": "ri-funding-mix__bar--zakat",
+            }
+        ]
+        if row.paying_patients > 0:
+            regular_base = zakat_top - self._STACK_GAP
+            regular_top = y_for(row.zakat_beneficiary_patients + row.paying_patients)
+            segments.append(
+                {
+                    "path": self._rounded_top_path(
+                        x, regular_top, bar_width, regular_base
+                    ),
+                    "css_class": "ri-funding-mix__bar--regular",
+                }
+            )
+
+        return {
+            "date": row.clinic_date,
+            "zakat": row.zakat_beneficiary_patients,
+            "regular": row.paying_patients,
+            "total": row.total_visits,
+            "segments": segments,
+            "label_x": cx,
+            "label_y": date_label_y,
+            "hit_x": cx - slot_width / 2,
+            "hit_width": slot_width,
+        }
+
+    def _rounded_top_path(self, x, y_top, width, y_base):
+        r = min(self._BAR_CORNER_RADIUS, width / 2, max(0, y_base - y_top))
+        return (
+            f"M {x} {y_base} L {x} {y_top + r} Q {x} {y_top} {x + r} {y_top} "
+            f"L {x + width - r} {y_top} "
+            f"Q {x + width} {y_top} {x + width} {y_top + r} "
+            f"L {x + width} {y_base} Z"
+        )
+
+    def _square_path(self, x, y_top, width, y_base):
+        x_end, y_end = x + width, y_top
+        return f"M {x} {y_base} L {x} {y_top} L {x_end} {y_end} L {x_end} {y_base} Z"
+
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         context["reports"] = paginate_archive(request, self.get_reports())
+        context["funding_mix"] = self.get_funding_mix()
         # The merged-nav "Camp reports" teaser section (see this class's
         # docstring) — a handful of the latest camp reports plus a link to
         # their own archive, not a second paginated list on this page.

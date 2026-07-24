@@ -16,6 +16,81 @@ archive's own page/URL rather than a second paginated list here).
     </div>
   </section>
 
+  {% if funding_mix.bars %}
+    <section class="section">
+      <div class="wrapper">
+        <div class="ri-funding-mix">
+          <div class="ri-funding-mix__head">
+            <h2 class="ri-funding-mix__title">{% translate "Patient footfall — last 30 days" %}</h2>
+          </div>
+          <p class="ri-funding-mix__caption">
+            {% translate "Zakat-funded vs. regular visits, one bar per day the clinic reported data. Gaps in the dates are days with no export, not zero-visit days." %}
+          </p>
+          <div class="ri-funding-mix__legend">
+            <span class="ri-funding-mix__legend-item">
+              <span class="ri-funding-mix__swatch ri-funding-mix__swatch--zakat"></span>{% translate "Zakat" %}
+            </span>
+            <span class="ri-funding-mix__legend-item">
+              <span class="ri-funding-mix__swatch ri-funding-mix__swatch--regular"></span>{% translate "Regular" %}
+            </span>
+          </div>
+          <div class="ri-funding-mix__scroll">
+            <svg class="ri-funding-mix__chart" data-funding-mix
+                 data-label-zakat="{% translate 'Zakat' %}"
+                 data-label-regular="{% translate 'Regular' %}"
+                 data-label-total="{% translate 'Total' %}"
+                 viewBox="0 0 {{ funding_mix.chart_width }} {{ funding_mix.chart_height }}"
+                 preserveAspectRatio="xMidYMid meet"
+                 role="img" aria-label="{% translate 'Patient footfall over the last 30 days — see the table below for exact figures.' %}">
+              {% for tick in funding_mix.ticks %}
+                <line class="ri-funding-mix__gridline"
+                      x1="{{ funding_mix.grid_x1 }}" x2="{{ funding_mix.grid_x2 }}"
+                      y1="{{ tick.y }}" y2="{{ tick.y }}" />
+                <text class="ri-funding-mix__axis-text" x="{{ funding_mix.axis_label_x }}" y="{{ tick.label_y }}"
+                      text-anchor="end">{{ tick.value }}</text>
+              {% endfor %}
+              {% for bar in funding_mix.bars %}
+                {% for segment in bar.segments %}
+                  <path class="{{ segment.css_class }}" d="{{ segment.path }}"></path>
+                {% endfor %}
+                <text class="ri-funding-mix__axis-text" x="{{ bar.label_x }}" y="{{ bar.label_y }}"
+                      text-anchor="middle">{{ bar.date|date:"j M" }}</text>
+                <rect class="ri-funding-mix__hit"
+                      data-funding-mix-hit
+                      data-date="{{ bar.date|date:'j M' }}" data-zakat="{{ bar.zakat }}"
+                      data-regular="{{ bar.regular }}" data-total="{{ bar.total }}"
+                      x="{{ bar.hit_x }}" y="0" width="{{ bar.hit_width }}" height="{{ funding_mix.chart_height }}" />
+              {% endfor %}
+            </svg>
+          </div>
+          <details class="ri-funding-mix__table-toggle">
+            <summary>{% translate "View as table" %}</summary>
+            <table class="ri-funding-mix__table">
+              <thead>
+                <tr>
+                  <th>{% translate "Date" %}</th>
+                  <th>{% translate "Zakat" %}</th>
+                  <th>{% translate "Regular" %}</th>
+                  <th>{% translate "Total" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for bar in funding_mix.bars %}
+                  <tr>
+                    <td>{{ bar.date|date:"j M Y" }}</td>
+                    <td>{{ bar.zakat }}</td>
+                    <td>{{ bar.regular }}</td>
+                    <td>{{ bar.total }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </details>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+
   <section class="section">
     <div class="wrapper prose">
       <h2>{% translate "Daily reports" %}</h2>

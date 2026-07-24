@@ -1,0 +1,142 @@
+/*
+ * Reports index — funding-mix chart (Plan 13). Scoped to `.ri-funding-mix`.
+ * Reads semantic tokens only (tokens.css), so light + dark come for free.
+ * Load after components.css, same as daily-report.css.
+ */
+
+.ri-funding-mix {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--card-radius);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+
+.ri-funding-mix__head {
+  margin-bottom: var(--space-1);
+}
+.ri-funding-mix__title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-2xl);
+  line-height: 1.1;
+  color: var(--color-text);
+  margin: 0;
+}
+.ri-funding-mix__caption {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  margin: 0 0 var(--space-2);
+  max-width: 65ch;
+}
+
+.ri-funding-mix__legend {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+  margin-bottom: var(--space-2);
+}
+.ri-funding-mix__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.ri-funding-mix__swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  display: inline-block;
+}
+.ri-funding-mix__swatch--zakat {
+  background: var(--color-brand);
+}
+.ri-funding-mix__swatch--regular {
+  background: var(--color-text-faint);
+}
+
+.ri-funding-mix__scroll {
+  overflow-x: auto;
+}
+.ri-funding-mix__chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Fills the card at any width above this; below it, the scroll
+     container above scrolls horizontally rather than shrinking bars
+     and axis text past legibility. */
+  min-width: 560px;
+}
+
+.ri-funding-mix__gridline {
+  stroke: var(--color-border-default);
+  stroke-width: 1;
+}
+.ri-funding-mix__axis-text {
+  fill: var(--color-text-faint);
+  font-size: 0.625rem;
+  font-family: var(--font-body);
+}
+.ri-funding-mix__bar--zakat {
+  fill: var(--color-brand);
+}
+.ri-funding-mix__bar--regular {
+  fill: var(--color-text-faint);
+}
+.ri-funding-mix__hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.ri-funding-mix__table-toggle {
+  margin: var(--space-1) 0;
+}
+.ri-funding-mix__table-toggle summary {
+  font-size: var(--font-size-xs);
+  color: var(--color-brand);
+  cursor: pointer;
+  user-select: none;
+}
+.ri-funding-mix__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-xs);
+  margin-top: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+.ri-funding-mix__table th,
+.ri-funding-mix__table td {
+  text-align: right;
+  padding: 0.25rem var(--space-1);
+  border-bottom: 1px solid var(--color-border-default);
+}
+.ri-funding-mix__table th:first-child,
+.ri-funding-mix__table td:first-child {
+  text-align: left;
+}
+.ri-funding-mix__table th {
+  color: var(--color-text-faint);
+  font-weight: 500;
+}
+
+/* Hover tooltip — added by funding-mix-chart.js; hidden until JS shows it,
+   so the chart and table above remain fully usable without JS. */
+.ri-funding-mix__tooltip {
+  position: fixed;
+  pointer-events: none;
+  /* Inverted on purpose: --color-text/--color-bg swap values per theme, so
+     this auto-inverts (dark-on-light in light mode, light-on-dark in dark
+     mode) without a separate dark-mode override. */
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: var(--font-size-xs);
+  padding: 0.375rem 0.625rem;
+  border-radius: 6px;
+  transform: translate(-50%, calc(-100% - 10px));
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+  z-index: 10;
+}
+.ri-funding-mix__tooltip.is-visible {
+  opacity: 1;
+}
