@@ -45,6 +45,7 @@ plan from 03.5 onward carries three lifecycle sections:
 | 10 | [Media object storage](10-media-object-storage.md) — serve/persist Wagtail uploads from S3-compatible object storage (Cloudflare R2); prod media was 404ing on ephemeral disk | 🚧 In progress |
 | 11 | [Stakeholder feedback triage (July 2026)](11-stakeholder-feedback-2026-07.md) — backlog of report/admin/content/process items from the maintainer's review round, sorted into tracks and priorities, to be sliced into follow-up plans. Track E's options review: [E1/E2 research](11-e1-e2-research-2026-07.md). Track F2's planning pass: [live impact-stats planning](11-f2-live-impact-stats-planning.md) | 🚧 In progress |
 | 12 | [Observability](12-observability.md) — Sentry error tracking + uptime alerting on `/healthz` (Track A), Umami Cloud traffic analytics (Track B); the "monitoring" item deferred below, now being addressed. Track B merged (PR #116, maintainer account/website-ID setup still pending); Track A in progress | 🚧 In progress |
+| 13 | [Reports index: funding-mix trend chart](13-reports-funding-mix-chart.md) — rolling 30-day Zakat-vs-Regular stacked bar chart on `/reports/`, server-rendered SVG, no daily-page chart, no department/diagnosis breakdown | 🚧 In progress |
 
 **Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ⏸ Paused/parked (work stopped, not abandoned) · ✅ Done
 
