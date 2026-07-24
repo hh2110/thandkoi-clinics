@@ -15,6 +15,7 @@ dependencies = [
     "anthropic>=0.40,<1",
     "openpyxl>=3.1,<4",
     "xlrd>=2.0,<3",
+    "sentry-sdk>=2.20,<3",
 ]
 
 [dependency-groups]

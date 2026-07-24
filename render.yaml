@@ -64,6 +64,11 @@ services:
         sync: false
       - key: MEDIA_CUSTOM_DOMAIN
         sync: false
+      # Sentry error tracking (Plan 12 Track A) — optional. Unlike the secrets
+      # above, the app boots and runs identically if this is left unset; it
+      # only enables error reporting once set. See docs/deploying.md → Secrets.
+      - key: SENTRY_DSN
+        sync: false
       # Generated once by Render and kept secret.
       - key: SECRET_KEY
         generateValue: true
