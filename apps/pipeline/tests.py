@@ -2103,6 +2103,30 @@ def test_get_funding_mix_solo_zakat_bar_has_one_segment(home_page):
     assert bar["segments"][0]["css_class"] == "ri-funding-mix__bar--zakat"
 
 
+def test_get_funding_mix_solo_regular_bar_rests_on_baseline(home_page):
+    """A day with zero Zakat patients renders as a single rounded regular
+    segment resting on the baseline — not offset upward by the stacked-
+    segment gap above a degenerate zero-height Zakat segment."""
+    today = timezone.localdate()
+    index = ReportIndexPageFactory(parent=home_page)
+    DailyAggregateFactory(
+        clinic_date=today,
+        total_visits=5,
+        zakat_beneficiary_patients=0,
+        paying_patients=5,
+    )
+
+    funding_mix = index.get_funding_mix()
+    bar = funding_mix["bars"][0]
+
+    assert len(bar["segments"]) == 1
+    assert bar["segments"][0]["css_class"] == "ri-funding-mix__bar--regular"
+    # The segment's path must start and end at the true baseline (tick 0),
+    # not floated above it by _STACK_GAP.
+    baseline_y = funding_mix["ticks"][0]["y"]
+    assert f" {baseline_y} " in bar["segments"][0]["path"]
+
+
 def test_reports_index_renders_funding_mix_chart_with_real_figures(client, home_page):
     today = timezone.localdate()
     index = ReportIndexPageFactory(parent=home_page, slug="reports")

@@ -457,26 +457,40 @@ class ReportIndexPage(Page):
         cx = round(self._PAD_LEFT + slot_width * index + slot_width / 2, 2)
         x = round(cx - bar_width / 2, 2)
         zakat_top = y_for(row.zakat_beneficiary_patients)
+        total_top = y_for(row.zakat_beneficiary_patients + row.paying_patients)
 
-        segments = [
-            {
-                "path": self._rounded_top_path(x, zakat_top, bar_width, baseline)
-                if row.paying_patients == 0
-                else self._square_path(x, zakat_top, bar_width, baseline),
-                "css_class": "ri-funding-mix__bar--zakat",
-            }
-        ]
-        if row.paying_patients > 0:
-            regular_base = zakat_top - self._STACK_GAP
-            regular_top = y_for(row.zakat_beneficiary_patients + row.paying_patients)
-            segments.append(
+        if row.zakat_beneficiary_patients == 0:
+            # Solo regular segment, resting on the baseline — mirrors the
+            # solo-zakat case below. Without this, the regular segment's
+            # base would be offset by _STACK_GAP above a degenerate
+            # zero-height zakat segment, floating it off the baseline.
+            segments = [
                 {
-                    "path": self._rounded_top_path(
-                        x, regular_top, bar_width, regular_base
-                    ),
+                    "path": self._rounded_top_path(x, total_top, bar_width, baseline),
                     "css_class": "ri-funding-mix__bar--regular",
                 }
-            )
+            ]
+        elif row.paying_patients == 0:
+            segments = [
+                {
+                    "path": self._rounded_top_path(x, zakat_top, bar_width, baseline),
+                    "css_class": "ri-funding-mix__bar--zakat",
+                }
+            ]
+        else:
+            regular_base = zakat_top - self._STACK_GAP
+            segments = [
+                {
+                    "path": self._square_path(x, zakat_top, bar_width, baseline),
+                    "css_class": "ri-funding-mix__bar--zakat",
+                },
+                {
+                    "path": self._rounded_top_path(
+                        x, total_top, bar_width, regular_base
+                    ),
+                    "css_class": "ri-funding-mix__bar--regular",
+                },
+            ]
 
         return {
             "date": row.clinic_date,
