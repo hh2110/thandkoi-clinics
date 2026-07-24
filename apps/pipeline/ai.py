@@ -333,7 +333,21 @@ EMPTY_COLUMNS_FLAG_MODEL = "claude-haiku-4-5"
 # freetext summary is now capped at ~50 words (see
 # _FREETEXT_SUMMARY_SYSTEM_PROMPT below), so its bound and max_tokens shrink
 # to match — still comfortably above what a real 50-word response needs.
-MAX_FREETEXT_SUMMARY_LENGTH = 600  # max_tokens=120 below
+#
+# Loosened again 2026-07-24 (found via production backfill: ~30% of daily
+# reports across May-July published with no freetext_summary at all, no
+# error in the Anthropic call or the app logs). Root-caused against
+# `pipeline_aicalllog`: every affected report's call landed at exactly
+# output_tokens=120 — the model was still aiming for the ~50-word target
+# (most successful calls finish well under 120 tokens), but on days with
+# more free-text entries it would run a little long and get hard-cut
+# mid-sentence before reaching `end_turn`, so `_draft_short_text`'s
+# stop_reason guard (correctly) discarded the whole response. The 50-word
+# instruction in the prompt is unchanged — this only gives the model room
+# to finish the sentence it was already writing instead of being cut off
+# for drifting slightly past target, matching MAX_FREETEXT_SUMMARY_LENGTH's
+# own ~4-chars/token margin rule above.
+MAX_FREETEXT_SUMMARY_LENGTH = 1000  # max_tokens=200 below
 MAX_EMPTY_COLUMNS_FLAG_LENGTH = 1000  # max_tokens=200 below
 
 # Tightened 2026-07-23 (Plan 11 Track B11, maintainer decision): the
@@ -398,7 +412,7 @@ def build_freetext_summary_payload(
     body = {FREETEXT_COLUMN_LABELS[name]: values for name, values in columns.items()}
     return {
         "model": FREETEXT_SUMMARY_MODEL,
-        "max_tokens": 120,
+        "max_tokens": 200,
         "system": _FREETEXT_SUMMARY_SYSTEM_PROMPT,
         "messages": [
             {
