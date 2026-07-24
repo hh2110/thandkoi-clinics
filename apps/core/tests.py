@@ -1077,6 +1077,150 @@ def test_newsletter_never_renders_an_unconsented_photo(client, home_page):
     assert "Unconsented photo" not in content
 
 
+def test_newsletter_masthead_and_structured_blocks_render(client, home_page):
+    """Plan 11 D14 redesign: the fixed masthead identity renders regardless
+    of body content, and each new structured block type (stat_band,
+    highlights, feature_split) renders through its own block template."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Inauguration photo", file=get_test_image_file())
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="may-2026",
+        title="A new chapter begins",
+        issue_date=datetime.date(2026, 6, 1),
+        issue_label="Inaugural Issue",
+        summary="763 patients reached across May and June.",
+        body=[
+            (
+                "stat_band",
+                {
+                    "heading": "Our impact, at a glance",
+                    "updated": "May–June 2026",
+                    "stats": [
+                        {"value": "763", "label": "Patients seen"},
+                        {"value": "379", "label": "Free-camp patients"},
+                    ],
+                },
+            ),
+            (
+                "highlights",
+                {
+                    "heading": "Highlights this issue",
+                    "items": ["<p>The clinic was <b>officially inaugurated</b>.</p>"],
+                },
+            ),
+            (
+                "feature_split",
+                {
+                    "eyebrow": "In focus",
+                    "heading": "A new chapter opens",
+                    "text": "<p>The doors opened to the community.</p>",
+                    "photo": {
+                        "image": image,
+                        "alt_text": "",
+                        "caption": "",
+                        "consent_confirmed": True,
+                    },
+                    "reverse": False,
+                    "pull_stats": [{"value": "69%", "label": "Women"}],
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/may-2026/").content.decode()
+    # Fixed series identity, not the per-issue title.
+    assert "The Thandkoi" in content and "Beacon" in content
+    assert "چراغِ شفا" in content
+    assert "JUNE 2026" in content and "INAUGURAL ISSUE" in content
+    # Stat band.
+    assert "763" in content and "Patients seen" in content
+    # Highlights.
+    assert "officially inaugurated" in content
+    # Feature split.
+    assert "A new chapter opens" in content
+    assert "69%" in content and 'alt="Inauguration photo"' in content
+
+
+def test_newsletter_feature_split_never_renders_unconsented_photo(client, home_page):
+    """Mirrors test_newsletter_never_renders_an_unconsented_photo for the new
+    feature_split block's own nested ConsentedImageBlock."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(
+        title="Unconsented split photo", file=get_test_image_file()
+    )
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="unconsented-split",
+        body=[
+            (
+                "feature_split",
+                {
+                    "eyebrow": "",
+                    "heading": "Should still show the text",
+                    "text": "<p>Body text renders regardless of the photo.</p>",
+                    "photo": {
+                        "image": image,
+                        "alt_text": "",
+                        "caption": "",
+                        "consent_confirmed": False,
+                    },
+                    "reverse": False,
+                    "pull_stats": [],
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/unconsented-split/").content.decode()
+    assert "Should still show the text" in content
+    assert "Unconsented split photo" not in content
+
+
+def test_newsletter_thumbnail_from_feature_split_photo(client, home_page):
+    """The archive tile's thumbnail comes from the first consented photo,
+    whether it's a legacy photo block or D14's feature_split block."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Camp thumbnail", file=get_test_image_file())
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="with-thumb",
+        title="Issue with a thumbnail",
+        body=[
+            (
+                "feature_split",
+                {
+                    "eyebrow": "",
+                    "heading": "A story",
+                    "text": "<p>Text.</p>",
+                    "photo": {
+                        "image": image,
+                        "alt_text": "",
+                        "caption": "",
+                        "consent_confirmed": True,
+                    },
+                    "reverse": False,
+                    "pull_stats": [],
+                },
+            ),
+        ],
+    )
+    NewsletterPageFactory(
+        parent=index,
+        slug="without-thumb",
+        title="Issue with no photo",
+    )
+    content = client.get("/en/newsletters/").content.decode()
+    assert 'alt="Camp thumbnail"' in content
+    # The no-photo issue's tile still renders (masthead strip carries the
+    # identity alone) without raising on a missing thumbnail.
+    assert "Issue with no photo" in content
+
+
 def test_about_page_renders_consented_photos(client, home_page):
     """AboutPage.photos mirrors NewsletterPage.body's photo handling exactly
     — same ConsentedImageBlock, same render template, just a single-block-type

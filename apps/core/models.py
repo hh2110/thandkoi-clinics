@@ -750,32 +750,97 @@ class NewsletterPage(Page):
     Contact) so an issue can mix prose with photos; the photo block reuses
     ``ConsentedImageBlock`` (Plan 04) since a newsletter issue is exactly the
     kind of content likely to carry camp/community photography.
+
+    Plan 11 D14 (the "Thandkoi Beacon" redesign) added ``issue_label`` and
+    three structured blocks (``stat_band``/``highlights``/``feature_split``)
+    alongside the original ``paragraph``/``photo`` — additive, so Plan 09's
+    AI-drafting flow (which only ever writes ``paragraph``/``photo``) is
+    unaffected. The masthead series name/Urdu motif is a fixed template
+    string, not a field — see D14's decision note in
+    ``.claude/plans/11-stakeholder-feedback-2026-07.md``.
     """
 
     issue_date = models.DateField(help_text="The issue's cover date.")
+    issue_label = models.CharField(
+        blank=True,
+        max_length=60,
+        help_text="Optional, shown after the issue date in the masthead, e.g. "
+        '"Inaugural Issue".',
+    )
     summary = models.TextField(
         blank=True,
-        help_text="Short teaser blurb — shown in the archive list and Home's "
-        "latest-newsletter section.",
+        help_text="Short teaser blurb — shown in the archive list, the "
+        "masthead lede, and Home's latest-newsletter section.",
     )
     body = StreamField(
         [
             ("paragraph", blocks.RichTextBlock()),
             ("photo", core_blocks.ConsentedImageBlock()),
+            ("stat_band", core_blocks.NewsletterStatBandBlock()),
+            ("highlights", core_blocks.NewsletterHighlightsBlock()),
+            ("feature_split", core_blocks.NewsletterFeatureSplitBlock()),
         ],
         blank=True,
         help_text="The issue's content.",
+        block_counts={"stat_band": {"max_num": 1}},
     )
 
     content_panels = [
         *Page.content_panels,
         FieldPanel("issue_date"),
+        FieldPanel("issue_label"),
         FieldPanel("summary"),
         FieldPanel("body"),
     ]
 
     parent_page_types = ["core.NewsletterIndexPage"]
     subpage_types: list[str] = []
+
+    _PROSE_BLOCK_TYPES = {"paragraph", "photo"}
+
+    def get_body_sections(self):
+        """Groups ``body`` into contiguous runs for the template.
+
+        Legacy ``paragraph``/``photo`` blocks (Plan 06; still the only block
+        types Plan 09's AI-drafting flow writes) render consecutively inside
+        one shared prose wrapper, exactly as before D14 — grouping runs
+        avoids wrapping every single paragraph in its own padded section.
+        D14's structured blocks (``stat_band``/``highlights``/
+        ``feature_split``) each render standalone, one section per block,
+        matching how HomePage's body blocks each render a full section
+        (Plan 04).
+
+        Returns a list of ``{"type": "prose"|"structured", "blocks": [...]}``.
+        """
+        sections = []
+        for block in self.body:
+            if block.block_type in self._PROSE_BLOCK_TYPES:
+                if sections and sections[-1]["type"] == "prose":
+                    sections[-1]["blocks"].append(block)
+                else:
+                    sections.append({"type": "prose", "blocks": [block]})
+            else:
+                sections.append({"type": "structured", "blocks": [block]})
+        return sections
+
+    def get_thumbnail(self):
+        """First consent-confirmed photo in ``body``, for the archive tile.
+
+        Checks both the legacy ``photo`` block and D14's ``feature_split``
+        block (its nested ``photo`` field). ``None`` when the issue has no
+        such photo, so the tile's masthead strip carries the series identity
+        alone — the handoff's own documented fallback, not an error state.
+        """
+        for block in self.body:
+            if block.block_type == "photo":
+                photo = block.value
+            elif block.block_type == "feature_split":
+                photo = block.value.get("photo")
+            else:
+                continue
+            if photo and photo.get("image") and photo.get("consent_confirmed"):
+                return photo
+        return None
 
     class Meta:
         verbose_name = "Newsletter"

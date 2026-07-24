@@ -1,0 +1,42 @@
+{% load wagtailcore_tags wagtailimages_tags %}
+{% comment %}
+NewsletterFeatureSplitBlock → an "In focus" photo + text split. Reuses the
+existing .feature-split / .stat__value / .stat__label classes
+(static/css/layout.css, Plan 03.5/D12) rather than inventing parallel
+markup — only the photo's aspect ratio (4:3 here vs. the sitewide 16:9
+default) is newsletter-specific, scoped via `.nl-feature-split` in
+newsletter.css so no other .feature-split caller is affected.
+
+The `value.photo.consent_confirmed` guard mirrors consented_image_block.html's
+own comment: `clean()` only runs through the admin-form StreamField widget, so
+this render-time check is the actual guarantee that an unconsented photo is
+never displayed, regardless of how the data was written (Plan 09's AI-drafting
+flow, a migration, an SSH content-ops snippet).
+{% endcomment %}
+<section class="section section--snug">
+  <div class="wrapper">
+    <div class="feature-split nl-feature-split {% if value.reverse %}feature-split--reverse{% endif %}">
+      {% if value.photo.image and value.photo.consent_confirmed %}
+        <div class="feature-split__media">
+          {% image value.photo.image fill-800x600 as photo %}
+          <img class="feature-split__image" src="{{ photo.url }}" alt="{{ value.photo.alt_text|default:value.photo.image.title }}" />
+        </div>
+      {% endif %}
+      <div class="feature-split__body">
+        {% if value.eyebrow %}<p class="eyebrow">{{ value.eyebrow }}</p>{% endif %}
+        <h3>{{ value.heading }}</h3>
+        {{ value.text|richtext }}
+        {% if value.pull_stats %}
+          <div class="feature-split__stats">
+            {% for stat in value.pull_stats %}
+              <div class="stat">
+                <p class="stat__value">{{ stat.value }}</p>
+                <p class="stat__label">{{ stat.label }}</p>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>

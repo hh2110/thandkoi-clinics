@@ -1,0 +1,9 @@
+{% comment %}
+NewsletterStatBandBlock → reuses partials/sections/stat_band.html (Plan 11
+D13, built for Home's live impact band) unchanged — this block only maps
+its StructValue onto that partial's existing context shape. `section--snug`
+overrides the partial's default tinted/banded look: the reference design
+shows the newsletter's stat band on the plain page background, not a raised
+band, since the masthead above it already carries the tint.
+{% endcomment %}
+{% include "partials/sections/stat_band.html" with heading=value.heading updated_caption=value.updated stats=value.stats section_modifier="section--snug" %}
