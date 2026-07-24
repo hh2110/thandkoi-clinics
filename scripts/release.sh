@@ -287,8 +287,12 @@ if gh release view "$REF" --repo "$REPO" >/dev/null 2>&1; then
   log "GitHub Release for $REF already exists — leaving it untouched"
 else
   log "Publishing GitHub Release for $REF"
-  gh release create "$REF" --repo "$REPO" --title "$REF" --generate-notes \
-    || echo "WARNING: could not create the GitHub Release for $REF (deploy itself succeeded). Create it manually if wanted: gh release create $REF --repo $REPO --generate-notes"
+  RELEASE_ERR="$(mktemp)"
+  gh release create "$REF" --repo "$REPO" --title "$REF" --generate-notes 2>"$RELEASE_ERR" || {
+    echo "WARNING: could not create the GitHub Release for $REF (deploy itself succeeded): $(cat "$RELEASE_ERR")"
+    echo "Create it manually if wanted: gh release create $REF --repo $REPO --generate-notes"
+  }
+  rm -f "$RELEASE_ERR"
 fi
 
 exit 0
