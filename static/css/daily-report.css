@@ -126,7 +126,7 @@
 .dr__age-label { font-size: var(--font-size-sm); color: var(--color-text-soft); font-variant-numeric: tabular-nums; }
 .dr__age-count { font-family: var(--font-heading); font-weight: 800; font-size: var(--font-size-lg); line-height: 1; color: var(--color-stat-value); font-variant-numeric: tabular-nums; }
 
-/* --- Notes ----------------------------------------------------------------- */
+/* --- Notes: three per-category cards (Plan 14, 2026-07-24) ----------------- */
 .dr__notes { margin-bottom: var(--space-4); }
 .dr__notes-title {
   font-family: var(--font-heading);
@@ -135,11 +135,36 @@
   color: var(--color-text);
   margin: 0 0 var(--space-2);
 }
-.dr__notes p {
-  font-size: var(--font-size-md);
-  line-height: 1.65;
+.dr__notes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+/* .dr__card-head/.dr__notes-glyph only apply inside the notes grid — the
+   Breakdown cards above (.dr__card--gender/--age) don't use this header
+   row shape, so these aren't scoped under a bare `.dr__card` selector. */
+.dr__notes-grid .dr__card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.dr__notes-grid .dr__card-title { margin: 0; }
+.dr__notes-glyph {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dr__notes-glyph svg { width: 20px; height: 20px; display: block; stroke: var(--color-brand-hover); }
+.dr__notes-grid p {
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
   color: var(--color-text-soft);
-  max-width: 68ch;
   text-wrap: pretty;
   margin: 0;
 }
@@ -175,4 +200,5 @@
   .dr__metrics { grid-template-columns: 1fr; }
   .dr__breakdown-grid { grid-template-columns: 1fr; }
   .dr__age-grid { grid-template-columns: repeat(2, 1fr); }
+  .dr__notes-grid { grid-template-columns: 1fr; }
 }

@@ -573,12 +573,34 @@ class DailyReportPage(Page):
     # `summary_sentence`, a failed/skipped AI call leaves the field blank
     # (or, on a re-ingest, preserves whatever was there before — see
     # `report_publishing.publish_daily_report`) rather than blocking publish.
-    freetext_summary = models.TextField(
+    # Split into three per-category fields (Plan 14, 2026-07-24, maintainer
+    # decision) — replaces the single `freetext_summary` field. Each is an
+    # independent, independently-editable restatement of that category's
+    # already-collected free-text entries (see
+    # `apps.pipeline.freetext.collect_freetext_entries_by_group` and
+    # `_group_for_visit` for the male-adult/female-adult/children split and
+    # the "under 14" age-band approximation it makes). Blank if the AI call
+    # failed/was skipped, or if that category had no matching visits that
+    # day.
+    freetext_summary_male_adults = models.TextField(
         blank=True,
         help_text="AI-drafted summary of today's free-text clinical columns "
-        "(Plan 11 Track B8) — a fixed-template restatement of this date's "
-        "already-collected free-text entries. Blank if the AI call failed "
-        "or was skipped.",
+        "for male adult patients (Plan 14). Blank if the AI call failed, "
+        "was skipped, or no male adult visits were recorded that day.",
+    )
+    freetext_summary_female_adults = models.TextField(
+        blank=True,
+        help_text="AI-drafted summary of today's free-text clinical columns "
+        "for female adult patients (Plan 14). Blank if the AI call failed, "
+        "was skipped, or no female adult visits were recorded that day.",
+    )
+    freetext_summary_children = models.TextField(
+        blank=True,
+        help_text="AI-drafted summary of today's free-text clinical columns "
+        "for child patients (Plan 14; age bands 0-5 and 6-18, an "
+        'approximation of "under 14" — see freetext.py\'s Plan 14 '
+        "grounding note). Blank if the AI call failed, was skipped, or no "
+        "child visits were recorded that day.",
     )
     empty_columns_flag = models.TextField(
         blank=True,
@@ -591,7 +613,9 @@ class DailyReportPage(Page):
         *Page.content_panels,
         FieldPanel("report_date"),
         FieldPanel("summary_sentence"),
-        FieldPanel("freetext_summary"),
+        FieldPanel("freetext_summary_male_adults"),
+        FieldPanel("freetext_summary_female_adults"),
+        FieldPanel("freetext_summary_children"),
         FieldPanel("empty_columns_flag"),
     ]
 

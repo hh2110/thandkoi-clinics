@@ -32,6 +32,14 @@ rules are architectural constraints, not preferences — never weaken them:
    free-text column added later needs that same question asked explicitly
    before it may cross into a model call, never assumed by analogy. See
    `apps.pipeline.freetext`'s module docstring for the full grounding note.
+   **Widened again** (decided 2026-07-24, Plan 14): the free-text-summary
+   call's payload now also groups entries by `DeidentifiedVisit.age_band`/
+   `sex` (male adults / female adults / children) before sending, so which
+   bucket an entry came from is now visible to the model. This is a
+   category label over already-de-identified fields already used elsewhere
+   on the same page (e.g. the "Breakdown" gender/age sections) — no exact
+   age, name, or other identifier is added. See
+   `apps.pipeline.freetext._group_for_visit` for the exact bucketing rule.
 3. **Numbers are deterministic.** All published figures are computed in Python
    and injected into prompts. The AI writes prose only; it must never invent or
    restate statistics from memory.

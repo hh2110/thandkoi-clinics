@@ -283,10 +283,10 @@ def test_draft_daily_summary_sentence_survives_a_logging_failure(db, monkeypatch
 
 
 def test_draft_freetext_summary_logs_an_ai_call(db):
-    columns = {"presenting_complaints": ["fever", "cough"]}
+    groups = {"male_adults": {"presenting_complaints": ["fever", "cough"]}}
     client = _stub_client("Common themes: fever and cough.", 180, 40)
 
-    summary = ai.draft_freetext_summary(JULY, columns, client)
+    summary = ai.draft_freetext_summary(JULY, groups, client)
 
     assert summary
     log = AiCallLog.objects.get()
@@ -300,11 +300,11 @@ def test_draft_freetext_summary_logs_an_ai_call(db):
 def test_draft_freetext_summary_still_logs_when_the_text_fails_sanity_check(db):
     """Same guarantee as the daily-summary case: tokens were spent even if
     the response fails the length sanity check afterwards."""
-    columns = {"presenting_complaints": ["fever"]}
+    groups = {"male_adults": {"presenting_complaints": ["fever"]}}
     too_long_text = "x" * (ai.MAX_FREETEXT_SUMMARY_LENGTH + 1)
     client = _stub_client(too_long_text, 220, 600)
 
-    summary = ai.draft_freetext_summary(JULY, columns, client)
+    summary = ai.draft_freetext_summary(JULY, groups, client)
 
     assert summary is None
     log = AiCallLog.objects.get()
@@ -317,14 +317,14 @@ def test_draft_freetext_summary_logs_nothing_when_the_client_raises(db):
         raise TimeoutError("simulated AI timeout")
 
     raising_client = SimpleNamespace(messages=SimpleNamespace(create=_raise))
-    columns = {"presenting_complaints": ["fever"]}
+    groups = {"male_adults": {"presenting_complaints": ["fever"]}}
 
-    assert ai.draft_freetext_summary(JULY, columns, raising_client) is None
+    assert ai.draft_freetext_summary(JULY, groups, raising_client) is None
     assert not AiCallLog.objects.exists()
 
 
 def test_draft_freetext_summary_survives_a_logging_failure(db, monkeypatch):
-    columns = {"presenting_complaints": ["fever"]}
+    groups = {"male_adults": {"presenting_complaints": ["fever"]}}
     client = _stub_client("Common themes: fever.", 180, 40)
 
     def _raise(*args, **kwargs):
@@ -332,7 +332,7 @@ def test_draft_freetext_summary_survives_a_logging_failure(db, monkeypatch):
 
     monkeypatch.setattr(AiCallLog, "record", _raise)
 
-    summary = ai.draft_freetext_summary(JULY, columns, client)
+    summary = ai.draft_freetext_summary(JULY, groups, client)
 
     assert summary == "Common themes: fever."
     assert not AiCallLog.objects.exists()

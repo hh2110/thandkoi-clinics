@@ -58,6 +58,17 @@ def _get_or_create_report_index() -> ReportIndexPage:
     return index
 
 
+#: Maps each :data:`apps.pipeline.freetext.FREETEXT_SUMMARY_GROUPS` key onto
+#: its ``DailyReportPage`` field name (Plan 14, 2026-07-24) — the one place
+#: that wiring lives, so the per-field preserve-on-falsy loop below and any
+#: future caller share a single source of truth for the mapping.
+_FREETEXT_SUMMARY_GROUP_FIELDS = {
+    freetext.GROUP_MALE_ADULTS: "freetext_summary_male_adults",
+    freetext.GROUP_FEMALE_ADULTS: "freetext_summary_female_adults",
+    freetext.GROUP_CHILDREN: "freetext_summary_children",
+}
+
+
 def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     """Create/update and auto-publish the daily report page for ``clinic_date``.
 
@@ -72,7 +83,10 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     empty-columns-flag from this date's ``DeidentifiedVisit`` rows and
     auto-publishes them alongside the numbers, same as ``summary_sentence``
     above — CLAUDE.md invariant #4's exception, widened 2026-07-23
-    (maintainer decision) to cover these two as well.
+    (maintainer decision) to cover these two as well. Plan 14 (2026-07-24)
+    splits the free-text summary into three per-category fields (see
+    ``_FREETEXT_SUMMARY_GROUP_FIELDS``) instead of one — B9's empty-columns
+    flag is unaffected and still runs over every visit regardless of group.
 
     If a re-ingest's call fails (transient API error/timeout), the existing
     page's field is left untouched rather than overwritten with an empty
@@ -81,7 +95,12 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     changed (found by code-review-tc, when this was still a review-gated
     draft — the same protection matters even more now that these values
     reach the public page directly). A brand new page has nothing to
-    preserve, so it falls back to ``""`` as before.
+    preserve, so it falls back to ``""`` as before. Plan 14 applies this
+    same preserve-on-falsy rule *per category* — a category with zero
+    matching visits today (so nothing for the model to summarise, or a
+    genuinely failed/malformed response for that key alone) leaves that
+    one field untouched rather than blanking it, independently of whether
+    the other two categories got a fresh value this round.
 
     The three drafting calls are independent of each other and run
     concurrently (found by code-review-tc: they used to run sequentially,
@@ -91,21 +110,35 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     aggregate = DailyAggregate.objects.get(clinic_date=clinic_date)
 
     visits = list(DeidentifiedVisit.objects.filter(visit_date=clinic_date))
-    freetext_columns = freetext.collect_freetext_entries(visits)
-    empty_columns = freetext.empty_columns_from_entries(freetext_columns)
+    freetext_groups = freetext.collect_freetext_entries_by_group(visits)
+    # Deliberately a second pass over `visits` (not
+    # `freetext.empty_columns_from_entries` over `freetext_groups`), even
+    # though the two used to share one pass before Plan 14 (see
+    # `empty_columns_from_entries`'s own docstring on why that sharing
+    # mattered). B9's "was this column empty today" must stay true across
+    # *every* visit, but `freetext_groups` only covers the three in-scope
+    # demographic buckets — an unknown-age-band visit or an unknown-sex
+    # adult's entries are deliberately excluded from every group (Plan 14
+    # grounding note), so building B9's input from `freetext_groups` would
+    # silently narrow "empty" to "empty across the categorised visits",
+    # wrongly flagging a column as empty when its only content came from an
+    # excluded visit.
+    empty_columns = freetext.compute_empty_columns(visits)
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         summary_future = executor.submit(
             ai.draft_daily_summary_sentence, aggregate, client
         )
         freetext_future = executor.submit(
-            ai.draft_freetext_summary, clinic_date, freetext_columns, client
+            ai.draft_freetext_summary, clinic_date, freetext_groups, client
         )
         empty_future = executor.submit(
             ai.draft_empty_columns_flag, clinic_date, empty_columns, client
         )
         summary_sentence = summary_future.result() or ""
-        new_freetext_summary = freetext_future.result()
+        new_freetext_summary_by_group = freetext.parse_freetext_summary_by_group(
+            freetext_future.result() or ""
+        )
         new_empty_columns_flag = empty_future.result()
 
     index = _get_or_create_report_index()
@@ -117,16 +150,21 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
             report_date=clinic_date,
             aggregate=aggregate,
             summary_sentence=summary_sentence,
-            freetext_summary=new_freetext_summary or "",
             empty_columns_flag=new_empty_columns_flag or "",
             live=False,
+            **{
+                field_name: new_freetext_summary_by_group.get(group, "")
+                for group, field_name in _FREETEXT_SUMMARY_GROUP_FIELDS.items()
+            },
         )
         index.add_child(instance=page)
     else:
         page.aggregate = aggregate
         page.summary_sentence = summary_sentence
-        if new_freetext_summary:
-            page.freetext_summary = new_freetext_summary
+        for group, field_name in _FREETEXT_SUMMARY_GROUP_FIELDS.items():
+            new_value = new_freetext_summary_by_group.get(group)
+            if new_value:
+                setattr(page, field_name, new_value)
         if new_empty_columns_flag:
             page.empty_columns_flag = new_empty_columns_flag
 
