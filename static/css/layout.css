@@ -52,6 +52,13 @@
   color: var(--color-pale-aqua);
 }
 
+/* Plan 11 D12 (2026-07-24) — hairline top+bottom border for a full-bleed
+   raised band (stat band, and now the home page's daily-report band), so the
+   band reads as a distinct strip rather than just a colour change. */
+.section--banded {
+  border-block: 1px solid var(--color-border-default);
+}
+
 /* --- Eyebrow + section header ---------------------------------------------- */
 .eyebrow {
   font-family: var(--font-heading);
@@ -155,7 +162,12 @@
   font-family: var(--font-heading);
   font-weight: 800;
   font-size: var(--font-size-lg);
-  color: var(--color-brand);
+  /* Plan 11 D12 (2026-07-24): was var(--color-brand) — teal-on-teal against
+     .hero__stat-card's --color-surface in dark mode read as near-invisible
+     (both close in luminance). Amber is the one warm highlight this page
+     uses (brand-guidelines.md §7), reserved for exactly this kind of "one
+     eye-catching figure per view" role. */
+  color: var(--color-accent);
   font-variant-numeric: tabular-nums;
   margin-block: 0;
 }
@@ -205,7 +217,15 @@
 .stat__label {
   font-size: var(--font-size-xs);
   color: var(--color-text-soft);
-  margin-block: var(--space-1) 0;
+  margin-block: 4px 0;
+}
+
+/* Lead stat (Plan 11 D12) — the one figure per stat row that gets the amber
+   highlight instead of --color-stat-value's teal, e.g. the home page's daily-
+   report teaser "Patients seen" figure. Opt-in per stat, not per band, since
+   a band can mix a highlighted lead figure with ordinary teal ones. */
+.stat--accent .stat__value {
+  color: var(--color-accent);
 }
 
 .stat-band__caption {
@@ -359,6 +379,16 @@
 .feature-split__link {
   font-weight: 600;
   text-decoration: none;
+}
+
+/* Plan 11 D12 — the home page's daily-report teaser link only; the
+   newsletter teaser keeps the default (inherited) text colour.
+   `:root[data-theme] a` (base.css) outranks a single class on specificity
+   ((0,2,1) vs (0,1,0)), so this repeats that shape to win outright — same
+   trick as base.css's own light/dark link-colour overrides. */
+.feature-split__link--accent,
+:root[data-theme] .feature-split__link--accent {
+  color: var(--color-accent);
 }
 
 @media (min-width: 56rem) {
@@ -612,6 +642,19 @@
 .coc-section__header .section-header__title {
   max-width: none;
   margin-inline: auto;
+}
+
+/* Plan 11 D12 (2026-07-24) — frames the wheel on a --card surface (radius
+   20px, wider than .card's --card-radius, per the handoff) instead of
+   floating directly on the section background. */
+.coc__panel {
+  max-width: 35rem;
+  margin-inline: auto;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  padding-block: var(--space-6);
 }
 
 .coc {

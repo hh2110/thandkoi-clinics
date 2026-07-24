@@ -15,8 +15,17 @@ Context (all optional):
   stats         — optional inline {value, label} pairs (e.g. "128 patients").
   body          — body paragraph.
   cta_label / cta_url   — optional trailing link ("Read the full report →").
+  section_modifier — optional background/rhythm modifier class(es), e.g.
+                  "section--tinted section--snug" (Plan 11 D12: the home
+                  page's daily-report band). Defaults to plain (no modifier),
+                  unlike stat_band.html which defaults to tinted.
+  cta_accent       — Plan 11 D12: amber (not default) colour for cta_label.
+                  Scoped to the one caller that asked for it (home page's
+                  report teaser) — leave unset everywhere else.
+  lead_stat_accent — Plan 11 D12: amber (not teal) for the *first* stat's
+                  value only. Same scoping as cta_accent.
 {% endcomment %}
-<section class="section">
+<section class="section {{ section_modifier }}">
   <div class="wrapper">
     <div class="feature-split {% if reverse %}feature-split--reverse{% endif %}">
       <div class="feature-split__media">
@@ -31,7 +40,7 @@ Context (all optional):
         {% if stats %}
           <div class="feature-split__stats">
             {% for stat in stats %}
-              <div class="stat">
+              <div class="stat {% if forloop.first and lead_stat_accent %}stat--accent{% endif %}">
                 <p class="stat__value">{{ stat.value }}</p>
                 {% if stat.label %}<p class="stat__label">{{ stat.label }}</p>{% endif %}
               </div>
@@ -39,7 +48,7 @@ Context (all optional):
           </div>
         {% endif %}
         {% if body %}<p>{{ body }}</p>{% endif %}
-        {% if cta_label %}<a class="feature-split__link" href="{{ cta_url|default:'#' }}">{{ cta_label }}</a>{% endif %}
+        {% if cta_label %}<a class="feature-split__link {% if cta_accent %}feature-split__link--accent{% endif %}" href="{{ cta_url|default:'#' }}">{{ cta_label }}</a>{% endif %}
       </div>
     </div>
   </div>
