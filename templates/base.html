@@ -102,6 +102,13 @@
     base.
     {% endcomment %}
     <link rel="stylesheet" href="{% static 'css/newsletter.css' %}" />
+    {% comment %}
+    Reports index funding-mix chart (Plan 13) — scoped to `.ri-funding-mix`,
+    reads tokens.css only. Sitewide like daily-report.css/newsletter.css
+    rather than a per-page block, since no page-scoped CSS block exists yet
+    in this base.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/report-index.css' %}" />
     {% block extra_head %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">
@@ -118,6 +125,7 @@
     <script src="{% static 'js/nav.js' %}" defer></script>
     <script src="{% static 'js/lightbox.js' %}" defer></script>
     <script src="{% static 'js/circle-of-care.js' %}" defer></script>
+    <script src="{% static 'js/funding-mix-chart.js' %}" defer></script>
     {% block extra_js %}{% endblock %}
   </body>
 </html>
