@@ -536,8 +536,11 @@
    only because production has no footer links to lose — the Contact & Bank
    Details setting has neither an email (the mailto:) nor any social links
    entered, so both blocks render their "coming soon" <p> placeholder text
-   instead of an <a>. Repeating the themed shape at (0,2,2) wins
-   outright, in both themes. Same trick as `.feature-split__link--accent`
+   instead of an <a>. Repeating the themed shape wins outright in both themes:
+   `:root` (1) + `[data-theme]` (1) + `.site-footer` (1) + `a` = (0,3,1),
+   against the (0,2,1) it has to beat. The bare `.site-footer a` is kept as
+   the first half of the pair so the no-`data-theme` case (no toggle used
+   yet) still gets the colour. Same trick as `.feature-split__link--accent`
    (layout.css) and report-index.css. Found 2026-07-25. */
 .site-footer a,
 :root[data-theme] .site-footer a {

@@ -403,7 +403,7 @@ def test_footer_link_colour_survives_the_themed_anchor_override():
     the light theme `--color-teal-deep` is also `--color-footer-bg`, so a bare
     class lost the cascade and painted every footer link the exact colour of the
     ground it sits on — a 1:1 contrast ratio, invisible (found 2026-07-25).
-    Repeating the themed shape restores (0,2,2) and wins in both themes.
+    Repeating the themed shape gets (0,3,1) and wins in both themes.
     """
     css = (settings.BASE_DIR / "static" / "css" / "components.css").read_text()
     css_no_comments = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
