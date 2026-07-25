@@ -19,7 +19,7 @@ from wagtail.models import Site
 from apps.core.factories import HomePageFactory
 from apps.pipeline import dashboard as dashboard_module
 from apps.pipeline.factories import DailyAggregateFactory, ReportIndexPageFactory
-from apps.pipeline.footfall_chart import build_footfall_chart
+from apps.pipeline.footfall_chart import CHART_HEIGHT, build_footfall_chart
 from apps.pipeline.models import ClinicDashboardPage
 from apps.pipeline.report_publishing import _get_or_create_clinic_dashboard
 
@@ -265,7 +265,13 @@ def test_every_bar_gets_a_hover_hit_rect_carrying_its_own_figures(client, dashbo
 
     content = render(client, dashboard, start=day(0), end=day(5))
 
-    assert "data-funding-mix\n" in content or "data-funding-mix " in content
+    # The <svg>'s own opt-in hook, and the three label strings the script
+    # builds the tooltip sentence from — without these the rects below are
+    # never wired up at all.
+    svg = re.search(r"<svg class=\"dash-chart__plot\".*?>", content, re.S).group()
+    assert "data-funding-mix\n" in svg
+    for label in ("zakat", "regular", "total"):
+        assert f'data-label-{label}="' in svg
     hits = re.findall(r"<rect class=\"dash-chart__hit\".*?/>", content, re.S)
     assert len(hits) == 2
     for hit, (date, zakat, regular, total) in zip(
@@ -285,18 +291,18 @@ def test_hover_hit_rects_are_full_height_so_short_bars_stay_hoverable(
     """Next to a 200-visit day a 2-visit day is a few pixels tall, but both
     hit targets span the full plot, so the quiet day is as easy to hover as
     the busy one."""
-    rows = [_Row(day(0), 200, 150, 50), _Row(day(2), 2, 2, 0)]
     aggregate(day(0), total=200, zakat=150, regular=50)
     aggregate(day(2), total=2, zakat=2, regular=0)
 
     content = render(client, dashboard, start=day(0), end=day(5))
 
-    chart = build_footfall_chart(rows, day(0), day(5), bar_class_prefix="dash-chart")
     hits = re.findall(r"<rect class=\"dash-chart__hit\".*?/>", content, re.S)
     assert len(hits) == 2
     for hit in hits:
-        height = float(re.search(r'height="([\d.]+)"', hit).group(1))
-        assert height == chart["chart_height"]
+        # Asserted against the geometry module's own constant, not against a
+        # chart rebuilt here from a second copy of the rows: the plot height
+        # is fixed, so a local rebuild would only add a copy to drift.
+        assert f'height="{CHART_HEIGHT}"' in hit
         assert 'y="0"' in hit
 
 
