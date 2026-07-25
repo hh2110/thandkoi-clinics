@@ -268,10 +268,11 @@ the number of patients) — a patient can have several", where "several" means
 several *services*, one per fee column. So the display label stays
 **"quantity"**.
 
-The one thing the column format cannot express is **several units of the same
-service in one visit**: two separate lab tests both land in that visit's
-single Lab Fee cell as one summed amount, and count once. Worth re-checking
-against the updated export when it lands (Q5), but not a reason to relabel.
+No caveat remains. The maintainer settled the one edge case the same day:
+**a "service" is the line, not the item** — one lab service can cover N lab
+tests, and `qty` counts lab services. So the count of non-zero fee cells is
+exactly the clinic's own unit of service delivered, and "quantity" is the
+correct label with nothing left to re-check.
 
 **D15 — `*.csv` added to `.gitignore` in this PR.** Invariant #5's block list
 covers `*.xls`, `*.xlsx`, `/uploads/` and `/data/` — every raw-export format
@@ -281,7 +282,8 @@ about the pipeline changes; this only stops such a file being committed if
 one is ever saved into a working copy. No CSV is tracked today (checked), so
 the rule costs nothing, and a deliberate fixture can still be added with
 `git add -f`. A pre-existing gap surfaced by this plan's grounding rather
-than created by it, and small enough to close in the same pass.
+than created by it, small enough to close in the same pass, and confirmed
+by the maintainer (2026-07-25) as staying in this change.
 
 ## Open questions for the maintainer
 
@@ -291,13 +293,9 @@ than created by it, and small enough to close in the same pass.
   Ultrasound); the display order and labels follow from whatever the export
   really carries. No action needed now — the first export with fee columns
   answers it.
-- **Q5 (Phase 2, minor).** Settled for now — the label stays "quantity"
-  (D14). The only thing to re-check when the updated export lands: whether a
-  single visit can ever be charged twice for the same service. If it can't,
-  `qty` is exactly "services delivered" with no caveat at all.
-- **Q2 (default assumed).** Should the dashboard appear in the primary nav?
-  **Assumed no** — reachable from the reports index (1a) and home (1c), as
-  the handoff's entry-point work item implies. Easy to flip later.
+- **Q2 — answered 2026-07-25: no nav entry.** Reachable from the reports
+  index (1a) and the home band (1c) only, as the handoff's entry-point work
+  item implies. A content-level preference, flippable later without code.
 - **Q3 — answered 2026-07-25: public.** Same as the daily reports it
   aggregates. Put to the maintainer explicitly with the consequence spelled
   out — the day the revenue columns land, the site shows clinic income by
@@ -330,7 +328,11 @@ Gaps with no in-repo precedent, and how they are grounded instead:
 
 ## Feature flag (Stage 6)
 
-**No runtime flag**, consistent with every plan in this repo. The natural
+**No runtime flag**, consistent with every plan in this repo — put to the
+maintainer with the consequence stated (when 16.4 deploys, both entry points
+go live for every visitor at once) and **confirmed 2026-07-25**. The
+maintainer also approved 16.1's refactor of the live reports-page chart in
+the same pass, rather than giving the dashboard its own copy. The natural
 gates do the work here:
 
 - Nothing on the site links to the dashboard until task 16.4 lands, so a
@@ -344,17 +346,18 @@ gates do the work here:
 
 ## Release plan (Stage 10)
 
-- **How it ships.** Four PRs (below), each merged only after a clean
-  `code-review-tc` pass and green CI, then deployed by the existing
-  human-triggered `workflow_dispatch` release (`.github/workflows/deploy.yml`)
-  against a dated tag. The dashboard page creates itself on deploy via the
-  data migration (D1), but nothing links to it until task 16.4 ships — that
-  ordering, not a flag or a manual step, is the staging point.
-- **Gating check per phase.** (1) 16.3 deployed — the page exists and is
-  correct at its URL, but no existing page links to it; walk the URL by hand
-  in both themes and check a 7-day, a 90-day, a 1-year and an empty range.
-  (2) 16.4 deployed — entry points live; verify from home and `/reports/`
-  that both links appear and land on the dashboard.
+- **How it ships (maintainer decision, 2026-07-25).** Four PRs, each merged
+  as its review comes back clean, then **one deploy** once all four are in —
+  rather than deploying 16.3 unlinked to production first. The maintainer's
+  own pre-merge checks (including light/dark screenshots) are the gate, so a
+  production dry-run adds a step without adding information. Deploy is the
+  existing human-triggered `workflow_dispatch` release
+  (`.github/workflows/deploy.yml`) against a dated tag.
+- **Gating check.** Before the single deploy: each PR's own screenshots and
+  tests, plus a walk of the assembled branch — a week, three months, a year,
+  and a range with no reporting days — in both themes. After the deploy:
+  verify from home and `/reports/` that both entry points land on the
+  dashboard.
 - **Access.** Public once linked (Q3). No new permissions.
 - **Informed.** Maintainer only; no downstream operators or customers.
 - **Rollback trigger.** Any wrong figure, a crash on a range boundary, or a
