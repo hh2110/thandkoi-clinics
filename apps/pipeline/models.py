@@ -443,6 +443,10 @@ class ReportIndexPage(Page):
         context["camp_reports_preview"] = (
             camp_index.get_camp_reports()[:3] if camp_index is not None else []
         )
+        # Entry point 1a (Plan 16.4): the "Open the dashboard →" link in the
+        # footfall card's head. ``None`` drops the link entirely — see
+        # ``ClinicDashboardPage.entry_point_url``.
+        context["dashboard_url"] = ClinicDashboardPage.entry_point_url()
         return context
 
     class Meta:
@@ -666,6 +670,25 @@ class ClinicDashboardPage(Page):
     max_count = 1
     parent_page_types = ["pipeline.ReportIndexPage"]
     subpage_types: list[str] = []
+
+    @classmethod
+    def entry_point_url(cls) -> str | None:
+        """URL of the single live dashboard, or ``None`` if there isn't one.
+
+        The one place Plan 16's two entry points (task 16.4) resolve the
+        dashboard's address, so neither hardcodes ``/en/reports/dashboard/``
+        — the path is locale-prefixed (D1) and Wagtail owns it.
+
+        ``None`` when the page is missing, so a caller can omit its link
+        rather than render a dead one. Two real cases, not one: a database
+        that has never run the D1 data migration, and a maintainer who has
+        **unpublished** the page — which is exactly this plan's rollback
+        lever ("unlink the entry points (a content edit, no deploy)"), so
+        the filter is ``.live()`` rather than the bare ``.first()``
+        ``ReportIndexPage.get_context`` uses for the camp-reports teaser.
+        """
+        page = cls.objects.live().first()
+        return page.url if page is not None else None
 
     def _preset_label(self, days: int) -> str:
         """The pill's caption for a ``days``-long preset.

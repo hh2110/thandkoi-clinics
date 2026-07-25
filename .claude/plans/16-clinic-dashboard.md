@@ -84,7 +84,9 @@ index and the home page.
   (D9).
 - **Tests** — range parsing/clamping, bucketing boundaries, empty range, gap
   detection, both entry-point links, the no-revenue layout, and that the
-  newsletter/editorial stat bands are unchanged.
+  newsletter stat band is unchanged. (The editorial band this originally
+  also named no longer exists — see "Decisions taken while implementing
+  16.4".)
 - **Dark-theme and responsive verification with live screenshots**, both
   themes, per the dark-mode trap recorded in memory (a token that "should"
   flip sometimes doesn't).
@@ -370,6 +372,60 @@ buried in the diff:
   the `1.75fr/1fr` layout all appear — so the branch is verified rather
   than dead code, and Phase 2 needs no template work as promised.
 
+## Decisions taken while implementing 16.4 (2026-07-25)
+
+- **D7 says `stat_band.html` has three consumers; it has two.** The
+  editorial `ImpactStatsBlock` and its `templates/blocks/impact_stats_block.html`
+  were **retired on 2026-07-24** by Plan 11 D13 (PR #107) — the same PR that
+  redesigned this band. So the partial's only other consumer is
+  `NewsletterStatBandBlock`, and that is what the D7 "renders unchanged" test
+  asserts (plus a direct render of the partial with no link context). There
+  is nothing else to prove unchanged. A stray untracked copy of the deleted
+  template exists in the maintainer's working copy; it is not in git and not
+  wired to any block.
+- **Entry point 1a is outlined with `--color-stat-value`, not filled.** The
+  handoff specifies `--color-brand` text and border, which is 16.3's trap
+  again (~1.5:1 on the dark card). 16.3 resolved its Apply button by going
+  filled because Apply is the form's primary action; 1a is a secondary link
+  on someone else's card, and the design is explicitly a bordered pill, so it
+  keeps the outline and swaps the token. `--color-stat-value` **is**
+  `--color-brand` in light, so the light rendering matches the handoff
+  exactly; dark gets pale aqua. Measured on the real page after the change:
+  6.08:1 light, 6.25:1 dark, against ~1.5:1 for the handoff's literal spec.
+- **A single class was not enough to set that colour.** `:root[data-theme] a`
+  in `base.css` is (0,2,1) and silently outranked `.ri-funding-mix__dashboard-link`
+  (0,1,0) — the first pass rendered teal-deep in light and pale aqua in dark,
+  neither of them the token asked for, and only a computed-style read in the
+  browser caught it. Fixed with the paired-selector shape `layout.css` already
+  uses for `.feature-split__link--accent` (Plan 11 D12), which exists for this
+  exact reason.
+- **The reports index's own `View as table` is fixed here**, from
+  `--color-brand` to `--color-stat-value` (6.08:1 light / 6.25:1 dark). 16.3
+  deliberately left this pre-existing bug alone as out of its scope; 16.4 edits
+  that file and adds a second brand-coloured control a few lines above it, so
+  the two would otherwise be inconsistent inside one card. Called out in the
+  PR rather than slipped in.
+- **1c stays on the section's existing flexbox; no grid rewrite.** The
+  handoff describes `auto repeat(4, 1fr)`, and the flex row this section has
+  had since Plan 11 D13 already produces exactly that (fixed title column,
+  cards at `flex: 1`). What flex did *not* do on its own is the handoff's
+  tablet rule — four cards still fitted across 834px — so a `max-width:
+  55.999rem` rule takes `.stat-band--with-link` cards to a half-row basis,
+  giving two columns with the link tile last. Three-card bands are untouched.
+- **The tile's hover tint is `--color-accent-soft-bg` in both themes.** The
+  handoff's light value (`#fdf4e6`) is a new colour value, which D4/D10
+  forbid; the token it names for dark reads as a tint of the band's own
+  surface in light too.
+- **Stat values step down to `--font-size-xl` (1.953rem), not a literal
+  2rem**, and only at the four-across breakpoint. Below it the cards wrap
+  two-up and keep their full size.
+- **Not fixed, noted:** `.dash__preset:hover` in `dashboard.css` (16.3) has
+  the same specificity problem as the third bullet — `:root[data-theme] a`
+  wins, so the pill's hover colour is teal-deep in light rather than
+  `--color-stat-value`. It is identical in dark and hover-only in light, it
+  is on a different page from this task's two entry points, and fixing it
+  here would be the third out-of-scope change in one PR.
+
 ## Open questions for the maintainer
 
 - **Q4 (Phase 2, answerable once the software update ships).** Which
@@ -479,17 +535,17 @@ Conventional-Commit type.
       branches present and inert. Tests: renders with 3 KPI cards and no
       revenue card, side cards two-up, `View as table` fallback lists every
       bucket, no-JS form works.
-- [ ] **16.4 — Entry points 1a + 1c** (`feat`). Reports-index link in
+- [x] **16.4 — Entry points 1a + 1c** (`feat`). Reports-index link in
       `.ri-funding-mix__head`; opt-in link tile in `stat_band.html` wired from
       the Home impact band (D7). Tests: both links present and pointing at the
       dashboard URL; newsletter and editorial stat bands render unchanged.
-- [ ] **Verification, carried in each PR's test plan** (not a separate PR):
+- [x] **Verification, carried in each PR's test plan** (not a separate PR):
       real-browser screenshots of the dashboard and both entry points in
       **light and dark** at 1280px and tablet width, taken after the change —
       per the dark-mode trap (a token that reads correct in source can still
       fail to flip) and the broken-`resize_window` note (use the iframe
       harness, not the tool).
-- [ ] **Roadmap index** — flip this plan's row to ✅ Done when 16.4 merges,
+- [x] **Roadmap index** — flip this plan's row to ✅ Done when 16.4 merges,
       in the same pass (Stage 9).
 
 ## Acceptance criteria

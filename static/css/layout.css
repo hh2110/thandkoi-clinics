@@ -289,6 +289,60 @@
   margin-block: var(--space-1) 0 0;
 }
 
+/* --- Impact-band link tile (Plan 16.4, entry point 1c) ---------------------
+   Opt-in: only a band given `link_url`/`link_label` carries the tile, and
+   only that band gets `.stat-band--with-link` (D7) — the newsletter band
+   renders exactly as it did.
+
+   The handoff describes the row as `auto repeat(4, 1fr)`; this section has
+   been flex since Plan 11 D13 and already produces that — a fixed-width
+   title column plus cards at `flex: 1`, i.e. four equal tracks. Precedent
+   over a rewrite, and the wrap behaviour below the 56rem breakpoint (two
+   up, tile last) then comes from the existing `flex-wrap` rather than a
+   second grid definition. */
+.stat-band__link-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  /* Amber where the stat cards use the neutral hairline, so the tile reads
+     as the one actionable box in the row. */
+  border-color: var(--color-accent);
+  text-decoration: none;
+}
+/* The handoff's light-mode hover is a soft amber tint (#fdf4e6) that exists
+   in no token; D4/D10 forbid new colour values, so both themes use the
+   token the handoff itself names for dark. It is a tint of the band's own
+   surface either way, which is all the hover has to say. */
+.stat-band__link-card:hover {
+  background-color: var(--color-accent-soft-bg);
+}
+/* Below the 56rem row breakpoint the cards wrap on their 9rem basis, and
+   four of them still fit across a tablet — verified at 834px, where they
+   squeeze to ~190px each and the longest label runs to three lines. The
+   handoff asks for two columns with the link tile last at that width, so
+   the basis goes to half the row for a band that carries the tile. Three-
+   card bands (the newsletter's) keep the 9rem basis untouched. */
+@media (max-width: 55.999rem) {
+  .stat-band--with-link .stat-band__card {
+    flex: 1 1 calc(50% - var(--space-2));
+  }
+}
+
+.stat-band__link-glyph {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  color: var(--color-accent);
+}
+.stat-band__link-label {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
 .stat-band__empty {
   margin-block: 0;
 }
@@ -310,6 +364,17 @@
 
   .stat-band__card {
     flex: 1;
+  }
+
+  /* Four tracks share the width a band with three stat cards had to
+     itself, so the figures step down one rung of the type scale — the
+     handoff's "2rem, down from the current larger size at that width",
+     rounded to the existing --font-size-xl (1.953rem) rather than adding
+     a value. Accepted by the maintainer, 2026-07-25 (D7). Scoped to the
+     four-across row: below this breakpoint the cards wrap two-up with the
+     link tile last, and the figures keep their full size. */
+  .stat-band--with-link .stat-band__card-value {
+    font-size: var(--font-size-xl);
   }
 }
 

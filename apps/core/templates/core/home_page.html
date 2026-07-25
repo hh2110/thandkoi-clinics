@@ -49,6 +49,12 @@ subtitle, instead of one combined string — stat_band.html was redesigned
 from a centered number/label row into a title-left + stat-cards-right
 layout (maintainer-supplied handoff), and the two pieces render in
 different places in that layout.
+
+2026-07-25 (Plan 16.4, entry point 1c): the same band gains a fourth,
+link tile pointing at the clinic dashboard — opt-in context on the shared
+partial (D7), so the newsletter band that also includes it is unchanged.
+`dashboard_url` is None until the dashboard page exists and is live, and
+the tile simply doesn't render then.
 {% endcomment %}
 
 {% block content %}
@@ -60,7 +66,8 @@ different places in that layout.
   {% if live_impact_stats_as_of %}
     {% blocktranslate asvar live_impact_updated with date=live_impact_stats_as_of|date:"d M Y" %}Updated {{ date }}{% endblocktranslate %}
   {% endif %}
-  {% include "partials/sections/stat_band.html" with stats=live_impact_stats heading=live_impact_heading updated_caption=live_impact_updated %}
+  {% translate "See the live dashboard" as live_impact_link_label %}
+  {% include "partials/sections/stat_band.html" with stats=live_impact_stats heading=live_impact_heading updated_caption=live_impact_updated link_url=dashboard_url link_label=live_impact_link_label %}
 
   {% for block in body_from_circle_of_care %}
     {% include_block block %}
