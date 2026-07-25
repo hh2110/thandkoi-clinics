@@ -214,5 +214,42 @@ Uptime monitor on `/healthz` set up alongside it (1 included free).
 
 ## Status
 
-Track A–C implemented on `plan/17-observability-round-2`. Track D is a
-Sentry-UI task done alongside.
+**Tracks A–C — done.** Merged as PR #135 and auto-deployed to production on
+2026-07-25 at 15:51 UTC. Verified live, not just locally: within 15 minutes
+production had sent **1.2K spans / 270 transactions**, `/healthz` appeared in
+**none** of them (Decision 3 holds in production), and the logs dataset stayed
+empty of bot-scan 404s (the review fix holds too).
+
+**Track D — dashboard done, uptime monitor blocked on a maintainer decision.**
+
+Dashboard: **"Thandkoi Clinics — Service health"**,
+[dashboard/5046596](https://thandkoi-clinics.sentry.io/dashboard/5046596/),
+six widgets:
+
+| Widget | Dataset |
+|---|---|
+| Errors by release | errors — table, `release` × `count()` |
+| Top Unhandled Error Types | errors — area, from Sentry's widget library |
+| Response time (p50 / p95) | spans — `p50/p95(span.duration)`, `is_transaction:true` |
+| Slowest transactions | spans — table, `transaction` × `p95` × `count()` |
+| Warnings over time | logs — `severity:warn` |
+| Recent warnings | logs — table, `timestamp` × `message` |
+
+Two deviations from the widget set planned above, both recorded rather than
+quietly absorbed:
+
+1. **"Errors over time" grouped by `level` could not be saved.** The custom
+   widget builder accepted and previewed it, but the widget silently failed to
+   persist across five attempts — with and without the `level` group-by. Its
+   job (is the error count rising?) is covered by **Top Unhandled Error Types**
+   from Sentry's own widget library, which saved without trouble; the split by
+   `level` was worth little anyway, since every error event in this project is
+   `level:error`. Worth one more try if Sentry changes the builder.
+2. **The uptime monitor is not created.** Enabling it requires acknowledging
+   that *"uptime check data may be stored outside your selected data region"* —
+   and this org was deliberately created in the **EU** region (`de.sentry.io`).
+   The check itself carries nothing sensitive (a `GET /healthz` and its status
+   code), but accepting a data-residency term on the maintainer's behalf is
+   their call, not an implementation detail. **Open question for the
+   maintainer**; Plan 12 Track A's external uptime monitor remains the
+   alternative that avoids the question entirely.
