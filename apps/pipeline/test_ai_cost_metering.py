@@ -131,6 +131,65 @@ def test_compute_cost_usd_returns_zero_for_an_unrecognized_model():
     assert compute_cost_usd("some-future-model", 1000, 1000) == Decimal("0")
 
 
+def test_assert_no_uncounted_cache_tokens_is_a_noop_without_cache_tokens():
+    """Plan 15 Track D3: the guard passes silently for a normal response —
+    absent cache fields (or zero) mean nothing to price beyond input/output."""
+    from apps.pipeline.ai_pricing import assert_no_uncounted_cache_tokens
+
+    # No cache attributes at all (the SDK-stub shape used across the suite).
+    assert_no_uncounted_cache_tokens(SimpleNamespace(input_tokens=10, output_tokens=5))
+    # Cache attributes present but zero.
+    assert_no_uncounted_cache_tokens(
+        SimpleNamespace(
+            input_tokens=10,
+            output_tokens=5,
+            cache_read_input_tokens=0,
+            cache_creation_input_tokens=0,
+        )
+    )
+
+
+def test_assert_no_uncounted_cache_tokens_flags_uncounted_cache_usage():
+    """Plan 15 Track D3: a response that reports prompt-cache tokens this
+    module does not price raises, so enabling caching can't silently
+    mis-meter cost."""
+    from apps.pipeline.ai_pricing import (
+        UncountedCacheTokensError,
+        assert_no_uncounted_cache_tokens,
+    )
+
+    with pytest.raises(UncountedCacheTokensError):
+        assert_no_uncounted_cache_tokens(
+            SimpleNamespace(
+                input_tokens=10,
+                output_tokens=5,
+                cache_read_input_tokens=200,
+                cache_creation_input_tokens=0,
+            )
+        )
+
+
+def test_log_ai_call_flags_cache_tokens_without_discarding_the_response(db):
+    """Plan 15 Track D3: the D3 guard runs inside ``_log_ai_call``'s existing
+    'logging must never discard a good response' try/except — a cached
+    response is flagged (no AiCallLog row written), never raised into the
+    caller that would then drop a perfectly good draft."""
+    AiCallLog.objects.all().delete()
+    cached = SimpleNamespace(
+        usage=SimpleNamespace(
+            input_tokens=10,
+            output_tokens=5,
+            cache_read_input_tokens=200,
+            cache_creation_input_tokens=0,
+        )
+    )
+
+    # Must not raise, and must not write a (mis-priced) row.
+    ai._log_ai_call(AiCallLog.CALL_SITE_DAILY_SUMMARY, "claude-haiku-4-5", cached)
+
+    assert not AiCallLog.objects.exists()
+
+
 def test_ai_call_log_record_does_not_truncate_a_small_call_to_zero(db):
     """Found by code-review-tc: cost_usd used to be DecimalField(decimal_places=4),
     silently rounding a small/cheap call (well within a single request's normal

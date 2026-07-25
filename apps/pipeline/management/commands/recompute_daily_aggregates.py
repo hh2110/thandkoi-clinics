@@ -16,7 +16,8 @@ import datetime
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.pipeline.ingest import recompute_daily_aggregate
-from apps.pipeline.models import DailyAggregate, DeidentifiedVisit
+from apps.pipeline.models import DailyAggregate, DailyReportPage, DeidentifiedVisit
+from apps.pipeline.report_publishing import publish_daily_report
 
 
 class Command(BaseCommand):
@@ -55,8 +56,27 @@ class Command(BaseCommand):
             self.stdout.write("No dates to recompute.")
             return
 
+        republished = 0
         for clinic_date in sorted(dates):
             recompute_daily_aggregate(clinic_date)
             self.stdout.write(self.style.SUCCESS(f"  recomputed  {clinic_date}"))
 
-        self.stdout.write(self.style.SUCCESS(f"Recomputed {len(dates)} date(s)."))
+            # Plan 15 Track B4: the published page reads its *numbers* live
+            # from the aggregate, so those refresh for free — but the
+            # auto-published AI prose (summary sentence + per-group free-text
+            # summaries) was drafted against the pre-recompute figures and is
+            # now frozen text that may quote numbers this recompute has since
+            # changed. Re-publish so the prose is redrafted against the new
+            # aggregate. Only for dates that already have a page — recompute
+            # must not conjure a report page for a date that never published
+            # one (that's `republish_daily_report`'s job, Track B3).
+            if DailyReportPage.objects.filter(report_date=clinic_date).exists():
+                publish_daily_report(clinic_date)
+                republished += 1
+                self.stdout.write(self.style.SUCCESS(f"  republished {clinic_date}"))
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Recomputed {len(dates)} date(s); republished {republished}."
+            )
+        )

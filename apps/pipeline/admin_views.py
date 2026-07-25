@@ -45,7 +45,12 @@ from xlrd.compdoc import CompDocError
 from apps.pipeline.forms import ExportUploadForm
 from apps.pipeline.ingest import ingest_export
 from apps.pipeline.parser_registry import ExportParseError, ParserRegistry
-from apps.pipeline.xls_compat import convert_xls_to_xlsx, looks_like_xls
+from apps.pipeline.xls_compat import (
+    XlsxTooLargeError,
+    convert_xls_to_xlsx,
+    guard_xlsx_decompression,
+    looks_like_xls,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +89,13 @@ def upload_export(request):
                     # The clinic system exports legacy .xls; convert once,
                     # in memory, so everything downstream stays .xlsx-only.
                     uploaded = convert_xls_to_xlsx(uploaded)
+                # Plan 15 Track C5: reject a decompression-bomb .xlsx by its
+                # declared archive metadata before load_workbook reads it into
+                # memory. A converted .xls is our own safe output, but a
+                # directly-uploaded .xlsx is attacker-controlled — the 2.5 MB
+                # memory-upload cap bounds the *compressed* bytes, not what
+                # they expand to.
+                guard_xlsx_decompression(uploaded)
                 workbook = load_workbook(uploaded, read_only=True, data_only=True)
                 try:
                     suggested = ParserRegistry.sniff_all(workbook)
@@ -95,6 +107,7 @@ def upload_export(request):
                 OSError,
                 XLRDError,
                 CompDocError,
+                XlsxTooLargeError,
             ) as exc:
                 # BadZipFile: a non-Excel file (e.g. a PDF renamed) isn't a
                 # zip archive at all, so openpyxl never gets far enough to
@@ -139,8 +152,16 @@ def upload_export(request):
                 except ExportParseError as exc:
                     # Raised by a parser before anything is persisted, with a
                     # message written to be shown to the admin verbatim.
+                    #
+                    # Deliberately NOT sent to Sentry (Plan 15 Track A1): this
+                    # is an *expected* rejection of a malformed export, not a
+                    # bug, and capturing the exception would attach the parse
+                    # traceback — whose frame-locals sit on a raw patient row
+                    # mid-parse — to an external error tracker. The message
+                    # itself is structural-only by the ExportParseError
+                    # contract (never a cell value — see parser_registry), so
+                    # logging it is safe; capturing the exception is not.
                     logger.warning("Export upload failed to parse: %s", exc)
-                    sentry_sdk.capture_exception()
                     error = f"{exc} Nothing was saved."
         else:
             error = "; ".join(

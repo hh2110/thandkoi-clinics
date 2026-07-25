@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date
@@ -98,10 +99,21 @@ def normalise_sex(raw: str | None) -> str:
 
 # Hand-written keyword → fixed-category mapping (maintainer decision, PR #15
 # post-review: diagnosis is confirmed free text in the source clinic
-# software). Matched by substring against the lower-cased, stripped raw
-# value. Not user-editable at runtime and not agentic inference — reviewed
-# in code like the rest of the parser. Extend this table, don't invent a new
-# mechanism, when a new common diagnosis needs its own category.
+# software). Matched as whole words/phrases against the lower-cased, stripped
+# raw value (see ``diagnosis_category_for``), not user-editable at runtime and
+# not agentic inference — reviewed in code like the rest of the parser. Extend
+# this table, don't invent a new mechanism, when a new common diagnosis needs
+# its own category.
+#
+# Word-boundary matching (Plan 15 Track D1): a bare substring match mis-filed
+# any diagnosis that merely *contained* a keyword inside a longer, unrelated
+# word — "heartburn" tripped "heart" (Cardiac) when it is Gastrointestinal,
+# "cold sore" tripped "cold" (Respiratory) when it is Dermatological. Matching
+# each keyword as a whole word (and longest-phrase-first, so "cold sore" wins
+# over "cold") fixes those. Two former substring-*prefix* keywords had to be
+# spelled out as whole words to keep matching once boundaries are enforced:
+# "pregnan" (never a word on its own) became "pregnant"/"pregnancy", and
+# "gastro" gained explicit "gastroenteritis"/"gastritis" siblings.
 _DIAGNOSIS_KEYWORDS: dict[str, str] = {
     "hypertension": DeidentifiedVisit.DIAGNOSIS_HYPERTENSION,
     "high bp": DeidentifiedVisit.DIAGNOSIS_HYPERTENSION,
@@ -118,6 +130,9 @@ _DIAGNOSIS_KEYWORDS: dict[str, str] = {
     "diarrhoea": DeidentifiedVisit.DIAGNOSIS_GASTROINTESTINAL,
     "vomiting": DeidentifiedVisit.DIAGNOSIS_GASTROINTESTINAL,
     "gastro": DeidentifiedVisit.DIAGNOSIS_GASTROINTESTINAL,
+    "gastroenteritis": DeidentifiedVisit.DIAGNOSIS_GASTROINTESTINAL,
+    "gastritis": DeidentifiedVisit.DIAGNOSIS_GASTROINTESTINAL,
+    "heartburn": DeidentifiedVisit.DIAGNOSIS_GASTROINTESTINAL,
     "abdominal pain": DeidentifiedVisit.DIAGNOSIS_GASTROINTESTINAL,
     "joint pain": DeidentifiedVisit.DIAGNOSIS_MUSCULOSKELETAL,
     "back pain": DeidentifiedVisit.DIAGNOSIS_MUSCULOSKELETAL,
@@ -126,8 +141,10 @@ _DIAGNOSIS_KEYWORDS: dict[str, str] = {
     "skin": DeidentifiedVisit.DIAGNOSIS_DERMATOLOGICAL,
     "rash": DeidentifiedVisit.DIAGNOSIS_DERMATOLOGICAL,
     "allergy": DeidentifiedVisit.DIAGNOSIS_DERMATOLOGICAL,
+    "cold sore": DeidentifiedVisit.DIAGNOSIS_DERMATOLOGICAL,
     "antenatal": DeidentifiedVisit.DIAGNOSIS_MATERNAL_CHILD,
-    "pregnan": DeidentifiedVisit.DIAGNOSIS_MATERNAL_CHILD,
+    "pregnant": DeidentifiedVisit.DIAGNOSIS_MATERNAL_CHILD,
+    "pregnancy": DeidentifiedVisit.DIAGNOSIS_MATERNAL_CHILD,
     "postnatal": DeidentifiedVisit.DIAGNOSIS_MATERNAL_CHILD,
     "child health": DeidentifiedVisit.DIAGNOSIS_MATERNAL_CHILD,
     "cardiac": DeidentifiedVisit.DIAGNOSIS_CARDIAC,
@@ -139,17 +156,30 @@ _DIAGNOSIS_KEYWORDS: dict[str, str] = {
     "typhoid": DeidentifiedVisit.DIAGNOSIS_INFECTIOUS,
 }
 
+#: ``_DIAGNOSIS_KEYWORDS`` compiled to whole-word/phrase patterns, ordered
+#: longest-keyword-first so a specific multi-word term is tried before a
+#: shorter one nested inside it (e.g. "cold sore" before "cold", "chest
+#: infection"/"chest pain" before any bare "chest"). Built once at import.
+_DIAGNOSIS_KEYWORD_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(rf"\b{re.escape(keyword)}\b"), category)
+    for keyword, category in sorted(
+        _DIAGNOSIS_KEYWORDS.items(), key=lambda item: -len(item[0])
+    )
+]
+
 
 def diagnosis_category_for(raw_diagnosis: str | None) -> str:
     """Map a raw free-text diagnosis to a fixed category — never store the text.
 
-    The raw value is read only as this function's local ``value`` and is
-    never returned, logged, or attached to a row — only the resulting fixed
-    category crosses back to the caller.
+    Each keyword is matched as a whole word/phrase (Plan 15 Track D1), so a
+    keyword nested inside an unrelated longer word no longer mis-files the
+    visit. The raw value is read only as this function's local ``value`` and
+    is never returned, logged, or attached to a row — only the resulting
+    fixed category crosses back to the caller.
     """
     value = (raw_diagnosis or "").strip().lower()
-    for keyword, category in _DIAGNOSIS_KEYWORDS.items():
-        if keyword in value:
+    for pattern, category in _DIAGNOSIS_KEYWORD_PATTERNS:
+        if pattern.search(value):
             return category
     return DeidentifiedVisit.DIAGNOSIS_OTHER
 

@@ -50,12 +50,18 @@
 
   function initToggle(button) {
     var label = button.querySelector("[data-theme-toggle-label]");
+    // Labels are emitted server-side (and run through Django's {% translate %})
+    // onto data-attributes, so this script never hardcodes English strings —
+    // it just swaps between the two the server rendered. Falls back to English
+    // only if the attributes are somehow absent.
+    var lightLabel = button.getAttribute("data-label-light") || "Light theme";
+    var darkLabel = button.getAttribute("data-label-dark") || "Dark theme";
 
     function syncButton(theme) {
       var isDark = theme === "dark";
       button.setAttribute("aria-pressed", String(isDark));
       if (label) {
-        label.textContent = isDark ? "Dark theme" : "Light theme";
+        label.textContent = isDark ? darkLabel : lightLabel;
       }
     }
 

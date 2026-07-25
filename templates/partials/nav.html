@@ -55,13 +55,18 @@ as inline-at-the-end, same as before.
   <details class="primary-nav">
     <summary>{% translate "Menu" %}</summary>
     <ul class="primary-nav__list">
+      {% comment %}
+      aria-current="page" marks the active item for assistive tech, not just
+      Home (Plan 15 Track D4). Each link compares request.path against its own
+      "/<lang>/<slug>/" the same way the Home item always has.
+      {% endcomment %}
       <li>
         <a href="/{{ lang }}/" {% if request.path == "/"|add:lang|add:"/" %}aria-current="page"{% endif %}>{% translate "Home" %}</a>
       </li>
-      <li><a href="/{{ lang }}/about/">{% translate "About" %}</a></li>
-      <li><a href="/{{ lang }}/our-work/">{% translate "Our Work" %}</a></li>
-      <li><a href="/{{ lang }}/reports/">{% translate "Reports" %}</a></li>
-      <li><a href="/{{ lang }}/newsletters/">{% translate "Newsletters" %}</a></li>
+      <li><a href="/{{ lang }}/about/" {% if request.path == "/"|add:lang|add:"/about/" %}aria-current="page"{% endif %}>{% translate "About" %}</a></li>
+      <li><a href="/{{ lang }}/our-work/" {% if request.path == "/"|add:lang|add:"/our-work/" %}aria-current="page"{% endif %}>{% translate "Our Work" %}</a></li>
+      <li><a href="/{{ lang }}/reports/" {% if request.path == "/"|add:lang|add:"/reports/" %}aria-current="page"{% endif %}>{% translate "Reports" %}</a></li>
+      <li><a href="/{{ lang }}/newsletters/" {% if request.path == "/"|add:lang|add:"/newsletters/" %}aria-current="page"{% endif %}>{% translate "Newsletters" %}</a></li>
       <li class="nav-dropdown">
         <details class="nav-dropdown__details">
           <summary class="nav-dropdown__trigger">
@@ -69,9 +74,9 @@ as inline-at-the-end, same as before.
             <span class="nav-dropdown__caret" aria-hidden="true">&#9662;</span>
           </summary>
           <ul class="nav-dropdown__menu">
-            <li><a href="/{{ lang }}/team/">{% translate "Team" %}</a></li>
-            <li><a href="/{{ lang }}/gallery/">{% translate "Gallery" %}</a></li>
-            <li><a href="/{{ lang }}/contact/">{% translate "Contact" %}</a></li>
+            <li><a href="/{{ lang }}/team/" {% if request.path == "/"|add:lang|add:"/team/" %}aria-current="page"{% endif %}>{% translate "Team" %}</a></li>
+            <li><a href="/{{ lang }}/gallery/" {% if request.path == "/"|add:lang|add:"/gallery/" %}aria-current="page"{% endif %}>{% translate "Gallery" %}</a></li>
+            <li><a href="/{{ lang }}/contact/" {% if request.path == "/"|add:lang|add:"/contact/" %}aria-current="page"{% endif %}>{% translate "Contact" %}</a></li>
           </ul>
         </details>
       </li>
