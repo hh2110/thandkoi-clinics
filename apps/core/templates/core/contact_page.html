@@ -8,6 +8,10 @@ this page and the footer with no redeploy. A plain mailto: link, no contact form
 guardrails). Each block renders only when its field is set.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-contact.jpg" alt=_("How to find the Thandkoi Clinics in Swabi") %}
+{% endblock %}
+
 {% block content %}
   {% with contact=settings.core.ContactBankSettings %}
   <section class="section">

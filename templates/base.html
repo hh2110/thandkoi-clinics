@@ -43,14 +43,25 @@
     <meta property="og:site_name" content="The Thandkoi Clinics" />
     <meta property="og:title" content="{{ meta_title }}" />
     <meta property="og:description" content="{{ meta_description }}" />
-    <meta name="twitter:card" content="{% block twitter_card %}summary{% endblock %}" />
+    {% comment %}
+    `summary_large_image` is the sitewide default because every card the site
+    now serves is a 1200x630 one (scripts/generate_og_cards.py). It used to be
+    `summary` — correct then, when the default image was the square favicon,
+    but wrong for a card, which platforms would letterbox into a small thumb.
+    {% endcomment %}
+    <meta name="twitter:card" content="{% block twitter_card %}summary_large_image{% endblock %}" />
     <meta name="twitter:title" content="{{ meta_title }}" />
     <meta name="twitter:description" content="{{ meta_description }}" />
     {% if request %}
     <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}" />
+    {% comment %}
+    Link-preview image. Pages with a card of their own override this block —
+    see partials/social_card.html for the pattern. Anything that doesn't falls
+    back to the sitewide card here, which is still a real card rather than the
+    bare favicon this used to serve.
+    {% endcomment %}
     {% block social_image_tags %}
-    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'favicons/favicon-512.png' %}" />
-    <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'favicons/favicon-512.png' %}" />
+      {% include "partials/social_card.html" with card="og-default.jpg" alt=_("The Thandkoi Clinics — a not-for-profit family-run clinic in Thandkoi, Swabi") %}
     {% endblock %}
     {% endif %}
     <link rel="icon" href="{% static 'favicons/favicon.svg' %}" type="image/svg+xml" />

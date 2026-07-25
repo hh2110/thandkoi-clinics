@@ -7,6 +7,10 @@ block renders only when its field has content, so a half-entered page still
 reads intentionally.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-about.jpg" alt=_("The Thandkoi Clinics — a family-run, not-for-profit clinic") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper prose">

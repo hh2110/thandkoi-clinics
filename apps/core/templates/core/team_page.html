@@ -7,6 +7,10 @@ portrait falls back to the shared placeholder. The `doctors` / `staff` lists
 come from the page's get_context.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-team.jpg" alt=_("The doctors, nurses and dietitians of the Thandkoi Clinics") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper">

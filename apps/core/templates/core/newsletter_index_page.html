@@ -19,6 +19,10 @@ D14's masthead strip is now the newsletter series' own visual identity, so
 the pending-asset placeholder above the intro would have duplicated it.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-newsletter.jpg" alt=_("The Thandkoi Beacon — the Thandkoi Clinics newsletter") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper prose">

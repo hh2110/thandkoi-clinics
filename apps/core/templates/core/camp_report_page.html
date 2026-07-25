@@ -9,6 +9,10 @@ ConsentedImageBlock, so `camp_photos` (built in get_context) only ever
 contains images that passed that gate.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-camps.jpg" alt=_("A medical camp report from the Thandkoi Clinics") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper prose">

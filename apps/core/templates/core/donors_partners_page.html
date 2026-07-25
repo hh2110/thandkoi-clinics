@@ -18,6 +18,10 @@ get_context) are the single source this page and the Donate page's carousel
 both read from — content is never duplicated by hand between the two.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-donors-partners.jpg" alt=_("The donors and partners behind the Thandkoi Clinics") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper prose">

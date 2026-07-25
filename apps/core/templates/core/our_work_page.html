@@ -6,6 +6,10 @@ Our Work page — the services rendered through the Plan 03.5 card grid (with th
 plus an infrastructure section. Composes the layout kit; no new section CSS.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-our-work.jpg" alt=_("Primary care at the Thandkoi Clinics, free at the point of need") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper">
