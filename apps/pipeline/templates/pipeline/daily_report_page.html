@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% comment %}
+Plan 18: this page is deliberately kept out of search indexes and web
+archives. It is the only public template carrying the per-group free-text
+summaries, and an index or an archive snapshot outlives any correction we
+make here — a summary blanked on the site would still be readable in a cached
+copy. `follow` is kept so the crawler still walks through to the reports
+index and dashboard, which carry no free text and should stay findable.
+{% endcomment %}
+{% block meta_robots %}<meta name="robots" content="noindex, follow" />{% endblock %}
+{% comment %}
 One daily clinic report — redesign (Plan 11 Track B12, 2026-07-23).
 
 Every figure comes from `aggregate` (a DailyAggregate read live in

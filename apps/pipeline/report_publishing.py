@@ -108,7 +108,7 @@ def _get_or_create_clinic_dashboard() -> ClinicDashboardPage:
 #: its ``DailyReportPage`` field name (Plan 14, 2026-07-24) — the one place
 #: that wiring lives, so the per-field preserve-on-falsy loop below and any
 #: future caller share a single source of truth for the mapping.
-_FREETEXT_SUMMARY_GROUP_FIELDS = {
+FREETEXT_SUMMARY_GROUP_FIELDS = {
     freetext.GROUP_MALE_ADULTS: "freetext_summary_male_adults",
     freetext.GROUP_FEMALE_ADULTS: "freetext_summary_female_adults",
     freetext.GROUP_CHILDREN: "freetext_summary_children",
@@ -165,7 +165,7 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     above — CLAUDE.md invariant #4's exception, widened 2026-07-23
     (maintainer decision) to cover these two as well. Plan 14 (2026-07-24)
     splits the free-text summary into three per-category fields (see
-    ``_FREETEXT_SUMMARY_GROUP_FIELDS``) instead of one — B9's empty-columns
+    ``FREETEXT_SUMMARY_GROUP_FIELDS``) instead of one — B9's empty-columns
     flag is unaffected and still runs over every visit regardless of group.
 
     If a re-ingest's call fails (transient API error/timeout), the existing
@@ -267,7 +267,7 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
             # (``None``) resolution and a deterministic blank both mean "".
             **{
                 field_name: resolve(group) or ""
-                for group, field_name in _FREETEXT_SUMMARY_GROUP_FIELDS.items()
+                for group, field_name in FREETEXT_SUMMARY_GROUP_FIELDS.items()
             },
         )
         index.add_child(instance=page)
@@ -279,7 +279,7 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
         # the free-text/empty-columns fields already had).
         if summary_sentence:
             page.summary_sentence = summary_sentence
-        for group, field_name in _FREETEXT_SUMMARY_GROUP_FIELDS.items():
+        for group, field_name in FREETEXT_SUMMARY_GROUP_FIELDS.items():
             resolved = resolve(group)
             # ``None`` means "preserve the existing field" (a genuine
             # per-group call failure); a string — including "" — is a
