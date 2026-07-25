@@ -26,6 +26,10 @@ from apps.core import views as core_views
 urlpatterns = [
     # Liveness/readiness probe for the host and for CI smoke tests.
     path("healthz", core_views.healthz, name="healthz"),
+    # Crawler directives (Plan 18). Unprefixed like the health check: robots.txt
+    # is only ever read from the site root, so it must not sit behind
+    # i18n_patterns' language prefix.
+    path("robots.txt", core_views.robots_txt, name="robots_txt"),
     # Django admin (kept distinct from Wagtail's admin).
     path("django-admin/", admin.site.urls),
     # Wagtail admin and document serving.

@@ -39,6 +39,15 @@
     {% firstof page.seo_title page.title "The Thandkoi Clinics" as meta_title %}
     {% firstof page.search_description "A not-for-profit, family-run primary care clinic in Thandkoi, Swabi, offering accessible healthcare funded on a Zakat & Sadaqa model." as meta_description %}
     <meta name="description" content="{{ meta_description }}" />
+    {% comment %}
+    Indexing directive (Plan 18). Empty sitewide — the site *wants* to be
+    found — and overridden by the one template whose content should never be
+    retained by a search index or a web archive: the daily report page, which
+    carries the per-group free-text summaries. See the Plan 18 plan file for
+    why this is a meta tag rather than a robots.txt Disallow (a crawler has to
+    be allowed to fetch a page before it can see the directive to drop it).
+    {% endcomment %}
+    {% block meta_robots %}{% endblock %}
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="The Thandkoi Clinics" />
     <meta property="og:title" content="{{ meta_title }}" />

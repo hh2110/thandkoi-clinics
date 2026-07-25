@@ -49,6 +49,7 @@ from apps.pipeline.factories import (
     DailyAggregateFactory,
     DailyReportPageFactory,
     DeidentifiedVisitFactory,
+    IngestRunFactory,
     ReportIndexPageFactory,
 )
 from apps.pipeline.ingest import (
@@ -2893,3 +2894,118 @@ def test_get_funding_mix_positions_bars_by_slot_not_row_order(home_page):
     expected_gap = round((later_index - earlier_index) * slot_width, 1)
     actual_gap = round(bars[later]["label_x"] - bars[earlier]["label_x"], 1)
     assert actual_gap == expected_gap
+
+
+# --- Plan 18: sub-floor free-text summary scrub + noindex -------------------
+
+
+def _page_with_subfloor_child_summary(home_page, report_date):
+    """A live report page whose *children* group is below the floor while its
+    *male adults* group clears it, with both summaries populated.
+
+    This is the exact shape found in production on 2026-07-24: one child visit
+    and three male-adult visits, with a summary published for both.
+    """
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    run = IngestRunFactory(clinic_date=report_date)
+    DeidentifiedVisitFactory(
+        ingest_run=run,
+        visit_date=report_date,
+        age_band=DeidentifiedVisit.AGE_BAND_0_5,
+        sex=DeidentifiedVisit.SEX_FEMALE,
+    )
+    for _ in range(freetext.MIN_GROUP_VISITS_TO_SUMMARISE):
+        DeidentifiedVisitFactory(
+            ingest_run=run,
+            visit_date=report_date,
+            age_band=DeidentifiedVisit.AGE_BAND_19_55,
+            sex=DeidentifiedVisit.SEX_MALE,
+        )
+    return DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=DailyAggregateFactory(clinic_date=report_date),
+        freetext_summary_children="A child presented with a fever.",
+        freetext_summary_male_adults="Several patients reported joint pain.",
+    )
+
+
+def test_scrub_command_blanks_only_the_subfloor_group(home_page):
+    """Plan 18: the floor ran at publish time only, so pages published before
+    it deployed kept a summary for a group of one. The backfill blanks that
+    group and leaves an eligible group's summary untouched."""
+    report_date = datetime.date(2026, 7, 24)
+    page = _page_with_subfloor_child_summary(home_page, report_date)
+
+    call_command("scrub_subfloor_freetext_summaries")
+
+    page.refresh_from_db()
+    assert page.freetext_summary_children == ""
+    assert page.freetext_summary_male_adults == "Several patients reported joint pain."
+
+
+def test_scrub_command_is_idempotent(home_page):
+    """Plan 18: a second run finds nothing left to do — the command keys off
+    "below the floor *and* currently non-empty", so it cannot double-report or
+    churn pages it has already cleaned."""
+    report_date = datetime.date(2026, 7, 24)
+    _page_with_subfloor_child_summary(home_page, report_date)
+
+    call_command("scrub_subfloor_freetext_summaries")
+    second_run = io.StringIO()
+    call_command("scrub_subfloor_freetext_summaries", stdout=second_run)
+
+    assert "0 summaries across 0 pages" in second_run.getvalue()
+
+
+def test_scrub_command_dry_run_writes_nothing(home_page):
+    """Plan 18: --dry-run is what gets checked against the production audit
+    before anything is destroyed, so it must report the row and change nothing."""
+    report_date = datetime.date(2026, 7, 24)
+    page = _page_with_subfloor_child_summary(home_page, report_date)
+
+    out = io.StringIO()
+    call_command("scrub_subfloor_freetext_summaries", "--dry-run", stdout=out)
+
+    page.refresh_from_db()
+    assert page.freetext_summary_children == "A child presented with a fever."
+    assert "2026-07-24: children" in out.getvalue()
+    assert "would blank 1 summaries across 1 pages" in out.getvalue()
+
+
+def test_scrub_command_also_scrubs_stored_revisions(home_page):
+    """Plan 18 D3: a Revision carries its own copy of every field. Blanking
+    only the live model would leave the text in the database and let a later
+    "publish this revision" in the admin put it back on the public page."""
+    report_date = datetime.date(2026, 7, 24)
+    page = _page_with_subfloor_child_summary(home_page, report_date)
+    revision = page.save_revision()
+    assert revision.content["freetext_summary_children"] != ""
+
+    call_command("scrub_subfloor_freetext_summaries")
+
+    revision.refresh_from_db()
+    assert revision.content["freetext_summary_children"] == ""
+    assert (
+        revision.content["freetext_summary_male_adults"]
+        == "Several patients reported joint pain."
+    )
+
+
+def test_daily_report_page_is_noindex(client, home_page):
+    """Plan 18: the one public template carrying free-text summaries must not
+    be retained by a search index or a web archive, where a snapshot would
+    outlive any correction made on the site itself."""
+    report_date = datetime.date(2026, 7, 24)
+    _page_with_subfloor_child_summary(home_page, report_date)
+
+    content = client.get(f"/en/reports/{report_date.isoformat()}/").content.decode()
+
+    assert '<meta name="robots" content="noindex, follow" />' in content
+
+
+def test_other_pages_are_not_noindex(client, home_page):
+    """Plan 18: the directive is scoped to the daily report page — the rest of
+    the site is a charity that wants to be found."""
+    assert 'name="robots"' not in client.get("/en/").content.decode()

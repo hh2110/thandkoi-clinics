@@ -1887,3 +1887,32 @@ def test_footer_urdu_tagline_no_longer_includes_chiragh_shafa(client, home_page)
     content = client.get("/en/").content.decode()
     assert "صحت سب کے لیے" in content
     assert "چراغ شفا" not in content
+
+
+# --- Plan 18: crawler directives --------------------------------------------
+
+
+def test_robots_txt_serves_from_the_site_root(client):
+    """Plan 18: robots.txt is only ever fetched from the root, so it must sit
+    outside i18n_patterns' language prefix — /robots.txt, never /en/robots.txt."""
+    response = client.get("/robots.txt")
+
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("text/plain")
+    assert "User-agent: *" in response.content.decode()
+
+
+def test_robots_txt_does_not_disallow_the_report_pages(client):
+    """Plan 18 D4: the daily reports are kept out of search by the noindex meta
+    tag, NOT by a Disallow here — a crawler has to be allowed to fetch a page
+    before it can read the directive telling it to drop the page. Disallowing
+    them here would strand any already-indexed URL in the index permanently."""
+    body = client.get("/robots.txt").content.decode()
+
+    disallowed = [
+        line.split(":", 1)[1].strip()
+        for line in body.splitlines()
+        if line.lower().startswith("disallow:")
+    ]
+    assert disallowed, "expected robots.txt to disallow at least the admin paths"
+    assert not any("report" in path for path in disallowed)
