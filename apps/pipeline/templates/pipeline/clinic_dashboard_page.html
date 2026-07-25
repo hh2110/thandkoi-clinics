@@ -32,6 +32,10 @@ All colour is from semantic tokens (tokens.css); component styles live in
 static/css/dashboard.css. `dash` is the page-scoped root class.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-reports.jpg" alt=_("The Thandkoi Clinics activity dashboard") %}
+{% endblock %}
+
 {% block content %}
   <div class="dash wrapper">
 

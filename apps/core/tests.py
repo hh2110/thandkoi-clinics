@@ -1133,7 +1133,10 @@ def test_every_template_card_reference_resolves_to_a_real_file():
     import re
 
     templates = [
-        *(settings.BASE_DIR / "apps" / "core" / "templates").rglob("*.html"),
+        # Every app's templates, not just core's -- the pipeline app has its
+        # own report pages, and scoping this to core is exactly how they were
+        # missed when the card set first shipped.
+        *(settings.BASE_DIR / "apps").rglob("templates/**/*.html"),
         *(settings.BASE_DIR / "templates").rglob("*.html"),
     ]
     cards_dir = settings.BASE_DIR / "static" / "images" / "og"
