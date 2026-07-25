@@ -1,5 +1,13 @@
 /*
- * Funding-mix chart (Plan 13) — hover tooltip for the reports-index chart.
+ * Funding-mix chart (Plan 13) — hover tooltip for the footfall charts.
+ *
+ * Serves every chart built by apps.pipeline.footfall_chart: the reports
+ * index, and the clinic dashboard from 2026-07-25. Both opt in with the
+ * same markup contract — `data-funding-mix` on the <svg>, carrying the
+ * three `data-label-*` strings, and one `data-funding-mix-hit` rect per
+ * bar carrying that bar's already-formatted date and figures. The
+ * attribute names keep Plan 13's spelling; only the styling is per-page
+ * (`ri-funding-mix__hit` vs `dash-chart__hit`).
  *
  * Progressive enhancement: the chart, its bars, axis labels, and the
  * "view as table" fallback all render fully without this script. This only
@@ -14,7 +22,10 @@
   function getTooltip() {
     if (tooltip) return tooltip;
     tooltip = document.createElement("div");
-    tooltip.className = "ri-funding-mix__tooltip";
+    // Shared, page-agnostic class — styled in components.css, not in either
+    // chart's own stylesheet (this element is appended to <body>, outside
+    // both pages' blocks).
+    tooltip.className = "chart-tooltip";
     document.body.appendChild(tooltip);
     return tooltip;
   }

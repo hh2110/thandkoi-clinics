@@ -530,3 +530,34 @@
   font-size: var(--font-size-2xl);
   color: var(--color-brand);
 }
+
+/* --- Chart hover tooltip ---------------------------------------------------- */
+/* One element, appended to <body> by funding-mix-chart.js and reused by every
+   footfall chart on the site — the reports index and, from 2026-07-25, the
+   clinic dashboard. It lives here rather than in either page's stylesheet
+   because it is not inside either page's block: it was `.ri-funding-mix__tooltip`
+   in report-index.css while the reports index was the only chart, and giving
+   the dashboard hover would otherwise have meant one page's stylesheet
+   styling the other's, which dashboard.css's header comment explicitly rules
+   out. Hidden until JS shows it, so both charts and their "View as table"
+   fallbacks remain fully usable without it. */
+.chart-tooltip {
+  position: fixed;
+  pointer-events: none;
+  /* Inverted on purpose: --color-text/--color-bg swap values per theme, so
+     this auto-inverts (dark-on-light in light mode, light-on-dark in dark
+     mode) without a separate dark-mode override. */
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: var(--font-size-xs);
+  padding: 0.375rem 0.625rem;
+  border-radius: 6px;
+  transform: translate(-50%, calc(-100% - 10px));
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+  z-index: 10;
+}
+.chart-tooltip.is-visible {
+  opacity: 1;
+}

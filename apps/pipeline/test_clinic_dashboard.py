@@ -19,7 +19,7 @@ from wagtail.models import Site
 from apps.core.factories import HomePageFactory
 from apps.pipeline import dashboard as dashboard_module
 from apps.pipeline.factories import DailyAggregateFactory, ReportIndexPageFactory
-from apps.pipeline.footfall_chart import build_footfall_chart
+from apps.pipeline.footfall_chart import CHART_HEIGHT, build_footfall_chart
 from apps.pipeline.models import ClinicDashboardPage
 from apps.pipeline.report_publishing import _get_or_create_clinic_dashboard
 
@@ -223,7 +223,10 @@ def test_date_form_is_a_get_form_with_a_visible_apply_and_no_script(client, dash
     assert "onchange" not in form.lower()
     page_body = content.split('class="dash wrapper"')[1].split("<footer")[0]
     assert "<script" not in page_body
-    assert "data-funding-mix" not in page_body
+    # The chart's hover hooks (added 2026-07-25) are the one JS-facing
+    # markup on this page, and they are scoped to the chart: the range
+    # controls this test is about still carry no handler of any kind.
+    assert "data-funding-mix" not in form
 
 
 def test_date_inputs_are_prefilled_with_the_current_range(client, dashboard):
@@ -250,6 +253,57 @@ def test_chart_is_role_img_with_an_aria_label(client, dashboard):
 
     assert 'role="img"' in content
     assert "Patient footfall from 1 Jun 2026 to 6 Jun 2026" in content
+
+
+def test_every_bar_gets_a_hover_hit_rect_carrying_its_own_figures(client, dashboard):
+    """The hover tooltip funding-mix-chart.js opens (2026-07-25) reads only
+    these attributes, so a bar without one is a bar the reader cannot hover.
+    The date spells the year out like the table row it mirrors, not like the
+    axis label under the bar."""
+    aggregate(day(0), total=7, zakat=5, regular=2)
+    aggregate(day(2), total=9, zakat=3, regular=6)
+
+    content = render(client, dashboard, start=day(0), end=day(5))
+
+    # The <svg>'s own opt-in hook, and the three label strings the script
+    # builds the tooltip sentence from — without these the rects below are
+    # never wired up at all.
+    svg = re.search(r"<svg class=\"dash-chart__plot\".*?>", content, re.S).group()
+    assert "data-funding-mix\n" in svg
+    for label in ("zakat", "regular", "total"):
+        assert f'data-label-{label}="' in svg
+    hits = re.findall(r"<rect class=\"dash-chart__hit\".*?/>", content, re.S)
+    assert len(hits) == 2
+    for hit, (date, zakat, regular, total) in zip(
+        hits,
+        [("1 Jun 2026", 5, 2, 7), ("3 Jun 2026", 3, 6, 9)],
+        strict=True,
+    ):
+        assert f'data-date="{date}"' in hit
+        assert f'data-zakat="{zakat}"' in hit
+        assert f'data-regular="{regular}"' in hit
+        assert f'data-total="{total}"' in hit
+
+
+def test_hover_hit_rects_are_full_height_so_short_bars_stay_hoverable(
+    client, dashboard
+):
+    """Next to a 200-visit day a 2-visit day is a few pixels tall, but both
+    hit targets span the full plot, so the quiet day is as easy to hover as
+    the busy one."""
+    aggregate(day(0), total=200, zakat=150, regular=50)
+    aggregate(day(2), total=2, zakat=2, regular=0)
+
+    content = render(client, dashboard, start=day(0), end=day(5))
+
+    hits = re.findall(r"<rect class=\"dash-chart__hit\".*?/>", content, re.S)
+    assert len(hits) == 2
+    for hit in hits:
+        # Asserted against the geometry module's own constant, not against a
+        # chart rebuilt here from a second copy of the rows: the plot height
+        # is fixed, so a local rebuild would only add a copy to drift.
+        assert f'height="{CHART_HEIGHT}"' in hit
+        assert 'y="0"' in hit
 
 
 def test_view_as_table_lists_every_bucket_with_its_figures(client, dashboard):

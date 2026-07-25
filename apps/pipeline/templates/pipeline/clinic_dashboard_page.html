@@ -8,13 +8,22 @@ built live in ClinicDashboardPage.get_context from DailyAggregate rows —
 never from a stored field on this page, which has none (D1). No AI-written
 prose anywhere on this page (D12).
 
-No JavaScript, by construction rather than as a fallback (D9): the presets
-are plain <a> links carrying the range in the query string, and the From/To
-form is a GET form with a visible Apply submit. Nothing here auto-submits,
-so nothing here needs a script. The chart is server-rendered SVG for the
-same reason (D2) — see apps.pipeline.footfall_chart, whose geometry this
-shares with the reports index, styled through its own `dash-chart` block
-rather than that page's `ri-funding-mix` one.
+No JavaScript for anything load-bearing, by construction rather than as a
+fallback (D9): the presets are plain <a> links carrying the range in the
+query string, and the From/To form is a GET form with a visible Apply
+submit. Nothing here auto-submits, so nothing here needs a script. The
+chart is server-rendered SVG for the same reason (D2) — see
+apps.pipeline.footfall_chart, whose geometry this shares with the reports
+index, styled through its own `dash-chart` block rather than that page's
+`ri-funding-mix` one.
+
+2026-07-25: the chart's per-bar hover tooltip is the one exception, and it
+is purely additive. The `data-funding-mix`/`data-funding-mix-hit` attribute
+contract is the reports index's, wired up by the sitewide
+static/js/funding-mix-chart.js; the reader was already missing the hover
+figures they get on that page. With the script blocked or broken the chart,
+its axis labels and the "View as table" fallback below it are all unchanged
+— nothing on this page reads from the hit rects.
 
 `pct` deliberately means two things, following DashboardStats' docstring:
 share of total_visits in funding_rows/age_bands, but share of the larger of
@@ -143,6 +152,10 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
       {% if chart.bars %}
         <div class="dash-chart__scroll">
           <svg class="dash-chart__plot"
+               data-funding-mix
+               data-label-zakat="{% translate 'Zakat' %}"
+               data-label-regular="{% translate 'Regular' %}"
+               data-label-total="{% translate 'Total' %}"
                viewBox="0 0 {{ chart.chart_width }} {{ chart.chart_height }}"
                preserveAspectRatio="xMidYMid meet"
                role="img"
@@ -162,6 +175,23 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
                 <text class="dash-chart__axis-text" x="{{ bar.label_x }}" y="{{ bar.label_y }}"
                       text-anchor="middle">{{ bar.date|date:chart_axis_date_format }}</text>
               {% endif %}
+              {% comment %}
+              The tooltip's date uses `chart_table_date_format`, not the
+              axis one: like the table row it mirrors, it is read away from
+              the axis, so it spells the year out. At week grain the label
+              is that week's Monday — the same bucket label the table
+              shows. Figures are `intcomma`'d here rather than in JS, which
+              only concatenates the strings it is handed, so they match the
+              table and stay locale-aware.
+              {% endcomment %}
+              <rect class="dash-chart__hit"
+                    data-funding-mix-hit
+                    data-date="{{ bar.date|date:chart_table_date_format }}"
+                    data-zakat="{{ bar.zakat|intcomma }}"
+                    data-regular="{{ bar.regular|intcomma }}"
+                    data-total="{{ bar.total|intcomma }}"
+                    x="{{ bar.hit_x }}" y="0" width="{{ bar.hit_width }}"
+                    height="{{ chart.chart_height }}" />
             {% endfor %}
           </svg>
         </div>
