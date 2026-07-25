@@ -17,6 +17,10 @@ duplicating that content here by hand; with no such page published yet it
 shows the carousel's own "coming soon" empty state.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-donate.jpg" alt=_("Donate to the Thandkoi Clinics — free consultations and free medicine") %}
+{% endblock %}
+
 {% block content %}
   {% with contact=settings.core.ContactBankSettings %}
   <section class="section">

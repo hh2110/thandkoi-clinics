@@ -5,6 +5,10 @@ Camp Report archive — Plan 06. Same index + child-page pattern as the
 Newsletter archive; lists only published reports, newest first.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-camps.jpg" alt=_("Medical camp reports from the Thandkoi Clinics") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper prose">

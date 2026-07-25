@@ -1042,21 +1042,102 @@ def test_newsletter_social_meta_uses_the_branded_og_card(client, home_page):
         issue_date=datetime.date(2026, 7, 1),
     )
     content = client.get("/en/newsletters/july-2026/").content.decode()
-    og_url = "http://testserver/static/images/og-newsletter.png"
-    favicon_url = "http://testserver/static/favicons/favicon-512.png"
+    og_url = "http://testserver/static/images/og/og-newsletter.jpg"
+    default_url = "http://testserver/static/images/og/og-default.jpg"
     assert '<meta name="twitter:card" content="summary_large_image" />' in content
     assert f'property="og:image" content="{og_url}" />' in content
     assert f'name="twitter:image" content="{og_url}" />' in content
-    assert f'property="og:image" content="{favicon_url}" />' not in content
+    assert f'property="og:image" content="{default_url}" />' not in content
 
 
-def test_other_pages_still_use_the_default_favicon_og_image(client, home_page):
-    """Non-newsletter pages are unaffected by the D15 override (regression
-    guard for base.html's now-overridable social_image_tags block)."""
+def test_pages_without_their_own_card_fall_back_to_the_default(client, home_page):
+    """The sitewide fallback is the default *card*, not the bare favicon.
+
+    Regression guard for base.html's social_image_tags block: before the card
+    set existed this served favicon-512.png, a 512x512 square that WhatsApp
+    renders as a small thumbnail rather than a link preview card.
+    """
     content = client.get("/en/", follow=True).content.decode()
-    assert '<meta name="twitter:card" content="summary" />' in content
-    assert "favicon-512.png" in content
-    assert "og-newsletter.png" not in content
+    default_url = "http://testserver/static/images/og/og-default.jpg"
+    assert '<meta name="twitter:card" content="summary_large_image" />' in content
+    assert f'property="og:image" content="{default_url}" />' in content
+    # The favicon must no longer be anybody's share image, though it is still
+    # legitimately present in the <link rel="icon"> tags -- hence asserting on
+    # the og:image tag specifically rather than on the filename anywhere.
+    assert 'property="og:image" content="http://testserver/static/favicons/' not in (
+        content
+    )
+    assert "og-newsletter" not in content
+
+
+@pytest.mark.parametrize(
+    "url,card",
+    [
+        ("/en/about/", "og-about.jpg"),
+        ("/en/donate/", "og-donate.jpg"),
+    ],
+)
+def test_section_pages_declare_their_own_card(client, home_page, url, card):
+    """Section pages override the default with a card of their own."""
+    AboutPageFactory(parent=home_page, title="About", slug="about")
+    DonatePageFactory(parent=home_page, title="Donate", slug="donate")
+    content = client.get(url).content.decode()
+    assert (
+        f'property="og:image" content="http://testserver/static/images/og/{card}"'
+        in content
+    )
+    assert '<meta property="og:image:width" content="1200" />' in content
+    assert '<meta property="og:image:height" content="630" />' in content
+
+
+def test_every_declared_og_card_exists_and_fits_whatsapps_limit():
+    """Every card scripts/generate_og_cards.py declares is present and small.
+
+    This is the guard the old hand-made card lacked: it shipped at 786 KB,
+    over WhatsApp's 600 KB ceiling, so WhatsApp silently dropped it and
+    unfurled newsletter links with no image at all. Nothing in the test suite
+    noticed, because file size is not something a template test can see.
+
+    The dimension check matters for the same reason -- WhatsApp picks the
+    large card over a small square thumbnail based on the image's aspect
+    ratio, so a card that regressed to a square would quietly stop rendering
+    as a card at all.
+    """
+    from PIL import Image
+
+    cards_dir = settings.BASE_DIR / "static" / "images" / "og"
+    declared = _declared_og_cards()
+    assert declared, "no cards declared by the generator script"
+
+    for slug in declared:
+        path = cards_dir / f"og-{slug}.jpg"
+        assert path.exists(), f"{path.name} is declared but not generated"
+        size_kb = path.stat().st_size / 1024
+        assert size_kb <= 600, (
+            f"{path.name} is {size_kb:.0f} KB, over WhatsApp's 600 KB"
+        )
+        assert Image.open(path).size == (1200, 630), f"{path.name} is not 1200x630"
+
+
+def _declared_og_cards():
+    """The card slugs declared in the generator, read without importing it.
+
+    The script needs fontTools, which is deliberately not a project dependency
+    (it is only used at build time), so this parses the source rather than
+    importing it -- the test asserts on the shipped output, not on the
+    renderer.
+    """
+    import ast
+
+    source = (settings.BASE_DIR / "scripts" / "generate_og_cards.py").read_text()
+    tree = ast.parse(source)
+    slugs = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "Card":
+            for keyword in node.keywords:
+                if keyword.arg == "slug":
+                    slugs.append(ast.literal_eval(keyword.value))
+    return slugs
 
 
 def test_newsletter_body_renders_paragraph_and_consented_photo(client, home_page):

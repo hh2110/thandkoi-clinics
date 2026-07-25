@@ -9,6 +9,10 @@ gate. Paginated (`gallery_page_obj`), same as the Newsletter/Camp Report
 archives, so a growing gallery doesn't load every photo on one request.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-gallery.jpg" alt=_("Photographs from a day at the Thandkoi Clinics") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper prose">
