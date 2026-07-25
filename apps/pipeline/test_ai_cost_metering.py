@@ -31,7 +31,6 @@ import pytest
 from django.contrib.auth.models import Group
 
 from apps.pipeline import ai
-from apps.pipeline.aggregation import ClinicAggregate
 from apps.pipeline.ai_pricing import PRICING_PER_MILLION_TOKENS, compute_cost_usd
 from apps.pipeline.factories import AiCallLogFactory, DailyAggregateFactory
 from apps.pipeline.models import AiCallLog
@@ -67,8 +66,8 @@ def _stub_client(
 ):
     """A minimal Anthropic-client stand-in shared by every test below.
 
-    Shaped to satisfy all three real call sites: ``draft_newsletter_prose``
-    and ``draft_daily_summary_sentence`` only read ``.content[0].text`` and
+    Shaped to satisfy every real call site: ``draft_daily_summary_sentence``
+    only reads ``.content[0].text`` and
     (per Plan 11 C2) ``.usage``; ``draft_monthly_newsletter_body`` also reads
     ``.stop_reason``, so this returns an immediate ``end_turn`` — a one-turn
     conversation with no tool calls, sufficient to exercise its success path.
@@ -99,7 +98,6 @@ def test_every_live_model_constant_has_a_pricing_entry():
     drifting out of sync with PRICING_PER_MILLION_TOKENS, which would zero
     out AI spend logging with no test or runtime signal. This guards it."""
     live_models = {
-        ai.DRAFTING_MODEL,
         ai.DAILY_SUMMARY_MODEL,
         ai.MONTHLY_NEWSLETTER_MODEL,
     }
@@ -226,21 +224,7 @@ def test_ai_call_log_record_computes_and_persists_cost(db):
     assert AiCallLog.objects.get(pk=log.pk).cost_usd == expected
 
 
-# --- Logging happens at each of the three real call sites -------------------
-
-
-def test_draft_newsletter_prose_logs_an_ai_call(db):
-    aggregate = ClinicAggregate(total_patients=5, by_gender={"female": 5})
-    client = _stub_client("Some prose.", input_tokens=300, output_tokens=60)
-
-    ai.draft_newsletter_prose(aggregate, client)
-
-    log = AiCallLog.objects.get()
-    assert log.call_site == AiCallLog.CALL_SITE_NEWSLETTER_PROSE
-    assert log.model == ai.DRAFTING_MODEL
-    assert log.input_tokens == 300
-    assert log.output_tokens == 60
-    assert log.cost_usd == compute_cost_usd(ai.DRAFTING_MODEL, 300, 60)
+# --- Logging happens at each of the real call sites -------------------------
 
 
 def test_draft_daily_summary_sentence_logs_an_ai_call(db):

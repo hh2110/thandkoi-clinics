@@ -115,10 +115,6 @@ class IngestSummary:
     parser_key: str
     results: list[DateIngestResult] = field(default_factory=list)
 
-    @property
-    def total_rows(self) -> int:
-        return sum(result.row_count for result in self.results)
-
 
 def _ingest_one_date(
     clinic_date: date,

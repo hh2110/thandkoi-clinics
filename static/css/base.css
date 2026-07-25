@@ -116,12 +116,6 @@ small,
   font-size: var(--font-size-xs);
 }
 
-.uppercase-label {
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: var(--font-size-xs);
-}
-
 ul,
 ol {
   padding-inline-start: var(--space-3);
@@ -200,6 +194,3 @@ section {
   padding-block: var(--space-4);
 }
 
-.section-tinted {
-  background-color: var(--color-accent-soft-bg);
-}

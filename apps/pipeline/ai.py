@@ -2,17 +2,18 @@
 
 This module enforces privacy invariants #2 and #3 (CLAUDE.md):
 
-* **#2 — never send patient data to a model.** ``build_prompt_payload`` is built
-  from a :class:`~apps.pipeline.aggregation.ClinicAggregate`, which by
-  construction holds only counts. There is no code path here that can reach a
-  raw patient row.
+* **#2 — never send patient data to a model.** Every payload builder here is
+  built from an already-de-identified source — a :class:`DailyAggregate`, or
+  the free-text entries :mod:`apps.pipeline.freetext` collected — which by
+  construction hold only counts and identifier-free text. There is no code
+  path here that can reach a raw patient row.
 * **#3 — numbers are deterministic.** The model is asked to write prose *around*
   numbers that were already computed in Python; it is explicitly told not to
   invent or restate figures. The authoritative numbers are rendered from the
-  aggregate (see :mod:`apps.pipeline.rendering`), not parsed back out of the
+  aggregate by the report page's own template, not parsed back out of the
   model's prose.
 
-The Anthropic client is dependency-injected into :func:`draft_newsletter_prose`
+The Anthropic client is dependency-injected into every drafting function here
 so tests pass a canned stub and the real API is never called from the test
 suite. :func:`get_anthropic_client` builds the real client for production use
 and is deliberately never exercised by tests (a conftest guard makes calling it
@@ -29,7 +30,6 @@ from typing import Any, Protocol
 
 import sentry_sdk
 
-from apps.pipeline.aggregation import ClinicAggregate
 from apps.pipeline.ai_pricing import assert_no_uncounted_cache_tokens
 from apps.pipeline.freetext import FREETEXT_COLUMN_LABELS
 from apps.pipeline.models import AiCallLog, DailyAggregate
@@ -37,9 +37,9 @@ from apps.pipeline.models import AiCallLog, DailyAggregate
 logger = logging.getLogger(__name__)
 
 # Direct identifiers that may appear as columns in a raw export. They are read
-# for tallying (see aggregation.py) but must NEVER appear in an AI payload. The
-# guardrail test asserts none of these names — or their values — reach the
-# client. Extend this list as new export formats are onboarded (Plan 08).
+# by the parsers (see parser_registry.py) but must NEVER appear in an AI
+# payload. The guardrail test asserts none of these names — or their values —
+# reach the client. Extend this list as new export formats are onboarded.
 PATIENT_IDENTIFYING_COLUMNS = frozenset(
     {
         "patient_name",
@@ -58,17 +58,6 @@ PATIENT_IDENTIFYING_COLUMNS = frozenset(
         "date_of_birth",
         "dob",
     }
-)
-
-# Model used for newsletter drafting (see CLAUDE.md → Stack).
-DRAFTING_MODEL = "claude-sonnet-5"
-
-_SYSTEM_PROMPT = (
-    "You are drafting prose for a not-for-profit clinic's public report. "
-    "You are given de-identified aggregate counts only. Write warm, factual "
-    "narrative around these numbers. Do NOT invent, estimate, or restate any "
-    "statistic from memory — every number the reader sees is inserted by our "
-    "code, not by you. Never ask for or refer to individual patients."
 )
 
 
@@ -113,56 +102,6 @@ def _log_ai_call(call_site: str, model: str, response: Any) -> None:
     except Exception:  # noqa: BLE001 - logging must never discard a good response
         logger.warning("Failed to log AiCallLog for %s (%s)", call_site, model)
         sentry_sdk.capture_exception()
-
-
-def build_prompt_payload(aggregate: ClinicAggregate) -> dict[str, Any]:
-    """Build the exact payload handed to the model — aggregates only.
-
-    Everything in the returned dict comes from ``aggregate.as_dict()``; there is
-    no field here that could carry a patient identifier.
-    """
-    return {
-        "model": DRAFTING_MODEL,
-        "max_tokens": 1024,
-        # Sonnet 5 runs adaptive thinking by default when `thinking` is
-        # omitted (Opus did not) -- thinking output counts against this same
-        # fixed max_tokens, so an unconfigured default risks truncating this
-        # already-tight budget (stop_reason="max_tokens") purely from the
-        # model swap. Disabled explicitly to keep the budget for prose, same
-        # as the pre-existing Opus behavior.
-        "thinking": {"type": "disabled"},
-        "system": _SYSTEM_PROMPT,
-        "messages": [
-            {
-                "role": "user",
-                "content": (
-                    "Write the narrative for today's clinic report using only "
-                    "these de-identified aggregate figures:\n"
-                    + json.dumps(aggregate.as_dict(), sort_keys=True, indent=2)
-                ),
-            }
-        ],
-    }
-
-
-def draft_newsletter_prose(aggregate: ClinicAggregate, client: _AnthropicLike) -> str:
-    """Ask the (injected) client for prose around the de-identified aggregate.
-
-    Returns the model's text only. The numbers a reader ultimately sees are
-    rendered from ``aggregate`` in :mod:`apps.pipeline.rendering`; this prose is
-    treated as narrative, never as a source of figures.
-
-    Not currently called from any production code path — Plan 09 replaced
-    this one-shot-prompt shape with :func:`draft_monthly_newsletter_body`'s
-    "one-shot prompt with tooling" design for the live newsletter-drafting
-    flow (see :mod:`apps.pipeline.newsletter_drafting`). Kept (and still
-    AI-call-logged, per Plan 11 C2) because nothing has removed it and its
-    guardrail tests in ``tests.py`` still exercise it directly.
-    """
-    payload = build_prompt_payload(aggregate)
-    response = client.messages.create(**payload)
-    _log_ai_call(AiCallLog.CALL_SITE_NEWSLETTER_PROSE, DRAFTING_MODEL, response)
-    return response.content[0].text
 
 
 # --- Plan 08: the daily report's one AI-written summary sentence -----------

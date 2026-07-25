@@ -44,8 +44,7 @@ from wagtail.models import Site
 
 from apps.core.factories import HomePageFactory
 from apps.pipeline import ai, footfall_chart, freetext
-from apps.pipeline.aggregation import aggregate_export
-from apps.pipeline.ai import PATIENT_IDENTIFYING_COLUMNS, draft_newsletter_prose
+from apps.pipeline.ai import PATIENT_IDENTIFYING_COLUMNS
 from apps.pipeline.factories import (
     DailyAggregateFactory,
     DailyReportPageFactory,
@@ -56,7 +55,6 @@ from apps.pipeline.ingest import (
     persist_parsed_export,
     recompute_daily_aggregate,
 )
-from apps.pipeline.intake import process_upload
 from apps.pipeline.middleware import MemoryOnlyUploadHandlerMiddleware
 from apps.pipeline.models import (
     AiCallLog,
@@ -75,7 +73,6 @@ from apps.pipeline.parser_registry import (
     normalise_sex,
 )
 from apps.pipeline.parser_tkc_daily_v1 import TkcDailyActivityV1Parser
-from apps.pipeline.rendering import render_daily_report
 from apps.pipeline.report_publishing import publish_daily_report
 from apps.pipeline.xls_compat import (
     XlsxTooLargeError,
@@ -85,18 +82,10 @@ from apps.pipeline.xls_compat import (
 )
 from conftest import _StubAnthropicClient
 
-XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-# A fixture export that includes real-looking direct identifiers alongside the
-# two columns we actually aggregate on. Nothing in the "identifying" columns may
-# ever survive aggregation or reach a model.
-EXPORT_HEADER = ["patient_name", "mrn", "phone", "gender", "diagnosis"]
-EXPORT_ROWS = [
-    ["Fatima Bibi", "MRN-001", "0300-1112222", "Female", "Hypertension"],
-    ["Ahmed Khan", "MRN-002", "0301-3334444", "Male", "Diabetes"],
-    ["Zainab Ali", "MRN-003", "0302-5556666", "Female", "Hypertension"],
-]
-# Identifier substrings that must never appear downstream of aggregation.
+# Identifier substrings that must never appear downstream of ingest. These are
+# the fake names/MRNs/phones written into the synthetic exports below (see
+# ``_build_tkc_daily_xls``); a guard asserts none of them survive into a
+# persisted row, an aggregate, or an AI payload.
 RAW_IDENTIFIERS = [
     "fatima",
     "bibi",
@@ -113,135 +102,74 @@ RAW_IDENTIFIERS = [
 ]
 
 
-def _build_export_xlsx() -> bytes:
-    """Build an in-memory .xlsx export with PHI columns; return its bytes."""
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.append(EXPORT_HEADER)
-    for row in EXPORT_ROWS:
-        sheet.append(row)
-    buffer = io.BytesIO()
-    workbook.save(buffer)
-    return buffer.getvalue()
+def _publish_report_page_with_summary(client_fixture, home_page, summary_sentence):
+    """Publish one live ``DailyReportPage`` carrying ``summary_sentence``.
 
-
-# Deterministic expected aggregate, computed here in the test independently of
-# the production aggregation code.
-EXPECTED_TOTAL = len(EXPORT_ROWS)
-EXPECTED_BY_GENDER = {"female": 2, "male": 1}
-EXPECTED_BY_DIAGNOSIS = {"diabetes": 1, "hypertension": 2}
-
-
-def test_upload_never_persists_raw_phi(
-    db, django_assert_num_queries, settings, tmp_path
-):
-    """Invariant #1: an uploaded export leaves no file on disk and no DB row."""
-    settings.MEDIA_ROOT = str(tmp_path)
-    upload = SimpleUploadedFile(
-        "daily-export.xlsx", _build_export_xlsx(), content_type=XLSX_CONTENT_TYPE
-    )
-
-    # Aggregating must not touch the database at all — no raw patient row.
-    with django_assert_num_queries(0):
-        aggregate = process_upload(upload)
-
-    # Nothing was written to media storage — the raw upload is discarded.
-    assert list(tmp_path.iterdir()) == []
-
-    # The aggregate is correct...
-    assert aggregate.total_patients == EXPECTED_TOTAL
-    assert aggregate.by_gender == EXPECTED_BY_GENDER
-    assert aggregate.by_diagnosis == EXPECTED_BY_DIAGNOSIS
-
-    # ...and carries no direct identifier from the raw rows.
-    serialised = json.dumps(aggregate.as_dict()).lower()
-    for identifier in RAW_IDENTIFIERS:
-        assert identifier not in serialised
-    for column in PATIENT_IDENTIFYING_COLUMNS:
-        assert column not in serialised
-
-
-def test_ai_payload_contains_only_aggregates(db, mock_anthropic_client):
-    """Invariant #2: the payload sent to the model holds only aggregate counts.
-
-    ``db`` is required here (Plan 11 C2): ``draft_newsletter_prose`` now
-    writes an ``AiCallLog`` row after every call.
+    Returns the rendered HTML of the real page, fetched through the real URL
+    — the same thing a reader gets, not a bespoke render call.
     """
-    aggregate = aggregate_export(io.BytesIO(_build_export_xlsx()))
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    report_date = datetime.date(2026, 7, 11)
+    aggregate = DailyAggregateFactory(
+        clinic_date=report_date,
+        total_visits=4,
+        zakat_beneficiary_patients=3,
+        paying_patients=1,
+        category_counts={
+            "by_sex": {"female": 2, "male": 2},
+            "by_age_band": {"19-55": 4},
+        },
+    )
+    DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=aggregate,
+        summary_sentence=summary_sentence,
+    )
+    response = client_fixture.get(f"/en/reports/{report_date.isoformat()}/")
+    return response.content.decode()
 
-    prose = draft_newsletter_prose(aggregate, mock_anthropic_client)
-    assert prose  # the stub returned its canned text
 
-    # Inspect exactly what our code sent to the (mocked) client.
-    assert len(mock_anthropic_client.calls) == 1
-    sent = json.dumps(mock_anthropic_client.calls[0]).lower()
-
-    # No raw identifier value and no identifying column name crossed the wire.
-    for identifier in RAW_IDENTIFIERS:
-        assert identifier not in sent
-    for column in PATIENT_IDENTIFYING_COLUMNS:
-        assert column not in sent
-
-    # The de-identified aggregates DID cross — that's what the model works from.
-    assert str(EXPECTED_TOTAL) in sent
-    assert "hypertension" in sent
-    assert "by_gender" in sent
-
-
-def test_published_report_numbers_are_deterministic(db, mock_anthropic_client):
+def test_published_report_numbers_are_deterministic(client, home_page):
     """Invariant #3: published figures come from Python, not the model's prose.
 
-    ``db`` is required here (Plan 11 C2): ``draft_newsletter_prose`` now
-    writes an ``AiCallLog`` row after every call.
+    Retargeted 2026-07-25 from the Plan 02 prototype renderer (deleted with
+    ``apps.pipeline.rendering``) onto the live ``DailyReportPage``, which is
+    what actually ships. The AI-written ``summary_sentence`` is handed a
+    bogus figure; it must appear only inside the narrative block and never
+    among the deterministic figures the template reads from ``aggregate``.
     """
-    aggregate = aggregate_export(io.BytesIO(_build_export_xlsx()))
+    content = _publish_report_page_with_summary(
+        client, home_page, "The clinic saw 9999 patients today."
+    )
 
-    # The stub prose deliberately contains a bogus number ("9999").
-    prose = draft_newsletter_prose(aggregate, mock_anthropic_client)
-    assert "9999" in prose
-
-    html = render_daily_report(aggregate, prose)
-
-    # The figures the reader sees are the deterministic, code-computed numbers.
-    assert f"Patients seen: <strong>{EXPECTED_TOTAL}</strong>" in html
-    assert "hypertension: <strong>2</strong>" in html
-    assert "female: <strong>2</strong>" in html
-
-    # The bogus number from the model appears only inside the narrative block,
-    # never in the figures block — numbers came from code, not the mock.
-    figures_block, _, narrative_block = html.partition('data-role="narrative"')
+    # The figure the reader sees is the code-computed one, not the prose's.
+    figures_block, _, narrative_block = content.partition('data-role="narrative"')
     assert "9999" not in figures_block
     assert "9999" in narrative_block
 
-    # Byte-for-byte: re-aggregating the same export yields the same figures, and
-    # those figures equal the values computed independently in this test.
-    reaggregate = aggregate_export(io.BytesIO(_build_export_xlsx()))
-    assert reaggregate == aggregate
-    assert aggregate.total_patients == EXPECTED_TOTAL
-    assert aggregate.by_diagnosis == EXPECTED_BY_DIAGNOSIS
+    # ...and the real total is the one rendered from the aggregate.
+    assert "Patients seen" in figures_block
+    assert ">4<" in figures_block
 
 
-def test_template_comment_does_not_leak_into_output(db, mock_anthropic_client):
-    """The template's documentation comment must not render as visible text.
-
-    Django's ``{# ... #}`` hash-comment syntax is single-line only (its lexer
-    regex is not DOTALL), so a multi-line hash comment leaks into the HTML as
-    literal text. The template uses a ``{% comment %}`` block instead; this
-    guards against a regression back to the leaking form.
-
-    ``db`` is required here (Plan 11 C2): ``draft_newsletter_prose`` now
-    writes an ``AiCallLog`` row after every call.
-    """
-    aggregate = aggregate_export(io.BytesIO(_build_export_xlsx()))
-    prose = draft_newsletter_prose(aggregate, mock_anthropic_client)
-
-    html = render_daily_report(aggregate, prose)
-
-    # Distinctive phrases from the template's internal doc comment — none should
-    # ever reach the rendered page.
-    assert "Daily clinic report" not in html
-    assert "privacy invariant #3" not in html
-    assert "rendering.py" not in html
+# The Plan 02 renderer also carried a `test_template_comment_does_not_leak_
+# into_output` guard, deleted 2026-07-25 with the rest of that prototype and
+# deliberately NOT retargeted onto `daily_report_page.html`. That template
+# `{% extends "base.html" %}`, and Django discards everything outside a
+# `{% block %}` in an extending template — so a malformed multi-line
+# `{# ... #}` comment there can never reach the output, and the retargeted
+# assertion passed even when the comment was deliberately broken (verified by
+# mutation, 2026-07-25). The original guard was meaningful only because the
+# prototype template was standalone, rendered by `render_to_string`. A
+# vacuous guard is worse than none, so it is gone rather than moved.
+#
+# NOTE: the ~36 standalone partials under `templates/partials/` and
+# `templates/blocks/` DO render their content when `{% include %}`d, so the
+# leak is still possible there and is currently unguarded — see `500.html`'s
+# `assert "{# " not in content` in apps/core/tests.py for the one precedent.
+# Worth a general guard one day; out of scope for a dead-code sweep.
 
 
 def test_real_anthropic_client_is_forbidden_in_tests():
@@ -701,7 +629,7 @@ def test_ingest_never_persists_raw_phi_and_computes_correct_aggregate(home_page)
     de-identified rows and aggregates; invariant #3: the aggregate is exactly
     the deterministic recomputation from the fixture."""
     summary = _ingest_clinic_v1()
-    assert summary.total_rows == EXPECTED_TOTAL_VISITS
+    assert sum(r.row_count for r in summary.results) == EXPECTED_TOTAL_VISITS
     assert summary.results[0].status == IngestRun.STATUS_CREATED
 
     # No raw identifier or raw diagnosis text anywhere in what got persisted.
@@ -870,9 +798,9 @@ def _build_tkc_daily_xls(
     """A synthetic legacy ``.xls`` mirroring the clinic system's real layout.
 
     Same shape as the 2026-07-22 sample: banner row, ``Period:`` row, blank
-    row, header row, then data rows — with the same fake identifiers as
-    ``EXPORT_ROWS`` so the ``RAW_IDENTIFIERS`` guard applies. Built with
-    xlwt (dev dependency) because openpyxl cannot write BIFF.
+    row, header row, then data rows — carrying the fake identifiers that
+    ``RAW_IDENTIFIERS`` lists, so that guard applies. Built with xlwt (dev
+    dependency) because openpyxl cannot write BIFF.
 
     Extended (Plan 11 Track B8/B9, 2026-07-23) with the seven free-text
     columns via ``TKC_FREETEXT_ROWS`` above.
@@ -1846,15 +1774,17 @@ def test_empty_columns_flag_prompt_requires_a_json_array_no_markdown(
 # is written and registered.
 
 #: Every function in ``apps.pipeline.ai`` that physically calls
-#: ``client.messages.create``. Three today: the two one-shot payload calls
-#: (``draft_newsletter_prose`` and the shared ``_draft_short_text`` behind the
-#: daily-summary / free-text-summary / empty-columns calls) and the
-#: newsletter tool-loop. A new physical call site trips
+#: ``client.messages.create``. Two today: the shared ``_draft_short_text``
+#: behind the daily-summary / free-text-summary / empty-columns calls, and
+#: the newsletter tool-loop. A new physical call site trips
 #: ``test_ai_call_sites_are_all_payload_guarded`` until it is acknowledged
 #: here and given a guardrail test below.
+#:
+#: ``draft_newsletter_prose`` was a third until 2026-07-25, when it was
+#: deleted as dead code — Plan 09 had already superseded it with
+#: ``draft_monthly_newsletter_body`` and nothing in production called it.
 _EXPECTED_MESSAGES_CREATE_FUNCTIONS = frozenset(
     {
-        "draft_newsletter_prose",
         "_draft_short_text",
         "draft_monthly_newsletter_body",
     }
@@ -1866,10 +1796,6 @@ _EXPECTED_MESSAGES_CREATE_FUNCTIONS = frozenset(
 #: data. A new call site adds a ``CALL_SITE_*`` constant, which must be
 #: registered here with its guardrail test or the backstop fails.
 _PAYLOAD_GUARDRAIL_TESTS = {
-    "newsletter_prose": (
-        "apps.pipeline.tests",
-        "test_ai_payload_contains_only_aggregates",
-    ),
     "daily_summary": (
         "apps.pipeline.tests",
         "test_daily_summary_payload_contains_only_this_dates_aggregate",
