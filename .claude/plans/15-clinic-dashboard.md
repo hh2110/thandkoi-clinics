@@ -111,9 +111,13 @@ index-plus-child pattern every other section already uses. Rejected:
 `INSTALLED_APPS` — a pattern this repo uses nowhere) and a plain Django view
 (would need hand-wiring into `i18n_patterns` ahead of Wagtail's catch-all,
 and would sit outside the page tree that everything else lives in).
-Consequence: the page must be created in the tree — seeded like
-`seed_core_content` does, and created on production via the documented
-content-ops SSH flow.
+Consequence: the page must exist in the tree. It gets there the same way the
+Reports index itself does — a `_get_or_create_clinic_dashboard()` helper
+mirroring `apps/pipeline/report_publishing.py`'s
+`_get_or_create_report_index` ("fetch if it exists, otherwise create it live
+… so the first ever ingest doesn't depend on a maintainer having clicked it
+into existence in `/admin/`"), called from a data migration so production
+needs **no manual content-ops SSH step**.
 **The real URL is `/en/reports/dashboard/`, not `/reports/dashboard/`** —
 `config/urls.py` wraps Wagtail's catch-all in `i18n_patterns(...,
 prefix_default_language=True)`, so the unprefixed path in the handoff does
@@ -233,8 +237,7 @@ chips list dates only. Nothing here touches invariants #1–#5.
 | Bar track colour | `.dr__bar-track` → `--color-border-default` |
 | Optional context on a shared partial | `stat_band.html`'s existing optional `updated_caption` / `section_modifier` |
 | Progressive-enhancement JS | `static/js/funding-mix-chart.js`, `circle-of-care.js` |
-| Seeding a new page into the tree | `apps/core/management/commands/seed_core_content.py` |
-| Production page creation | `docs/content-operations.md` (SSH + Wagtail Python API) |
+| Creating a singleton page in the tree | `_get_or_create_report_index` in `apps/pipeline/report_publishing.py` (get-or-create, live, under Home), and `seed_core_content`'s `_get` idiom it mirrors |
 | Design provenance in-repo | `docs/design/README.md` + `docs/design/prototypes/*.dc.html` |
 
 Gaps with no in-repo precedent, and how they are grounded instead:
@@ -251,9 +254,10 @@ Gaps with no in-repo precedent, and how they are grounded instead:
 **No runtime flag**, consistent with every plan in this repo. The natural
 gates do the work here:
 
-- The page does not exist until it is created in the page tree, and it is
-  linked from nowhere until task 15.4 lands — so partial work cannot reach a
-  reader.
+- Nothing on the site links to the dashboard until task 15.4 lands, so a
+  half-finished page cannot reach a reader through any existing journey
+  (it is reachable by URL, like any unlinked page — acceptable given Q3's
+  public default and that it exposes nothing the daily reports don't).
 - Every revenue surface is gated on `has_revenue` (D6), which is data
   presence, not configuration — the handoff's own design, and strictly better
   than a flag because it needs no second release and cannot drift out of sync
@@ -263,15 +267,15 @@ gates do the work here:
 
 - **How it ships.** Four PRs (below), each merged only after a clean
   `code-review-tc` pass and green CI, then deployed by the existing
-  human-triggered `workflow_dispatch` release against a dated tag. The
-  dashboard page itself is created in production content-ops style (SSH +
-  Wagtail API) **after** the code deploy — so the deploy is inert until that
-  step, giving a natural staging point.
-- **Gating check per phase.** (1) Code deployed, page not yet created —
-  verify nothing on the live site changed. (2) Page created but entry points
-  not yet linked — walk the URL by hand in both themes, check a 7-day, a
-  90-day, a 1-year and an empty range. (3) Entry points live — verify from
-  home and `/reports/`.
+  human-triggered `workflow_dispatch` release (`.github/workflows/deploy.yml`)
+  against a dated tag. The dashboard page creates itself on deploy via the
+  data migration (D1), but nothing links to it until task 15.4 ships — that
+  ordering, not a flag or a manual step, is the staging point.
+- **Gating check per phase.** (1) 15.3 deployed — the page exists and is
+  correct at its URL, but no existing page links to it; walk the URL by hand
+  in both themes and check a 7-day, a 90-day, a 1-year and an empty range.
+  (2) 15.4 deployed — entry points live; verify from home and `/reports/`
+  that both links appear and land on the dashboard.
 - **Access.** Public once linked (Q3). No new permissions.
 - **Informed.** Maintainer only; no downstream operators or customers.
 - **Rollback trigger.** Any wrong figure, a crash on a range boundary, or a
@@ -298,7 +302,8 @@ Conventional-Commit type.
       90/91 and 400/401 boundaries, the empty range, `end < start`, the 5-year
       cap, and gap detection across a Sunday. No UI in this PR.
 - [ ] **15.3 — `ClinicDashboardPage` + template + CSS** (`feat`). Model,
-      migration, `subpage_types` update, seed entry, template composing
+      schema migration, `subpage_types` update, the get-or-create helper plus
+      the data migration that calls it (D1), template composing
       header/presets/date form, KPI row, chart (via 15.1), funding split,
       gender, age bands, reporting gaps; `static/css/dashboard.css`; revenue
       branches present and inert. Tests: renders with 3 KPI cards and no
