@@ -419,7 +419,7 @@ Conventional-Commit type.
       `ReportIndexPage.get_funding_mix` becomes a thin caller. **No behaviour
       change** — Plan 13's existing tests must pass untouched, which is the
       acceptance test for this PR.
-- [ ] **16.2 — Range aggregation module** (`feat`). New
+- [x] **16.2 — Range aggregation module** (`feat`). New
       `apps/pipeline/dashboard.py`: param parse/clamp (D10), DB-side sums,
       funding/gender/age-band rows (D5), reporting-gap dates, slot count and
       grain selection (D3), week/month bucket folding (D16), `has_revenue`
