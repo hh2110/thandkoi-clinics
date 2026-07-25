@@ -90,6 +90,12 @@ jobs:
   # than being buried in the test job's logs.
   supply-chain:
     runs-on: ubuntu-latest
+    # gitleaks-action reads the PR's commit list via the API on a
+    # pull_request event; the default GITHUB_TOKEN is restricted, so grant the
+    # read scopes it needs (the job never writes anything).
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,11 +120,17 @@ jobs:
       # Dependency-vulnerability scan against the locked dependency set. Export
       # the frozen lockfile to a requirements file (excluding the unpublished
       # project package itself) and audit that, so the scan matches exactly
-      # what production installs. Run via uvx so pip-audit needs no project
-      # dependency of its own; --strict fails the job on an audit-tool error
-      # too, not only on a finding.
+      # the versions production installs. Run via uvx so pip-audit needs no
+      # project dependency of its own; --strict fails the job on an audit-tool
+      # error too, not only on a finding.
+      #
+      # --no-hashes: pip-audit resolves the file via a pip dry-run, and a
+      # hash-pinned requirements file makes pip enforce per-wheel hashes
+      # (failing when the resolved platform/interpreter wheel isn't among the
+      # pinned set). We only need the pinned *versions* to audit against the
+      # advisory DB, so drop the hashes for this scan.
       - name: Dependency audit (pip-audit)
         run: |
           uv export --frozen --no-dev --format requirements-txt \
-            --no-emit-project > requirements-audit.txt
+            --no-emit-project --no-hashes > requirements-audit.txt
           uvx pip-audit --strict -r requirements-audit.txt
