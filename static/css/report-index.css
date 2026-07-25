@@ -172,26 +172,3 @@
   color: var(--color-text-faint);
   font-weight: 500;
 }
-
-/* Hover tooltip — added by funding-mix-chart.js; hidden until JS shows it,
-   so the chart and table above remain fully usable without JS. */
-.ri-funding-mix__tooltip {
-  position: fixed;
-  pointer-events: none;
-  /* Inverted on purpose: --color-text/--color-bg swap values per theme, so
-     this auto-inverts (dark-on-light in light mode, light-on-dark in dark
-     mode) without a separate dark-mode override. */
-  background: var(--color-text);
-  color: var(--color-bg);
-  font-size: var(--font-size-xs);
-  padding: 0.375rem 0.625rem;
-  border-radius: 6px;
-  transform: translate(-50%, calc(-100% - 10px));
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.08s ease;
-  z-index: 10;
-}
-.ri-funding-mix__tooltip.is-visible {
-  opacity: 1;
-}

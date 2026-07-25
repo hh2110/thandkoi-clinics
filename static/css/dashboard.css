@@ -523,6 +523,16 @@
 .dash-chart__bar--regular {
   fill: var(--color-text-faint);
 }
+/* Full-height invisible hover target per bar, so a short bar is as easy to
+   hover as a tall one (added 2026-07-25 — see the template's note). The
+   tooltip it opens is the shared `.chart-tooltip` in components.css, not a
+   `dash-chart` element: funding-mix-chart.js appends one element to
+   <body>, shared with the reports index, so it belongs to neither page's
+   block. */
+.dash-chart__hit {
+  fill: transparent;
+  cursor: pointer;
+}
 .dash-chart__empty {
   font-size: var(--font-size-sm);
   color: var(--color-text-faint);
