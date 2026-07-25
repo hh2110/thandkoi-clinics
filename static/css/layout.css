@@ -323,7 +323,7 @@
    handoff asks for two columns with the link tile last at that width, so
    the basis goes to half the row for a band that carries the tile. Three-
    card bands (the newsletter's) keep the 9rem basis untouched. */
-@media (max-width: 55.999rem) {
+@media (max-width: 55.99rem) {
   .stat-band--with-link .stat-band__card {
     flex: 1 1 calc(50% - var(--space-2));
   }
