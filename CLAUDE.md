@@ -99,6 +99,28 @@ behavior. Events are tagged with `environment=production` and `release`
 (Render's auto-injected `RENDER_GIT_COMMIT` — no separate release-tag env var
 exists). See [docs/deploying.md](docs/deploying.md) → Secrets.
 
+**Performance tracing and structured logs** were added in Plan 17
+([.claude/plans/17-observability-round-2.md](.claude/plans/17-observability-round-2.md)),
+reversing Plan 12's deliberate parking of APM. Two things matter for any
+future change here:
+
+1. **The Sentry hooks live in `config/observability.py`, not in
+   `prod.py`** — importing prod settings executes the whole file and demands
+   every secret, which is why the original PHI scrub shipped untested and the
+   Plan 15 Track A1 leak went uncaught. Keep them there and keep them tested
+   (`config/test_observability.py`).
+2. **`before_send` fires for error events ONLY.** Any new event kind needs its
+   own scrub hook. Tracing required `before_send_transaction` for exactly this
+   reason — a transaction event carries its own `request` section, so the
+   upload view's raw-PHI multipart body would otherwise ride out on every
+   sampled request. If you enable a further Sentry product (profiling, replay,
+   check-ins), ask what payload *it* carries before turning it on, never by
+   analogy to what's already scrubbed.
+
+Log forwarding is `WARNING` and above only (`sentry_logs_level`); `INFO` is
+deliberately not forwarded. `SENTRY_TRACES_SAMPLE_RATE` dials trace volume
+from the Render dashboard with no deploy; `/healthz` is never traced.
+
 A **Sentry MCP server** is registered on the maintainer's machine for this
 project (`claude mcp add --transport http sentry https://mcp.sentry.dev/mcp`,
 scope `local` — lives in Claude Code's own config, not the repo, so it won't

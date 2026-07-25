@@ -50,6 +50,8 @@ plan from 03.5 onward carries three lifecycle sections:
 | 15 | [Code-review remediation (July 2026)](15-code-review-remediation-2026-07.md) — fixes from two whole-codebase review passes, sequenced by risk into four PRs: Sentry PHI leak + prod-settings CI gate (P0), report-publishing re-ingest data integrity (P1), guardrail/injection/k-anonymity/supply-chain hardening (P2), correctness/perf/i18n/docs polish (P3), structured outputs (follow-on) | 🚧 In progress (Tracks A–D implemented; Track E deferred) |
 | 16 | [Clinic dashboard (range view) + entry points](16-clinic-dashboard.md) — `/reports/dashboard/` totalling any reader-chosen date range (KPIs, bucketed footfall chart, funding/gender/age splits, reporting gaps), plus entry points 1a (reports index) and 1c (home impact band). Phase 1 ships without revenue data; revenue surfaces are gated on data presence, not a flag. Design handoff: [`docs/design/clinic-dashboard-handoff.md`](../../docs/design/clinic-dashboard-handoff.md). 16.1 (chart-geometry extraction, PR #131) and 16.2 (range aggregation module, PR #132) merged; 16.3 (page + template + CSS) and 16.4 (entry points) remain | 🚧 In progress |
 
+| 17 | [Observability round 2](17-observability-round-2.md) — performance tracing (response times) + `WARNING` structured logs in Sentry, the `before_send_transaction` PHI hook tracing newly requires, scrub hooks extracted to a testable `config/observability.py`, and one custom "Service health" dashboard. Explicit reversal of Plan 12's parked APM decision | 🚧 In progress |
+
 **Legend:** ⬜ Not started · 📝 Drafted (plan written, not implemented) · 🚧 In progress · ⏸ Paused/parked (work stopped, not abandoned) · ✅ Done
 
 ## Out of scope (for now)

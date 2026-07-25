@@ -207,6 +207,26 @@ app boots and behaves identically whether or not it's set — see Plan 12's
 Decisions. Leave it unset until a Sentry project exists; set it whenever
 error tracking should turn on.
 
+`SENTRY_TRACES_SAMPLE_RATE` ([Plan 17](../.claude/plans/17-observability-round-2.md)
+Track A) follows the same soft-fail posture, one step further: it is optional,
+not a secret, and an *unparseable or out-of-range* value is logged and ignored
+in favour of the code default (`1.0`) rather than raising at import — a typo in
+a monitoring knob must never be a boot failure. Its purpose is to make trace
+volume dialable without a deploy:
+
+| Value | Effect |
+|---|---|
+| unset / blank | code default, `1.0` — trace every request except `/healthz` |
+| `0` | performance tracing off; errors and logs unaffected |
+| e.g. `0.25` | sample a quarter of requests |
+
+`/healthz` is never traced at any setting (Plan 17 Decision 3) — a 60-second
+uptime poll is ~43k requests/month whose latency says nothing, and including it
+would drag every p50 widget toward zero. Sizing note: the free Developer plan
+includes **5M spans/month with no pay-as-you-go**, so over-quota spans are
+dropped and never billed; at this site's measured traffic (15 page views in the
+24h to 2026-07-25) full sampling sits orders of magnitude inside that budget.
+
 `UMAMI_WEBSITE_ID` ([Plan 12](../.claude/plans/12-observability.md) Track B)
 is set in the Render dashboard too, but isn't a secret — it's a public value
 that ships in every page's HTML source regardless, so unlike the vars above

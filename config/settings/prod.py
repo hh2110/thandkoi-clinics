@@ -5,7 +5,12 @@ Everything sensitive comes from the environment — the process must fail loudly
 if a required secret is missing, rather than fall back to an insecure default.
 """
 
+import logging
+
 import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
+
+from config import observability
 
 from .base import *  # noqa: F403
 from .base import STORAGES, env
@@ -113,7 +118,7 @@ LOGGING = {
     },
 }
 
-# --- Error tracking (Plan 12 Track A) ---------------------------------------
+# --- Observability (Plan 12 Track A; tracing + logs, Plan 17) ----------------
 
 # Deliberately soft-fail, unlike every setting above: SENTRY_DSN is read with
 # a blank default and the SDK is only initialized if it's non-empty, so a
@@ -122,25 +127,14 @@ LOGGING = {
 # reason the site goes down).
 SENTRY_DSN = env("SENTRY_DSN", default="")
 
-
-def _sentry_before_send(event, hint):
-    """Drop request bodies from every event before it leaves the process.
-
-    This is the PHI-scrub belt to ``max_request_body_size="never"``'s braces
-    (Plan 15 Track A1): the upload view receives a full patient export as a
-    multipart request body, and an unhandled error anywhere in the request —
-    not just in the upload path — would otherwise let Sentry attach that body
-    (or a URL/form representation of it) to the event. A daily clinic export
-    is raw PHI (CLAUDE.md invariant #1), so it must never cross into an
-    external error-tracking service. We positively delete the request body
-    representation rather than trust any single ``sentry_sdk.init`` knob to
-    cover every shape it can take.
-    """
-    request = event.get("request")
-    if isinstance(request, dict):
-        request.pop("data", None)
-        request.pop("body", None)
-    return event
+# Plan 17 Track A. Read as a string and coerced in Python rather than via
+# ``env.float(...)`` so a typo degrades to the default sample rate instead of
+# raising at import: observability must never become a new reason the site
+# fails to boot (Plan 12 Decisions, Plan 17 Decision 4). Dial to 0 in the
+# Render dashboard to switch tracing off with no deploy.
+SENTRY_TRACES_SAMPLE_RATE = observability.parse_sample_rate(
+    env("SENTRY_TRACES_SAMPLE_RATE", default="")
+)
 
 
 if SENTRY_DSN:
@@ -162,13 +156,38 @@ if SENTRY_DSN:
     #     accepted (Plan 15 Decision 1).
     #   * max_request_body_size="never" tells the SDK not to read or attach
     #     request bodies at all — the upload view's body *is* a patient
-    #     export. _sentry_before_send is the belt-and-braces backstop that
-    #     positively drops any body representation that still slips through.
+    #     export. observability.before_send is the belt-and-braces backstop
+    #     that positively drops any body representation that still slips
+    #     through.
+    #   * before_send_transaction applies that same scrub to performance
+    #     events (Plan 17 Decision 1). before_send fires for error events
+    #     ONLY — a transaction event carries its own request section, so
+    #     turning on tracing without this would reopen the Track A1 hole
+    #     through a new door, on every sampled request rather than only on
+    #     errors. The two hooks share one scrub function by construction.
+    #
+    # Tracing and logs (Plan 17):
+    #   * traces_sampler (not a bare traces_sample_rate) so /healthz is never
+    #     sampled — it is the highest-volume route here and its latency says
+    #     nothing, so sampling it would both burn the span budget and drag
+    #     every p50 widget toward zero (Plan 17 Decision 3).
+    #   * enable_logs + sentry_logs_level=WARNING promotes logger.warning(...)
+    #     from a breadcrumb to a searchable signal. INFO is deliberately not
+    #     forwarded — it is per-request chatter with no diagnostic value at
+    #     this traffic level. event_level stays at the SDK default (ERROR), so
+    #     this changes what is *logged*, not what becomes an issue.
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         release=env.str("RENDER_GIT_COMMIT", default="") or None,
         environment="production",
         include_local_variables=False,
         max_request_body_size="never",
-        before_send=_sentry_before_send,
+        before_send=observability.before_send,
+        before_send_transaction=observability.before_send_transaction,
+        traces_sampler=observability.make_traces_sampler(SENTRY_TRACES_SAMPLE_RATE),
+        enable_logs=True,
+        before_send_log=observability.before_send_log,
+        integrations=[
+            LoggingIntegration(sentry_logs_level=logging.WARNING),
+        ],
     )

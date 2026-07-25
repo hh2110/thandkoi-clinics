@@ -50,6 +50,14 @@ after, and without becoming a new single point of failure for the site.
 - **Full APM / performance tracing** (Sentry performance monitoring,
   Datadog/New Relic) — disproportionate to current traffic. Revisit if
   traffic or team size grows.
+  > **2026-07-25 — reversed, in part.** Sentry's own tracing (not Datadog/New
+  > Relic) is now on: the maintainer asked for a dashboard covering response
+  > times, and this parking was the reason two of its three panels would have
+  > been permanently empty. The trigger was the ask, not traffic growth —
+  > traffic is still tiny, which is precisely what makes 100% sampling free.
+  > See [Plan 17](17-observability-round-2.md). Structured `WARNING` log
+  > forwarding was added in the same pass; "dedicated log aggregation"
+  > (Better Stack, Papertrail) below remains out of scope.
 - **Dedicated log aggregation** (Better Stack Logs, Papertrail) beyond
   Render's own tail — a related but separate concern; no action here beyond
   what Track A's Sentry events already surface.
