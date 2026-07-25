@@ -51,8 +51,9 @@
 
   /* The toggle now sits inside the <details> as the open menu's last row
      (see nav.html) — indented to match .primary-nav__list, with a hairline
-     separating it from the Donate button above. It's hidden automatically
-     when the menu is closed, since it's inside the collapsed <details>. */
+     separating it from the .primary-nav__cta Donate block above. It's hidden
+     automatically when the menu is closed, since it's inside the collapsed
+     <details>. */
   .site-header__controls {
     padding: var(--space-2);
     margin-block-start: var(--space-1);
@@ -228,15 +229,71 @@
   color: var(--color-brand-hover);
 }
 
+/* Current-page marker (2026-07-25, Plan 18 Track A / design handoff fix 1).
+   Was --color-brand, which is #086c7e in *both* themes — 1.9:1 on the dark
+   drawer, so the marker simply wasn't there in dark mode. --color-nav-current
+   flips (tokens.css). The weight bump is belt-and-braces: the marker survives
+   even where colour is missed.
+
+   This also covers the "More" flyout's Team/Gallery/Contact links (Plan 18
+   D2): .nav-dropdown is an <li> inside this list, so the descendant selector
+   already matches them at (0,3,0) — above .nav-dropdown__menu a:hover's
+   (0,2,0). No second rule needed; test_nav.py pins that. */
 .primary-nav__list a[aria-current="page"] {
-  color: var(--color-brand);
+  color: var(--color-nav-current);
+  font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 0.25em;
+}
+
+/* Donate's own block, out of the page list (see nav.html's comment for why).
+   Mobile shape: hairline above, --space-2 all round, the supporting sentence,
+   then the full-width amber button. Neutralised wholesale at 56rem below so
+   the desktop bar is unchanged — same pattern as .site-header__controls
+   above, which already does exactly this. */
+.primary-nav__cta {
+  border-block-start: 1px solid var(--color-border-default);
+  padding: var(--space-2);
+}
+
+.primary-nav__cta-text {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-soft);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+/* Paired with the parent rather than left as a lone class: `.button` (further
+   down this file) is also (0,1,0) and sets `display: inline-block`, so on a
+   tie the later rule wins and the full-width button silently shrank to its
+   text. Caught live at 390px, not by reading the diff. */
+.primary-nav__cta .primary-nav__cta-button {
+  display: block;
+  text-align: center;
 }
 
 @media (min-width: 56rem) {
   .primary-nav > summary {
     display: none;
+  }
+
+  /* Donate reads as an inline header button again, exactly where it sat as
+     the list's last <li>: ::details-content lays list / CTA / controls out as
+     one row with the same --space-3 gap that used to separate the list's last
+     item from the controls. */
+  .primary-nav__cta {
+    border-block-start: 0;
+    padding: 0;
+  }
+
+  .primary-nav__cta-text {
+    display: none;
+  }
+
+  /* Same pairing as the base rule above — it has to outrank it, and both
+     have to outrank `.button`. */
+  .primary-nav__cta .primary-nav__cta-button {
+    display: inline-block;
   }
 
   /* On desktop the disclosure is always shown inline, so the list must

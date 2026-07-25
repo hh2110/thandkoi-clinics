@@ -88,25 +88,40 @@ p {
   margin-block: 0 var(--space-2);
 }
 
-a {
+/* Anchors styled as buttons are excluded from every rule below (2026-07-25,
+   Plan 18 D10). Each `.button--*` variant sets its own colour at (0,1,0),
+   but `:root[data-theme="dark"] a` is (0,2,1) — so for any visitor who had
+   picked a theme by hand rather than inheriting the OS one, the themed link
+   colour won and *every* filled button rendered pale aqua on its own fill:
+   #a0e0e8 on Donate's amber (~2.2:1) and on primary's teal (~2.4:1). The
+   OS-preference path never showed it, because that rule is only (0,0,1).
+   Hover had the same shape — `.button--donate:hover` sets no colour, so a
+   hovered Donate label turned teal-bright.
+
+   `:not(:where(.button))` rather than `:not(.button)` on purpose: `:where()`
+   contributes zero specificity, so these rules keep the exact weight they
+   had and simply stop matching buttons. Nothing about ordinary links moves.
+   The one bare `.button` in the repo is a <button> element (the upload
+   form's submit), which these rules never matched anyway. */
+a:not(:where(.button)) {
   color: var(--color-brand-deep);
 }
 
 @media (prefers-color-scheme: dark) {
-  a {
+  a:not(:where(.button)) {
     color: var(--color-pale-aqua);
   }
 }
 
-:root[data-theme="dark"] a {
+:root[data-theme="dark"] a:not(:where(.button)) {
   color: var(--color-pale-aqua);
 }
 
-:root[data-theme="light"] a {
+:root[data-theme="light"] a:not(:where(.button)) {
   color: var(--color-teal-deep);
 }
 
-a:hover {
+a:not(:where(.button)):hover {
   color: var(--color-teal-bright);
 }
 

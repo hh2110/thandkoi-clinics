@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face { font-family:"Archivo"; font-style:normal; font-weight:700 800; font-display:swap; src:url("./fonts/archivo-latin-700-800.woff2") format("woff2"); }
+@font-face { font-family:"Public Sans"; font-style:normal; font-weight:400 600; font-display:swap; src:url("./fonts/public-sans-latin-400-600.woff2") format("woff2"); }
+*{ box-sizing:border-box; }
+body{ margin:0; font-family:"Public Sans",sans-serif; background:#dfe8e8; color:#0e2025; }
+a{ color:#086c7e; } a:hover{ color:#12879b; }
+</style>
+</helmet>
+
+<section style="padding:3rem; display:flex; flex-direction:column; gap:1.75rem;">
+  <div style="max-width:74ch;">
+    <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.12em; color:#728a8f; margin:0 0 .4rem;">Turn 1 · Mobile date range</p>
+    <h1 style="font-family:Archivo,sans-serif; font-weight:800; font-size:2rem; line-height:1.1; margin:0 0 .6rem;">Three ways to fit the range picker on a phone</h1>
+    <p style="font-size:1rem; line-height:1.6; color:#3e5257; margin:0; text-wrap:pretty;">Drawn at 390pt. The problem today is that the desktop layout stacks: five presets wrap onto two lines inside a pill, then a second card holds two dates and Apply — four rows of chrome before the first number. Every tap target below is at least 44pt.</p>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:2rem; align-items:flex-start;">
+
+    <div style="display:flex; flex-direction:column; gap:1rem; width:390px;">
+      <div id="1a" style="display:flex; flex-direction:column; gap:1rem;">
+        <div style="display:flex; align-items:center; gap:.6rem;">
+          <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1a</span>
+          <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.15rem; margin:0;">Scrolling chips + sheet</h2>
+        </div>
+        <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0;">Presets never wrap — they scroll sideways, which is the phone convention for a filter row. Custom dates move into a sheet, so the default case is one row tall and the numbers start higher up the page.</p>
+
+        <div style="width:390px; background:#f2f6f6; border:1px solid #cfdada; border-radius:24px; padding:1.25rem 1.25rem 1.5rem; overflow:hidden;">
+          <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.12em; color:#ce8a2c; margin:0 0 .35rem;">Thandkoi Clinics</p>
+          <h3 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.75rem; line-height:1.05; margin:0 0 .4rem;">Clinic dashboard</h3>
+          <p style="font-size:.9rem; color:#3e5257; margin:0 0 1rem;">26 Jun – 25 Jul 2026 · 30 days · 23 reporting days</p>
+
+          <div style="position:relative; margin:0 -1.25rem;">
+            <div style="display:flex; gap:.5rem; padding:0 1.25rem;">
+              <span style="flex:none; display:flex; align-items:center; height:44px; padding:0 1rem; border-radius:999px; background:#086c7e; color:#fff; font-weight:600; font-size:.95rem;">30 days</span>
+              <span style="flex:none; display:flex; align-items:center; height:44px; padding:0 1rem; border-radius:999px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem;">7 days</span>
+              <span style="flex:none; display:flex; align-items:center; height:44px; padding:0 1rem; border-radius:999px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem;">14 days</span>
+              <span style="flex:none; display:flex; align-items:center; height:44px; padding:0 1rem; border-radius:999px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem;">90 d</span>
+            </div>
+            <div style="position:absolute; inset:0 0 0 auto; width:56px; background:linear-gradient(90deg, rgba(242,246,246,0), #f2f6f6 70%); pointer-events:none;"></div>
+          </div>
+
+          <div style="height:1px; background:#e0e7e8; margin:1.25rem 0;"></div>
+          <div style="background:#fff; border:1px solid #e0e7e8; border-radius:12px; padding:1.1rem 1.2rem;">
+            <p style="font-family:Archivo,sans-serif; font-weight:800; font-size:2rem; line-height:1; color:#086c7e; margin:0;">192</p>
+            <p style="font-size:.92rem; font-weight:600; color:#3e5257; margin:.4rem 0 .15rem;">Patients seen</p>
+            <p style="font-size:.82rem; color:#728a8f; margin:0;">8.3 per reporting day</p>
+          </div>
+        </div>
+
+        <p style="font-size:.85rem; color:#728a8f; margin:0;">Scrolled to the end — the last chip opens the sheet.</p>
+        <div style="width:390px; background:#f2f6f6; border:1px solid #cfdada; border-radius:24px; padding:1.25rem; overflow:hidden; position:relative;">
+          <div style="display:flex; gap:.5rem; margin-bottom:1rem;">
+            <span style="flex:none; display:flex; align-items:center; height:44px; padding:0 1rem; border-radius:999px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem;">90 days</span>
+            <span style="flex:none; display:flex; align-items:center; height:44px; padding:0 1rem; border-radius:999px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem;">1 year</span>
+            <span style="flex:none; display:flex; align-items:center; gap:.4rem; height:44px; padding:0 1rem; border-radius:999px; background:#fff; border:1px dashed #086c7e; color:#086c7e; font-weight:600; font-size:.95rem;">Custom…</span>
+          </div>
+          <div style="background:#fff; border:1px solid #e0e7e8; border-radius:16px 16px 0 0; padding:1.25rem; margin:0 -1.25rem -1.25rem; box-shadow:0 -8px 24px rgba(10,62,72,.1);">
+            <div style="width:36px; height:4px; border-radius:999px; background:#e0e7e8; margin:0 auto 1rem;"></div>
+            <h4 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.05rem; margin:0 0 1rem;">Custom range</h4>
+            <div style="display:flex; flex-direction:column; gap:.75rem;">
+              <label style="display:flex; align-items:center; justify-content:space-between; gap:1rem; height:52px; border:1px solid #e0e7e8; border-radius:10px; padding:0 1rem;">
+                <span style="font-family:Archivo,sans-serif; font-weight:700; font-size:.68rem; text-transform:uppercase; letter-spacing:.1em; color:#728a8f;">From</span>
+                <span style="font-size:1rem; color:#0e2025;">26 Jun 2026</span>
+              </label>
+              <label style="display:flex; align-items:center; justify-content:space-between; gap:1rem; height:52px; border:1px solid #e0e7e8; border-radius:10px; padding:0 1rem;">
+                <span style="font-family:Archivo,sans-serif; font-weight:700; font-size:.68rem; text-transform:uppercase; letter-spacing:.1em; color:#728a8f;">To</span>
+                <span style="font-size:1rem; color:#0e2025;">25 Jul 2026</span>
+              </label>
+              <span style="display:flex; align-items:center; justify-content:center; height:52px; border-radius:999px; background:#086c7e; color:#fff; font-weight:600; font-size:1rem;">Apply</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:1rem; width:390px;">
+      <div id="1b" style="display:flex; flex-direction:column; gap:1rem;">
+        <div style="display:flex; align-items:center; gap:.6rem;">
+          <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1b</span>
+          <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.15rem; margin:0;">One button, one sheet</h2>
+        </div>
+        <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0;">All range controls collapse into a single field that states the current range. Everything — presets and custom dates — lives in one sheet. Shortest header of the three, and it kills the duplicate summary line, since the button <em>is</em> the summary.</p>
+
+        <div style="width:390px; background:#f2f6f6; border:1px solid #cfdada; border-radius:24px; padding:1.25rem 1.25rem 1.5rem;">
+          <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.12em; color:#ce8a2c; margin:0 0 .35rem;">Thandkoi Clinics</p>
+          <h3 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.75rem; line-height:1.05; margin:0 0 1rem;">Clinic dashboard</h3>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; background:#fff; border:1px solid #e0e7e8; border-radius:12px; padding:.85rem 1rem; min-height:56px;">
+            <div>
+              <p style="font-size:1rem; font-weight:600; color:#0e2025; margin:0 0 .15rem;">26 Jun – 25 Jul 2026</p>
+              <p style="font-size:.82rem; color:#728a8f; margin:0;">30 days · 23 reporting days</p>
+            </div>
+            <span style="flex:none; display:flex; align-items:center; gap:.4rem; font-weight:600; font-size:.9rem; color:#086c7e;">Change ▾</span>
+          </div>
+
+          <div style="height:1px; background:#e0e7e8; margin:1.25rem 0;"></div>
+          <div style="background:#fff; border:1px solid #e0e7e8; border-radius:12px; padding:1.1rem 1.2rem;">
+            <p style="font-family:Archivo,sans-serif; font-weight:800; font-size:2rem; line-height:1; color:#086c7e; margin:0;">192</p>
+            <p style="font-size:.92rem; font-weight:600; color:#3e5257; margin:.4rem 0 .15rem;">Patients seen</p>
+            <p style="font-size:.82rem; color:#728a8f; margin:0;">8.3 per reporting day</p>
+          </div>
+        </div>
+
+        <p style="font-size:.85rem; color:#728a8f; margin:0;">Sheet open.</p>
+        <div style="width:390px; background:#e9eeee; border:1px solid #cfdada; border-radius:24px; padding:2.5rem 0 0; overflow:hidden;">
+          <div style="background:#fff; border-radius:20px 20px 0 0; padding:1.25rem;">
+            <div style="width:36px; height:4px; border-radius:999px; background:#e0e7e8; margin:0 auto 1.1rem;"></div>
+            <h4 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.15rem; margin:0 0 1rem;">Date range</h4>
+            <div style="display:flex; flex-direction:column; gap:.5rem; margin-bottom:1.25rem;">
+              <sc-for list="{{ presets }}" as="p" hint-placeholder-count="5">
+                <div style="{{ p.rowStyle }}">
+                  <span style="font-size:1rem; font-weight:600;">{{ p.label }}</span>
+                  <span style="font-size:.88rem; color:#728a8f;">{{ p.range }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.68rem; text-transform:uppercase; letter-spacing:.1em; color:#728a8f; margin:0 0 .6rem;">Or pick dates</p>
+            <div style="display:flex; gap:.6rem; margin-bottom:1rem;">
+              <div style="flex:1; min-width:0; border:1px solid #e0e7e8; border-radius:10px; padding:.6rem .8rem;">
+                <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.62rem; text-transform:uppercase; letter-spacing:.1em; color:#728a8f; margin:0 0 .2rem;">From</p>
+                <p style="font-size:.98rem; margin:0;">26 Jun 2026</p>
+              </div>
+              <div style="flex:1; min-width:0; border:1px solid #e0e7e8; border-radius:10px; padding:.6rem .8rem;">
+                <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.62rem; text-transform:uppercase; letter-spacing:.1em; color:#728a8f; margin:0 0 .2rem;">To</p>
+                <p style="font-size:.98rem; margin:0;">25 Jul 2026</p>
+              </div>
+            </div>
+            <span style="display:flex; align-items:center; justify-content:center; height:52px; border-radius:999px; background:#086c7e; color:#fff; font-weight:600; font-size:1rem;">Show these dates</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:1rem; width:390px;">
+      <div id="1c" style="display:flex; flex-direction:column; gap:1rem;">
+        <div style="display:flex; align-items:center; gap:.6rem;">
+          <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1c</span>
+          <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.15rem; margin:0;">Everything visible</h2>
+        </div>
+        <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0;">No hidden state: presets become a tidy grid of tiles instead of a wrapping pill, and the two dates sit side by side with Apply full-width beneath. Tallest option, but nothing is a tap away and it needs no JavaScript at all.</p>
+
+        <div style="width:390px; background:#f2f6f6; border:1px solid #cfdada; border-radius:24px; padding:1.25rem 1.25rem 1.5rem;">
+          <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.12em; color:#ce8a2c; margin:0 0 .35rem;">Thandkoi Clinics</p>
+          <h3 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.75rem; line-height:1.05; margin:0 0 .4rem;">Clinic dashboard</h3>
+          <p style="font-size:.9rem; color:#3e5257; margin:0 0 1rem;">30 days · 23 reporting days</p>
+
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; margin-bottom:.6rem;">
+            <span style="display:flex; align-items:center; justify-content:center; height:46px; border-radius:10px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem;">7 days</span>
+            <span style="display:flex; align-items:center; justify-content:center; height:46px; border-radius:10px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem;">14 days</span>
+            <span style="display:flex; align-items:center; justify-content:center; height:46px; border-radius:10px; background:#086c7e; border:1px solid #086c7e; color:#fff; font-weight:600; font-size:.95rem;">30 days</span>
+            <span style="display:flex; align-items:center; justify-content:center; height:46px; border-radius:10px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem;">90 days</span>
+            <span style="display:flex; align-items:center; justify-content:center; height:46px; border-radius:10px; background:#fff; border:1px solid #e0e7e8; color:#3e5257; font-weight:600; font-size:.95rem; grid-column:span 2;">1 year</span>
+          </div>
+
+          <div style="background:#fff; border:1px solid #e0e7e8; border-radius:12px; padding:1rem; display:flex; flex-direction:column; gap:.7rem;">
+            <div style="display:flex; gap:.6rem;">
+              <div style="flex:1; min-width:0;">
+                <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.64rem; text-transform:uppercase; letter-spacing:.1em; color:#728a8f; margin:0 0 .3rem;">From</p>
+                <div style="height:46px; border:1px solid #e0e7e8; border-radius:10px; display:flex; align-items:center; padding:0 .75rem; font-size:.98rem;">26 Jun 2026</div>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.64rem; text-transform:uppercase; letter-spacing:.1em; color:#728a8f; margin:0 0 .3rem;">To</p>
+                <div style="height:46px; border:1px solid #e0e7e8; border-radius:10px; display:flex; align-items:center; padding:0 .75rem; font-size:.98rem;">25 Jul 2026</div>
+              </div>
+            </div>
+            <span style="display:flex; align-items:center; justify-content:center; height:48px; border-radius:999px; background:#086c7e; color:#fff; font-weight:600; font-size:1rem;">Apply</span>
+          </div>
+
+          <div style="height:1px; background:#e0e7e8; margin:1.25rem 0;"></div>
+          <div style="background:#fff; border:1px solid #e0e7e8; border-radius:12px; padding:1.1rem 1.2rem;">
+            <p style="font-family:Archivo,sans-serif; font-weight:800; font-size:2rem; line-height:1; color:#086c7e; margin:0;">192</p>
+            <p style="font-size:.92rem; font-weight:600; color:#3e5257; margin:.4rem 0 .15rem;">Patients seen</p>
+            <p style="font-size:.82rem; color:#728a8f; margin:0;">8.3 per reporting day</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1320, &quot;height&quot;: 1500}}">
+class Component extends DCLogic {
+  renderVals() {
+    const base = "display:flex; align-items:center; justify-content:space-between; gap:1rem; height:52px; padding:0 1rem; border-radius:10px;";
+    const rows = [
+      ["Last 7 days", "19 – 25 Jul", false],
+      ["Last 14 days", "12 – 25 Jul", false],
+      ["Last 30 days", "26 Jun – 25 Jul", true],
+      ["Last 90 days", "27 Apr – 25 Jul", false],
+      ["Last year", "26 Jul 25 – 25 Jul 26", false],
+    ];
+    return {
+      presets: rows.map(([label, range, on]) => ({
+        label, range,
+        rowStyle: base + (on
+          ? " background:#e4f4f6; border:1px solid #086c7e; color:#0e2025;"
+          : " background:#fff; border:1px solid #e0e7e8; color:#0e2025;"),
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>

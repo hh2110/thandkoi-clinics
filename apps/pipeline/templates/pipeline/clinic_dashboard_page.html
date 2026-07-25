@@ -32,10 +32,13 @@ text at all, only bars scaled to each other. Zakat% + Regular% can sum to
 under 100 when a range holds unknown-payment visits; that shortfall is left
 implicit and the counts beside every bar stay authoritative (D5).
 
-Revenue surfaces (the 4th KPI card, the "Revenue by service" table and the
-side-column layout switch) are written against `has_revenue` and are inert
-today — `dashboard.has_revenue` returns False until the clinic software
-ships fee columns (D6/D13), so Phase 2 lights them up with no template work.
+Revenue surfaces (the 4th KPI card and the "Revenue by service" table) are
+written against `has_revenue` and are inert today — `dashboard.has_revenue`
+returns False until the clinic software ships fee columns (D6/D13), so
+Phase 2 lights them up with no template work. As of the 2026-07-25 handoff
+revision (Plan 18) that is the whole of the gate: the split section's
+layout no longer changes with it, because the table now sits full width
+above the two side cards rather than beside them.
 
 All colour is from semantic tokens (tokens.css); component styles live in
 static/css/dashboard.css. `dash` is the page-scoped root class.
@@ -61,6 +64,20 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
         </p>
       </div>
 
+      {% comment %}
+      Range controls, revised 2026-07-25 (Plan 18 Track B, handoff revision
+      — approved mobile option 1c, "everything visible"). One markup at
+      every width: the presets are a tile grid that reflows five-across to
+      three, and the date card flex-wraps Apply onto its own full-width row
+      on a phone. There is deliberately no separate mobile treatment and no
+      sheet/popover — options 1a and 1b were rejected for hiding the dates
+      behind a tap and needing JavaScript, which this page has none of.
+      Every tile, input and button is 44px tall (touch minimum).
+
+      The `–` separator that used to sit between From and To is gone: the
+      fields are stacked label-over-input in their own cards now, so the
+      dash had nothing to join.
+      {% endcomment %}
       <div class="dash__controls">
         <nav class="dash__presets" aria-label="{% translate 'Preset ranges' %}">
           {% for preset in presets %}
@@ -75,7 +92,6 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
             <input class="dash__date-input" type="date" id="dash-start" name="start"
                    value="{{ stats.start|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" />
           </div>
-          <span class="dash__date-sep" aria-hidden="true">–</span>
           <div class="dash__date-field">
             <label class="dash__date-label" for="dash-end">{% translate "To" %}</label>
             <input class="dash__date-input" type="date" id="dash-end" name="end"
@@ -87,13 +103,13 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
     </header>
 
     {% comment %}
-    Three cards today, four once revenue exists (D6). funding_rows is always
-    [Zakat, Regular] in that order — get_context builds it with a strict zip
-    against that pair, so the two indexed lookups below cannot silently
-    swap.
+    Three cards today, four once revenue exists (D6) — the grid is auto-fit,
+    so it needs no modifier class to tell it which (Plan 18 D6).
+    funding_rows is always [Zakat, Regular] in that order — get_context
+    builds it with a strict zip against that pair, so the two indexed
+    lookups below cannot silently swap.
     {% endcomment %}
-    <section class="dash__kpis{% if has_revenue %} dash__kpis--with-revenue{% endif %}"
-             data-role="kpis">
+    <section class="dash__kpis" data-role="kpis">
       <div class="dash__kpi">
         <p class="dash__kpi-value">{{ stats.total_visits|intcomma }}</p>
         <p class="dash__kpi-label">{% translate "Patients seen" %}</p>
@@ -229,14 +245,20 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
     </section>
 
     {% comment %}
-    Revenue table left / Funding split + Gender stacked right once revenue
-    exists; without it the two side cards go two-up at full width and no
-    empty table is rendered at all (D6, the handoff's revenue-optional
-    table). `revenue_rows`/`revenue_totals` are Phase 2's context keys —
-    unset today, which is why this whole branch is unreachable for now.
+    Revenue table full width, Funding split + Gender beneath it as an
+    auto-fitting pair (2026-07-25, Plan 18 Track B / handoff revision). This
+    replaces Plan 16's 1.75fr-table / 1fr-side-column split, which crushed
+    both side cards on a tablet and needed a `--no-revenue` modifier to
+    un-crush them when the table wasn't there. With the table on its own row
+    the two side cards are already side-by-side at full width whether or not
+    revenue exists, so that modifier is gone rather than left as a no-op
+    (Plan 18 D6).
+
+    `revenue_rows`/`revenue_totals` are still Phase 2's context keys — unset
+    today, so this whole branch stays unreachable and no empty table is
+    rendered (Plan 16 D6/D13).
     {% endcomment %}
-    <section class="dash__split{% if not has_revenue %} dash__split--no-revenue{% endif %}"
-             data-role="split">
+    <section class="dash__split" data-role="split">
 
       {% if has_revenue %}
         <div class="dash__card dash__revenue" data-role="revenue">
@@ -244,25 +266,35 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
             <h2 class="dash__card-title">{% translate "Revenue by service" %}</h2>
             <p class="dash__revenue-note">{% translate "PKR · quantity in brackets" %}</p>
           </div>
-          <div class="dash__revenue-row dash__revenue-row--head">
-            <span>{% translate "Service" %}</span>
-            <span>{% translate "Regular" %}</span>
-            <span>{% translate "Zakat" %}</span>
-            <span>{% translate "Total" %}</span>
-          </div>
-          {% for row in revenue_rows %}
-            <div class="dash__revenue-row">
-              <span class="dash__revenue-service">{{ row.label }}</span>
-              <span class="dash__revenue-cell">{{ row.regular_amount|intcomma }}<span class="dash__revenue-qty">({{ row.regular_qty|intcomma }})</span></span>
-              <span class="dash__revenue-cell">{{ row.zakat_amount|intcomma }}<span class="dash__revenue-qty">({{ row.zakat_qty|intcomma }})</span></span>
-              <span class="dash__revenue-cell dash__revenue-cell--total">{{ row.total_amount|intcomma }}<span class="dash__revenue-qty">({{ row.total_qty|intcomma }})</span></span>
+          {% comment %}
+          Every row — head, data, total — sits inside one scroller so they
+          scroll as a single block below ~520px, keeping the columns aligned
+          with each other rather than crushing each row's tracks by a
+          different amount. Deliberately not a stacked card list on narrow
+          screens: the side-by-side Regular/Zakat comparison is the whole
+          point of the table. Same mechanism as `.dash-chart__scroll` above.
+          {% endcomment %}
+          <div class="dash__revenue-scroll">
+            <div class="dash__revenue-row dash__revenue-row--head">
+              <span>{% translate "Service" %}</span>
+              <span>{% translate "Regular" %}</span>
+              <span>{% translate "Zakat" %}</span>
+              <span>{% translate "Total" %}</span>
             </div>
-          {% endfor %}
-          <div class="dash__revenue-row dash__revenue-row--total">
-            <span>{% translate "Total" %}</span>
-            <span class="dash__revenue-cell">{{ revenue_totals.regular_amount|intcomma }}</span>
-            <span class="dash__revenue-cell">{{ revenue_totals.zakat_amount|intcomma }}</span>
-            <span class="dash__revenue-cell dash__revenue-cell--grand">{{ revenue_totals.total_amount|intcomma }}</span>
+            {% for row in revenue_rows %}
+              <div class="dash__revenue-row">
+                <span class="dash__revenue-service">{{ row.label }}</span>
+                <span class="dash__revenue-cell">{{ row.regular_amount|intcomma }}<span class="dash__revenue-qty">({{ row.regular_qty|intcomma }})</span></span>
+                <span class="dash__revenue-cell">{{ row.zakat_amount|intcomma }}<span class="dash__revenue-qty">({{ row.zakat_qty|intcomma }})</span></span>
+                <span class="dash__revenue-cell dash__revenue-cell--total">{{ row.total_amount|intcomma }}<span class="dash__revenue-qty">({{ row.total_qty|intcomma }})</span></span>
+              </div>
+            {% endfor %}
+            <div class="dash__revenue-row dash__revenue-row--total">
+              <span>{% translate "Total" %}</span>
+              <span class="dash__revenue-cell">{{ revenue_totals.regular_amount|intcomma }}</span>
+              <span class="dash__revenue-cell">{{ revenue_totals.zakat_amount|intcomma }}</span>
+              <span class="dash__revenue-cell dash__revenue-cell--grand">{{ revenue_totals.total_amount|intcomma }}</span>
+            </div>
           </div>
         </div>
       {% endif %}

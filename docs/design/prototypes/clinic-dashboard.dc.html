@@ -19,7 +19,7 @@ input[type="date"]{ font-family:"Public Sans",sans-serif; }
 </helmet>
 
 <div style="{{ shellStyle }}">
-  <div style="max-width:1180px; margin:0 auto; padding:2.75rem 2.5rem 4rem; display:flex; flex-direction:column; gap:2rem;">
+  <div style="max-width:1180px; margin:0 auto; padding:clamp(1.25rem,4vw,2.75rem) clamp(1rem,4vw,2.5rem) 4rem; display:flex; flex-direction:column; gap:2rem;">
 
     <header style="display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1.75rem;">
       <div>
@@ -28,29 +28,29 @@ input[type="date"]{ font-family:"Public Sans",sans-serif; }
         <p style="margin:0; font-size:1rem; color:var(--text-soft);">{{ rangeSummary }}</p>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:.65rem; align-items:flex-end;">
-        <div style="display:flex; gap:.35rem; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:4px;">
+      <div style="display:flex; flex-direction:column; gap:.6rem; width:min(100%,520px);">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(92px,1fr)); gap:.4rem;">
           <button type="button" onClick="{{ setP7 }}" style="{{ p7Style }}">7 days</button>
           <button type="button" onClick="{{ setP14 }}" style="{{ p14Style }}">14 days</button>
           <button type="button" onClick="{{ setP30 }}" style="{{ p30Style }}">30 days</button>
           <button type="button" onClick="{{ setP90 }}" style="{{ p90Style }}">90 days</button>
           <button type="button" onClick="{{ setP365 }}" style="{{ p365Style }}">1 year</button>
         </div>
-        <div style="display:flex; align-items:center; gap:.6rem; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:.55rem .8rem;">
-          <label style="display:flex; flex-direction:column; gap:.15rem;">
-            <span style="font-family:var(--fh); font-weight:700; font-size:.65rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">From</span>
-            <input type="date" value="{{ start }}" max="{{ today }}" onChange="{{ onStart }}" style="border:none; background:transparent; color:var(--text); font-size:.92rem; padding:0;">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:.85rem; display:flex; flex-wrap:wrap; gap:.6rem;">
+          <label style="flex:1 1 130px; min-width:0; display:flex; flex-direction:column; gap:.3rem;">
+            <span style="font-family:var(--fh); font-weight:700; font-size:.64rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">From</span>
+            <input type="date" value="{{ start }}" max="{{ today }}" onChange="{{ onStart }}" style="height:44px; width:100%; border:1px solid var(--border); border-radius:10px; background:transparent; color:var(--text); font-size:.95rem; padding:0 .7rem;">
           </label>
-          <span style="color:var(--text-faint);">–</span>
-          <label style="display:flex; flex-direction:column; gap:.15rem;">
-            <span style="font-family:var(--fh); font-weight:700; font-size:.65rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">To</span>
-            <input type="date" value="{{ end }}" max="{{ today }}" onChange="{{ onEnd }}" style="border:none; background:transparent; color:var(--text); font-size:.92rem; padding:0;">
+          <label style="flex:1 1 130px; min-width:0; display:flex; flex-direction:column; gap:.3rem;">
+            <span style="font-family:var(--fh); font-weight:700; font-size:.64rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">To</span>
+            <input type="date" value="{{ end }}" max="{{ today }}" onChange="{{ onEnd }}" style="height:44px; width:100%; border:1px solid var(--border); border-radius:10px; background:transparent; color:var(--text); font-size:.95rem; padding:0 .7rem;">
           </label>
+          <button type="button" onClick="{{ apply }}" style="flex:1 1 110px; align-self:flex-end; height:44px; border:none; cursor:pointer; border-radius:999px; background:var(--brand); color:#ffffff; font-family:var(--fb); font-weight:600; font-size:1rem;">Apply</button>
         </div>
       </div>
     </header>
 
-    <section style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;">
+    <section style="display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:1rem;">
       <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
         <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.35rem 1.5rem;">
           <p style="font-family:var(--fh); font-weight:800; font-size:2.1rem; line-height:1; color:var(--value); margin:0; font-variant-numeric:tabular-nums;">{{ k.value }}</p>
@@ -100,21 +100,22 @@ input[type="date"]{ font-family:"Public Sans",sans-serif; }
       <p style="margin:1rem 0 0; font-size:.85rem; color:var(--text-faint); max-width:70ch;">{{ grainNote }}Sundays are omitted — the clinic is closed. A gap marks a Monday–Saturday day with nothing reported, including holidays.</p>
     </section>
 
-    <section style="display:grid; grid-template-columns:1.75fr 1fr; gap:1.25rem; align-items:start;">
+    <section style="display:flex; flex-direction:column; gap:1.25rem;">
 
       <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden;">
         <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem; padding:1.6rem 1.9rem 1.1rem;">
           <h2 style="font-family:var(--fh); font-weight:800; font-size:1.25rem; color:var(--text); margin:0;">Revenue by service</h2>
           <span style="font-size:.82rem; color:var(--text-faint);">PKR · quantity in brackets</span>
         </div>
-        <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); gap:.75rem; padding:.7rem 1.5rem; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+        <div style="overflow-x:auto;">
+        <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); min-width:520px; gap:.75rem; padding:.7rem 1.5rem; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
           <span style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">Service</span>
           <span style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Regular</span>
           <span style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Zakat</span>
           <span style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Total</span>
         </div>
         <sc-for list="{{ revenueRows }}" as="r" hint-placeholder-count="5">
-          <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); gap:1rem; align-items:center; padding:.9rem 1.9rem; border-bottom:1px solid var(--border);">
+          <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); min-width:520px; gap:.75rem; align-items:center; padding:.9rem 1.5rem; border-bottom:1px solid var(--border);">
             <span style="font-size:.95rem; font-weight:600; color:var(--text);">{{ r.label }}</span>
             <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.3rem; min-width:0;">
               <span style="font-size:.95rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">{{ r.regular }}</span>
@@ -130,15 +131,16 @@ input[type="date"]{ font-family:"Public Sans",sans-serif; }
             </div>
           </div>
         </sc-for>
-        <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); gap:.75rem; align-items:baseline; padding:1.15rem 1.5rem; background:var(--track);">
+        <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); min-width:520px; gap:.75rem; align-items:baseline; padding:1.15rem 1.5rem; background:var(--track);">
           <span style="font-family:var(--fh); font-weight:800; font-size:.95rem; color:var(--text);">Total</span>
           <span style="font-family:var(--fh); font-weight:700; font-size:1rem; color:var(--text-soft); text-align:right; font-variant-numeric:tabular-nums;">{{ totalRegular }}</span>
           <span style="font-family:var(--fh); font-weight:700; font-size:1rem; color:var(--text-soft); text-align:right; font-variant-numeric:tabular-nums;">{{ totalZakat }}</span>
           <span style="font-family:var(--fh); font-weight:800; font-size:1.3rem; line-height:1; color:var(--value); text-align:right; font-variant-numeric:tabular-nums;">{{ totalAll }}</span>
         </div>
+        </div>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:1.25rem;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1.25rem; align-items:start;">
         <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.6rem 1.7rem;">
           <h2 style="font-family:var(--fh); font-weight:800; font-size:1.1rem; color:var(--text); margin:0 0 1.1rem;">Funding split</h2>
           <div style="display:flex; height:12px; border-radius:999px; overflow:hidden; background:var(--track);">
@@ -178,7 +180,7 @@ input[type="date"]{ font-family:"Public Sans",sans-serif; }
 
     <section style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.7rem 1.9rem;">
       <h2 style="font-family:var(--fh); font-weight:800; font-size:1.25rem; color:var(--text); margin:0 0 1.3rem;">Age bands</h2>
-      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1.25rem;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1.25rem;">
         <sc-for list="{{ ageRows }}" as="a" hint-placeholder-count="4">
           <div style="display:flex; flex-direction:column; gap:.6rem;">
             <div style="display:flex; align-items:baseline; justify-content:space-between; gap:.75rem;">
@@ -359,7 +361,7 @@ class Component extends DCLogic {
     const aMax = Math.max(...ages, 1);
     const pct = (v, t) => (t ? Math.round((v / t) * 100) : 0);
 
-    const chip = (on) => `border:none; cursor:pointer; font-family:var(--fb); font-weight:600; font-size:.82rem; padding:.35rem .85rem; border-radius:999px; background:${on ? "var(--brand)" : "transparent"}; color:${on ? "#fff" : "var(--text-soft)"};`;
+    const chip = (on) => `display:flex; align-items:center; justify-content:center; height:44px; cursor:pointer; font-family:var(--fb); font-weight:600; font-size:.92rem; border-radius:10px; border:1px solid ${on ? "var(--brand)" : "var(--border)"}; background:${on ? "var(--brand)" : "var(--surface)"}; color:${on ? "#fff" : "var(--text-soft)"};`;
 
     return {
       shellStyle: [
@@ -377,6 +379,7 @@ class Component extends DCLogic {
       onEnd: (e) => this.setRange(start, e.target.value),
       setP7: () => this.preset(7), setP14: () => this.preset(14), setP30: () => this.preset(30),
       setP90: () => this.preset(90), setP365: () => this.preset(365),
+      apply: () => this.forceUpdate(),
       p7Style: chip(span === 7), p14Style: chip(span === 14), p30Style: chip(span === 30),
       p90Style: chip(span === 90), p365Style: chip(span === 365),
 

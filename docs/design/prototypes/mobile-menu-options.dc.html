@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face { font-family:"Archivo"; font-style:normal; font-weight:700 800; font-display:swap; src:url("./fonts/archivo-latin-700-800.woff2") format("woff2"); }
+@font-face { font-family:"Public Sans"; font-style:normal; font-weight:400 600; font-display:swap; src:url("./fonts/public-sans-latin-400-600.woff2") format("woff2"); }
+*{ box-sizing:border-box; }
+body{ margin:0; font-family:"Public Sans",sans-serif; background:#dfe8e8; color:#0e2025; }
+a{ color:#086c7e; } a:hover{ color:#12879b; }
+</style>
+</helmet>
+
+<section style="padding:3rem; display:flex; flex-direction:column; gap:1.75rem;">
+  <div style="max-width:78ch;">
+    <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.12em; color:#728a8f; margin:0 0 .4rem;">Turn 1 · Mobile menu</p>
+    <h1 style="font-family:Archivo,sans-serif; font-weight:800; font-size:2rem; line-height:1.1; margin:0 0 .8rem;">Why the menu reads as "you're in Donate"</h1>
+    <p style="font-size:1rem; line-height:1.6; color:#3e5257; margin:0 0 .7rem; text-wrap:pretty;">The current page <em>is</em> already marked — <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">.primary-nav__list a[aria-current="page"]</code> in <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">components.css</code> sets <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">color: var(--color-brand)</code> plus an underline. The problem is the colour: <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">--color-brand</code> stays <strong>#086c7e</strong> in the dark theme, sitting on a <strong>#0a3e48</strong> drawer — about <strong>1.9:1</strong> contrast, far below the 4.5:1 WCAG AA minimum, so the marker is invisible in the exact screenshot Dawood sent. (Pale aqua <strong>#a0e0e8</strong> on the same drawer measures 8.0:1; brand teal on the light theme's white is already 6.1:1, which is why this only bites in dark mode.) Meanwhile the amber <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">.button--donate</code> is the last <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">&lt;li&gt;</code> of the same list — the one filled thing in the drawer.</p>
+    <p style="font-size:1rem; line-height:1.6; color:#3e5257; margin:0; text-wrap:pretty;">So: give the current page a marker that survives both themes, and stop the only filled element being the one that isn't a page. All three keep Donate one tap away; Dawood's second suggestion — donate links in body copy — is worth doing whichever wins. Drawers below are drawn with the real values: list padding <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">--space-1 --space-2 --space-2</code>, <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">--space-1</code> gap, links 600 weight with <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">padding-block: --space-1</code>, buttons 8px radius.</p>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:2rem; align-items:flex-start;">
+
+    <div id="1a" style="display:flex; flex-direction:column; gap:1rem; width:400px;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1a</span>
+        <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.15rem; margin:0;">CSS only</h2>
+      </div>
+      <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0;">No template change. Point the existing <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">aria-current</code> rule at a theme-aware token instead of <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">--color-brand</code> (pale aqua on dark, brand teal on light), add weight 700, and swap <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">.button--donate</code> for the existing <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">.button--outline</code> treatment in amber. Fill now only ever means "current page".</p>
+
+      <div style="{{ drawer }}">
+        <div style="{{ summaryRow }}"><span style="font-family:Archivo,sans-serif; font-weight:700; font-size:1.25rem;">Menu</span><span style="font-size:1.25rem;">✕</span></div>
+        <div style="padding:.5rem 1rem 1rem; display:flex; flex-direction:column; gap:.5rem;">
+          <sc-for list="{{ navA }}" as="i" hint-placeholder-count="6">
+            <span style="{{ i.style }}">{{ i.label }}</span>
+          </sc-for>
+          <span style="display:inline-block; align-self:flex-start; padding:.65em 1.25em; border-radius:8px; border:1px solid #e8b04a; color:#e8b04a; font-weight:600; font-size:1rem;">Donate</span>
+        </div>
+        <div style="{{ controls }}"><span style="{{ themePill }}">☀ Dark theme</span></div>
+      </div>
+      <p style="font-size:.85rem; color:#728a8f; margin:0;">Same rule in the light theme.</p>
+      <div style="{{ drawerLight }}">
+        <div style="{{ summaryRowLight }}"><span style="font-family:Archivo,sans-serif; font-weight:700; font-size:1.25rem;">Menu</span><span style="font-size:1.25rem;">✕</span></div>
+        <div style="padding:.5rem 1rem 1rem; display:flex; flex-direction:column; gap:.5rem;">
+          <sc-for list="{{ navALight }}" as="i" hint-placeholder-count="6">
+            <span style="{{ i.style }}">{{ i.label }}</span>
+          </sc-for>
+          <span style="display:inline-block; align-self:flex-start; padding:.65em 1.25em; border-radius:8px; border:1px solid #ce8a2c; color:#ce8a2c; font-weight:600; font-size:1rem;">Donate</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="1b" style="display:flex; flex-direction:column; gap:1rem; width:400px;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1b</span>
+        <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.15rem; margin:0;">Donate leaves the list</h2>
+      </div>
+      <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0;">Donate keeps its amber fill and its pull — it just stops being an <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">&lt;li&gt;</code> among the pages. Move that one line in <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">nav.html</code> out of <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">.primary-nav__list</code> into a block above <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">.site-header__controls</code>, behind a hairline, with a line of copy. Current page still needs 1a's colour fix.</p>
+
+      <div style="{{ drawer }}">
+        <div style="{{ summaryRow }}"><span style="font-family:Archivo,sans-serif; font-weight:700; font-size:1.25rem;">Menu</span><span style="font-size:1.25rem;">✕</span></div>
+        <div style="padding:.5rem 1rem 1rem; display:flex; flex-direction:column; gap:.5rem;">
+          <sc-for list="{{ navB }}" as="i" hint-placeholder-count="6">
+            <span style="{{ i.style }}">{{ i.label }}</span>
+          </sc-for>
+        </div>
+        <div style="border-top:1px solid #195a67; padding:1rem;">
+          <p style="font-size:.95rem; line-height:1.5; color:#abb4b6; margin:0 0 .75rem;">Zakat and Sadaqa keep care free for those who need it most.</p>
+          <span style="display:block; text-align:center; padding:.65em 1.25em; border-radius:8px; background:#e8b04a; color:#0e2025; font-weight:600; font-size:1rem;">Donate</span>
+        </div>
+        <div style="{{ controls }}"><span style="{{ themePill }}">☀ Dark theme</span></div>
+      </div>
+    </div>
+
+    <div id="1c" style="display:flex; flex-direction:column; gap:1rem; width:400px;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1c</span>
+        <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.15rem; margin:0;">Say it in the summary</h2>
+      </div>
+      <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0;">The <code style="font-size:.9em; background:#fff; padding:.1rem .3rem; border-radius:4px;">&lt;summary&gt;</code> that says "Menu" also names the page you're on, so the question is answered before the eye reaches the list — useful because the drawer opens under the fold on small screens. Needs the page title in the nav context. Combines with either treatment above; shown here with 1b's Donate block.</p>
+
+      <div style="{{ drawer }}">
+        <div style="{{ summaryRow }}">
+          <span style="display:flex; flex-direction:column; gap:.15rem;">
+            <span style="font-family:Archivo,sans-serif; font-weight:700; font-size:1.25rem;">Menu</span>
+            <span style="font-size:.9rem; color:#a0e0e8;">You're on Reports</span>
+          </span>
+          <span style="font-size:1.25rem;">✕</span>
+        </div>
+        <div style="padding:.5rem 1rem 1rem; display:flex; flex-direction:column; gap:.5rem;">
+          <sc-for list="{{ navB }}" as="i" hint-placeholder-count="6">
+            <span style="{{ i.style }}">{{ i.label }}</span>
+          </sc-for>
+        </div>
+        <div style="border-top:1px solid #195a67; padding:1rem;">
+          <span style="display:block; text-align:center; padding:.65em 1.25em; border-radius:8px; background:#e8b04a; color:#0e2025; font-weight:600; font-size:1rem;">Donate</span>
+        </div>
+        <div style="{{ controls }}"><span style="{{ themePill }}">☀ Dark theme</span></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1360, &quot;height&quot;: 1200}}">
+const ITEMS = ["Home", "About", "Our Work", "Reports", "Newsletters", "More ▾"];
+const CURRENT = "Reports";
+
+class Component extends DCLogic {
+  nav(dark) {
+    // real rule: .primary-nav__list a — 600 weight, padding-block var(--space-1)
+    const base = "padding:.5rem 0; font-weight:600; font-size:1rem;";
+    const link = dark ? "#f2f6f6" : "#0e2025";
+    const current = dark ? "#a0e0e8" : "#086c7e";
+    return ITEMS.map((label) => ({
+      label,
+      style: label === CURRENT
+        ? base + ` font-weight:700; color:${current}; text-decoration:underline; text-underline-offset:.25em;`
+        : base + ` color:${link};`,
+    }));
+  }
+
+  renderVals() {
+    return {
+      drawer: "width:400px; background:#0a3e48; border:1px solid #195a67; border-radius:12px; overflow:hidden; color:#f2f6f6;",
+      drawerLight: "width:400px; background:#ffffff; border:1px solid #e0e7e8; border-radius:12px; overflow:hidden; color:#0e2025;",
+      summaryRow: "display:flex; align-items:center; justify-content:space-between; padding:1rem; border-bottom:1px solid #195a67;",
+      summaryRowLight: "display:flex; align-items:center; justify-content:space-between; padding:1rem; border-bottom:1px solid #e0e7e8;",
+      controls: "border-top:1px solid #195a67; padding:1rem;",
+      themePill: "display:inline-flex; align-items:center; gap:.5rem; padding:.4rem .9rem; border-radius:999px; border:1px solid #195a67; color:#abb4b6; font-size:.9rem;",
+      navA: this.nav(true),
+      navALight: this.nav(false),
+      navB: this.nav(true),
+    };
+  }
+}
+</script>
+</body>
+</html>
