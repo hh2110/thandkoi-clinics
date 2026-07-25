@@ -8,6 +8,10 @@ reports teaser (a handful of the latest, linking out to the Camp Report
 archive's own page/URL rather than a second paginated list here).
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-reports.jpg" alt=_("Daily reports from the Thandkoi Clinics") %}
+{% endblock %}
+
 {% block content %}
   <section class="section">
     <div class="wrapper prose">
@@ -20,8 +24,16 @@ archive's own page/URL rather than a second paginated list here).
     <section class="section">
       <div class="wrapper">
         <div class="ri-funding-mix">
+          {% comment %}Plan 16.4, entry point 1a: the card that answers "how
+          busy has it been?" is where the reader's next question naturally
+          goes, so the dashboard link sits in its head. `dashboard_url` is
+          None until the dashboard page exists and is live, and the link is
+          omitted then.{% endcomment %}
           <div class="ri-funding-mix__head">
             <h2 class="ri-funding-mix__title">{% translate "Patient footfall — last 30 days" %}</h2>
+            {% if dashboard_url %}
+              <a class="ri-funding-mix__dashboard-link" href="{{ dashboard_url }}">{% translate "Open the dashboard →" %}</a>
+            {% endif %}
           </div>
           <p class="ri-funding-mix__caption">
             {% translate "Zakat-funded vs. regular visits, one bar per day the clinic reported data. Sundays are omitted — the clinic is closed. A gap marks a Monday–Saturday day with nothing reported, including holidays." %}

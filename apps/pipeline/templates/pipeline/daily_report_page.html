@@ -34,6 +34,10 @@ All colour is from semantic tokens (tokens.css); component styles live in
 static/css/daily-report.css. `dr` is the page-scoped root class.
 {% endcomment %}
 
+{% block social_image_tags %}
+  {% include "partials/social_card.html" with card="og-reports.jpg" alt=_("A daily report from the Thandkoi Clinics") %}
+{% endblock %}
+
 {% block content %}
   <article class="dr wrapper">
 

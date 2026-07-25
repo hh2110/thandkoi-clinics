@@ -11,7 +11,15 @@
   padding: var(--space-3) var(--space-3) var(--space-2);
 }
 
+/* Space-between row (Plan 16.4, entry point 1a): title left, dashboard link
+   right. `flex-wrap` + a 1rem gap so the link drops below the title on a
+   narrow viewport instead of squeezing it. */
 .ri-funding-mix__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: var(--space-1);
 }
 .ri-funding-mix__title {
@@ -22,6 +30,44 @@
   color: var(--color-text);
   margin: 0;
 }
+/* Entry point 1a's pill. The handoff specifies --color-brand for both the
+   text and the 1px border; that is the trap 16.3 hit with its Apply button
+   — brand teal (#086c7e) on this card's dark ground (#0d4f5c) is ~1.5:1,
+   and --color-brand does not flip per theme, so "it reads a token"
+   guarantees nothing. --color-stat-value is the token tokens.css added for
+   exactly this: it *is* --color-brand in light (so the light rendering
+   matches the handoff pixel for pixel) and pale aqua in dark. Kept outlined
+   rather than filled like `.dash__apply`, because this is a secondary link
+   on someone else's card, not a form's primary action.
+   Hover fills per the handoff — white on brand teal is legible in both. */
+.ri-funding-mix__dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+  text-decoration: none;
+  border: 1px solid var(--color-stat-value);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  white-space: nowrap;
+}
+/* Paired selector, not a bare class: `:root[data-theme] a` in base.css is
+   (0,2,1) and silently outranked a single class here — the first pass of
+   this rule rendered teal-deep in light and pale aqua in dark, neither of
+   them the token asked for. Same shape (and same reason) as
+   `.feature-split__link--accent` in layout.css. */
+.ri-funding-mix__dashboard-link,
+:root[data-theme] .ri-funding-mix__dashboard-link {
+  color: var(--color-stat-value);
+}
+.ri-funding-mix__dashboard-link:hover,
+:root[data-theme] .ri-funding-mix__dashboard-link:hover {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
 .ri-funding-mix__caption {
   font-size: var(--font-size-xs);
   color: var(--color-text-faint);
@@ -90,9 +136,18 @@
 .ri-funding-mix__table-toggle {
   margin: var(--space-1) 0;
 }
+/* --color-stat-value, not --color-brand (changed 2026-07-25, Plan 16.4).
+   A pre-existing dark-theme bug, not one this task introduced: brand teal
+   on the dark card ground is ~1.5:1, so this control was near-invisible.
+   16.3 saw it and deliberately left it alone — a live page outside that
+   task's scope — and gave the dashboard's own copy
+   (`.dash-chart__table-toggle summary`) --color-stat-value instead. 16.4
+   edits this file and adds a second brand-coloured control a few lines
+   above, so leaving the two inconsistent in the same card would be the
+   odd choice. Called out explicitly in the PR rather than slipped in. */
 .ri-funding-mix__table-toggle summary {
   font-size: var(--font-size-xs);
-  color: var(--color-brand);
+  color: var(--color-stat-value);
   cursor: pointer;
   user-select: none;
 }

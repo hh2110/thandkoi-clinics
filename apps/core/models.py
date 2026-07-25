@@ -260,11 +260,20 @@ class HomePage(Page):
         return body_blocks[:circle_index], body_blocks[circle_index:]
 
     def get_context(self, request, *args, **kwargs):
+        # Imported here rather than at module scope, mirroring
+        # ``get_live_impact_stats``'s own deferred pipeline import: this app
+        # is imported by ``apps.pipeline.models``, so a top-level import back
+        # the other way is circular.
+        from apps.pipeline.models import ClinicDashboardPage
+
         context = super().get_context(request, *args, **kwargs)
         context["latest_report"] = self.get_latest_report()
         context["latest_newsletter"] = self.get_latest_newsletter()
         context["live_impact_stats"] = self.get_live_impact_stats()
         context["live_impact_stats_as_of"] = self.get_live_impact_stats_as_of()
+        # Entry point 1c (Plan 16.4): the impact band's fourth, link tile.
+        # ``None`` leaves the band exactly as it was — a three-card row.
+        context["dashboard_url"] = ClinicDashboardPage.entry_point_url()
         body_before_circle, body_from_circle = self.get_body_split_on_circle_of_care()
         context["body_before_circle_of_care"] = body_before_circle
         context["body_from_circle_of_care"] = body_from_circle
