@@ -51,7 +51,25 @@
   --color-accent-soft-bg: var(--color-aqua-tint);
   --color-on-brand: #ffffff;
   --color-donate-bg: var(--color-amber-on-light);
-  --color-donate-text: #ffffff;
+  /* Dark ink on amber in *both* themes (Plan 18 D3, 2026-07-25), so it is
+     declared once here and never repeated in a theme block — same shape as
+     --color-on-brand above, and the structural reason it can't drift apart
+     again. Two things were wrong before:
+
+     - the dark blocks said var(--color-ink), which flips to near-white and
+       put pale text on the amber fill;
+     - this block said #ffffff, which nothing ever rendered — base.css's
+       themed `a` rules outranked `.button--donate` and painted the label
+       teal-deep instead (see D10). White on Amber-on-Light (#ce8a2c) is
+       ~2.6:1 and would have been a *regression* once D10 let the token
+       through; #0e2025 on it is ~8.9:1, and is what the button has
+       actually looked like all along.
+
+     A literal, not var(--color-ink), for the same reason
+     --color-footer-text is one (below): custom properties resolve live
+     against the current cascade, so the var would drag the dark flip back
+     in. #0e2025 on Amber-on-Dark (#e8b04a) is ~10:1. */
+  --color-donate-text: #0e2025;
   --color-focus-ring: var(--color-teal-bright);
 
   /* General-purpose amber highlight (Plan 11 D12, 2026-07-24) — distinct from
@@ -70,6 +88,16 @@
      own dark-appropriate colour without changing --color-brand everywhere
      else it's used. */
   --color-stat-value: var(--color-brand);
+
+  /* Nav current-page marker (Plan 18 D1, 2026-07-25). Same problem shape as
+     --color-stat-value above, on a different surface: the marker was
+     --color-brand, which doesn't flip per theme, so on the dark drawer
+     ground (--color-paper #0a3e48) it measured 1.9:1 — invisible. Pale aqua
+     on that ground is 8.0:1; brand teal on white stays 6.1:1. It resolves to
+     the same pair as --color-stat-value today and is deliberately still its
+     own token: that one is named for stat-band figures, and either surface
+     may need to move without dragging the other with it. */
+  --color-nav-current: var(--color-brand);
 
   /* Circle of Care wheel wedges (brand-guidelines.md §2: coral is hub-cross
      only, wedges are teal tones) — the only component-local colours this
@@ -140,7 +168,10 @@
     --color-text-faint: var(--color-ink-faint);
     --color-border-default: var(--color-border);
     --color-donate-bg: var(--color-amber-on-dark);
-    --color-donate-text: var(--color-ink);
+    /* No --color-donate-text here: it is dark ink in both themes and is
+       declared once in :root (Plan 18 D3). It used to be
+       var(--color-ink), which flips to near-white — the washed-out label
+       this plan fixes. */
     --color-accent: var(--color-amber-on-dark);
     /* Plan 11 D12 (2026-07-24): was var(--color-teal-deep), identical to
        --color-paper above — every "raised" section (stat band, and now the
@@ -151,6 +182,7 @@
        brand-guidelines.md's dark-neutrals table for the recorded decision. */
     --color-accent-soft-bg: #0b4753;
     --color-stat-value: var(--color-pale-aqua);
+    --color-nav-current: var(--color-pale-aqua);
     --color-coc-seg-1: var(--color-teal-bright);
     --color-coc-seg-2: #2cb0c4;
     --color-coc-seg-3: #0a6b7c;
@@ -179,12 +211,13 @@
   --color-text-faint: var(--color-ink-faint);
   --color-border-default: var(--color-border);
   --color-donate-bg: var(--color-amber-on-dark);
-  --color-donate-text: var(--color-ink);
+  /* No --color-donate-text here either — see the block above (Plan 18 D3). */
   --color-accent: var(--color-amber-on-dark);
   /* Plan 11 D12 (2026-07-24) — see the prefers-color-scheme block above for
      why this is no longer var(--color-teal-deep). */
   --color-accent-soft-bg: #0b4753;
   --color-stat-value: var(--color-pale-aqua);
+  --color-nav-current: var(--color-pale-aqua);
   --color-coc-seg-1: var(--color-teal-bright);
   --color-coc-seg-2: #2cb0c4;
   --color-coc-seg-3: #0a6b7c;
@@ -206,10 +239,11 @@
   --color-text-faint: var(--color-ink-faint);
   --color-border-default: var(--color-border);
   --color-donate-bg: var(--color-amber-on-light);
-  --color-donate-text: #ffffff;
+  /* No --color-donate-text here either — see :root (Plan 18 D3). */
   --color-accent: var(--color-amber-on-light);
   --color-accent-soft-bg: var(--color-aqua-tint);
   --color-stat-value: var(--color-brand);
+  --color-nav-current: var(--color-brand);
   --color-coc-seg-1: var(--color-teal-brand);
   --color-coc-seg-2: var(--color-teal-bright);
   --color-coc-seg-3: var(--color-teal-deep);

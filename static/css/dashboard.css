@@ -15,8 +15,15 @@
  * Load after components.css, same as daily-report.css / report-index.css.
  */
 
+/* The handoff's page padding is `clamp(1.25rem,4vw,2.75rem)
+   clamp(1rem,4vw,2.5rem) 4rem`. Only the block half is taken here (rounded
+   to the spacing scale): the inline half belongs to `.wrapper` (base.css),
+   which the site header and footer also use, so insetting this page further
+   than 1rem would leave its content misaligned against the header above it.
+   The prototype has no site chrome to line up with; this page does. See
+   Plan 18 D9. */
 .dash {
-  padding-block: var(--space-6) var(--space-8);
+  padding-block: clamp(var(--space-3), 4vw, var(--space-6)) var(--space-8);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -57,30 +64,40 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Preset pills + date form (no JS — see the template's comment) --------- */
+/* --- Preset tiles + date card (no JS — see the template's comment) ---------
+   Revised 2026-07-25 (Plan 18 Track B, handoff revision — the approved
+   mobile option 1c). One control stack at every width, capped at 520px: a
+   preset tile grid that reflows five-across to three, over a date card whose
+   fields and Apply button flex-wrap. Everything the reader touches is 44px
+   tall. The previous shape — a pill group plus a single-line card of
+   borderless inputs — had no room to reflow and pushed the dates off a
+   phone. */
 .dash__controls {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-1);
+  gap: 0.6rem;
+  width: min(100%, 520px);
 }
 .dash__presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-default);
-  border-radius: 999px;
-  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 0.4rem;
 }
 .dash__preset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.35rem 0.6rem;
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: var(--font-size-xs);
+  font-size: 0.92rem;
   color: var(--color-text-soft);
   text-decoration: none;
-  padding: 0.35rem 0.85rem;
-  border-radius: 999px;
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: 10px;
   white-space: nowrap;
 }
 /* --color-stat-value, not --color-brand: see `.dash__apply` below for why
@@ -93,38 +110,53 @@
 .dash__preset--selected,
 .dash__preset--selected:hover {
   background: var(--color-brand);
+  border-color: var(--color-brand);
   color: var(--color-on-brand);
 }
 
 .dash__dates {
   display: flex;
-  align-items: center;
-  gap: var(--space-1);
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border-default);
-  border-radius: 10px;
-  padding: 0.55rem 0.8rem;
-  flex-wrap: wrap;
+  border-radius: 12px;
+  padding: 0.85rem;
+}
+/* `flex: 1 1 130px` on the fields and `1 1 110px` on Apply is what makes the
+   card a single row on desktop and three stacked full-width rows on a phone,
+   with no media query: 130 + 130 + 110 + gaps needs ~410px, so the button
+   wraps first and then the fields. `min-width: 0` stops a date input's
+   intrinsic width (which is wider than 130px in most browsers) from pinning
+   the row open and forcing a horizontal scroll. */
+.dash__date-field {
+  flex: 1 1 130px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 .dash__date-label {
   display: block;
   font-family: var(--font-heading);
   font-weight: 700;
-  font-size: 0.65rem;
+  font-size: 0.64rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--color-text-faint);
 }
 .dash__date-input {
-  border: 0;
+  height: 44px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 10px;
   background: transparent;
   color: var(--color-text);
   font-family: var(--font-body);
-  font-size: var(--font-size-xs);
-  padding: 0;
-}
-.dash__date-sep {
-  color: var(--color-text-faint);
+  font-size: 0.95rem;
+  padding: 0 0.7rem;
 }
 /* Filled rather than outlined, mirroring `.button--primary`
    (components.css). An outlined version reading --color-brand for its text
@@ -134,29 +166,33 @@
    here. Brand-on-white is legible in both themes, and Apply is the form's
    primary action anyway. */
 .dash__apply {
+  flex: 1 1 110px;
+  height: 44px;
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   color: var(--color-on-brand);
   background: var(--color-brand);
   border: 1px solid transparent;
   border-radius: 999px;
-  padding: 0.35rem 0.85rem;
+  padding: 0 0.85rem;
   cursor: pointer;
 }
 .dash__apply:hover {
   background: var(--color-brand-hover);
 }
 
-/* --- KPI row --------------------------------------------------------------- */
+/* --- KPI row ---------------------------------------------------------------
+   auto-fit rather than a fixed count, so one rule serves three cards and four
+   (Plan 16 D6's `has_revenue` gate) *and* every width: 4-up, 2-up, 1-up with
+   no media query. auto-fit collapses the tracks it can't fill, so three cards
+   land as `repeat(3, 1fr)` and four as `repeat(4, 1fr)` on their own — which
+   is why the old `--with-revenue` modifier is gone rather than left as a
+   no-op (Plan 18 D6). */
 .dash__kpis {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: var(--space-2);
-}
-/* Phase 2 only — the fourth card appears with `has_revenue` (Plan 16 D6). */
-.dash__kpis--with-revenue {
-  grid-template-columns: repeat(4, 1fr);
 }
 .dash__kpi {
   background: var(--color-surface);
@@ -252,24 +288,24 @@
   background: var(--color-text-faint);
 }
 
-/* --- Split section: revenue (Phase 2) + funding split / gender ------------- */
+/* --- Split section: revenue (Phase 2) + funding split / gender -------------
+   Revised 2026-07-25 (Plan 18 Track B, handoff revision): the revenue table
+   is full width on its own row, with Funding split and Gender beneath it as
+   an auto-fitting pair — side by side on desktop, stacked on a phone. Plan
+   16's 1.75fr/1fr split put the two side cards in a column too narrow to
+   read on a tablet and needed a `--no-revenue` modifier to widen them when
+   the table was absent; both cards now sit the same way either way, so that
+   modifier is gone (Plan 18 D6). */
 .dash__split {
-  display: grid;
-  grid-template-columns: 1.75fr 1fr;
-  gap: var(--space-2);
-  align-items: start;
-}
-/* Today's layout: no revenue table, so the two side cards go two-up at full
-   width rather than stacking in a narrow column (Plan 16 D6). */
-.dash__split--no-revenue {
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .dash__side {
   display: grid;
-  gap: var(--space-2);
-}
-.dash__split--no-revenue .dash__side {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
 }
 
 .dash__stack {
@@ -340,9 +376,17 @@
   font-size: var(--font-size-xs);
   color: var(--color-text-faint);
 }
+/* All the rows scroll together as one block below their `min-width`, so the
+   columns stay aligned to each other instead of each row crushing its tracks
+   by a different amount. Same mechanism as `.dash-chart__scroll` below; the
+   card head sits outside it and wraps normally. */
+.dash__revenue-scroll {
+  overflow-x: auto;
+}
 .dash__revenue-row {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+  min-width: 520px;
   gap: 0.75rem;
   padding: 0.9rem var(--space-3);
   border-bottom: 1px solid var(--color-border-default);
@@ -397,10 +441,12 @@
   color: var(--color-stat-value);
 }
 
-/* --- Age bands ------------------------------------------------------------- */
+/* --- Age bands -------------------------------------------------------------
+   auto-fit, so the four bands go 4-up then 2-up then 1-up on their own (Plan
+   18 Track B). */
 .dash__age-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-3);
 }
 .dash__age-count {
@@ -581,29 +627,16 @@
   font-weight: 500;
 }
 
-/* --- Narrow screens -------------------------------------------------------- */
-@media (max-width: 60rem) {
-  .dash__split {
-    grid-template-columns: 1fr;
-  }
-}
+/* --- Narrow screens ---------------------------------------------------------
+   Nothing here on purpose (2026-07-25, Plan 18 D6). Every section above is an
+   auto-fitting grid or a wrapping flex row, so one markup and one rule set
+   serve 390px through 1280px. The two `max-width` queries this file used to
+   carry were removed rather than kept alongside them: they were a second
+   source of truth for the same breakpoints, and the `max-width: 40rem` KPI
+   rule (`grid-template-columns: 1fr`) actively contradicted
+   `repeat(auto-fit, minmax(210px, 1fr))`, which gives a legible two-up at
+   that width.
 
-@media (max-width: 40rem) {
-  .dash__header {
-    flex-direction: column;
-  }
-  .dash__controls {
-    align-items: stretch;
-    width: 100%;
-  }
-  .dash__kpis,
-  .dash__kpis--with-revenue {
-    grid-template-columns: 1fr;
-  }
-  .dash__split--no-revenue .dash__side {
-    grid-template-columns: 1fr;
-  }
-  .dash__age-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
+   The header itself needs no query either: it is a `flex-wrap: wrap` row
+   whose control stack is `width: min(100%, 520px)`, so the controls drop
+   under the title and go full-width on their own. */

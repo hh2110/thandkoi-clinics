@@ -80,10 +80,29 @@ as inline-at-the-end, same as before.
           </ul>
         </details>
       </li>
-      <li>
-        <a class="button button--donate" href="/{{ lang }}/donate/">{% translate "Donate" %}</a>
-      </li>
     </ul>
+    {% comment %}
+    Donate out of the page list (2026-07-25, Plan 18 Track A / design handoff
+    option 1b). As the last <li> of .primary-nav__list it was a filled amber
+    row among the page links, and the open drawer read as "you are in
+    Donate" whatever page you were actually on — the feedback that prompted
+    this handoff. It is not a page you are on; it is the ask. So it leaves
+    the list and becomes its own block below a hairline, with the supporting
+    sentence it never had room for as a row.
+
+    Reach is unchanged: it is still in the header at every width — the last
+    thing in the open drawer on mobile, and inline in the same place as
+    before at 56rem+, where components.css drops this block's border,
+    padding and sentence so the desktop bar is pixel-identical (verify
+    against main at 1280px before merging, per the handoff).
+    {% endcomment %}
+    <div class="primary-nav__cta">
+      <p class="primary-nav__cta-text">
+        {% translate "Zakat and Sadaqa keep care free for those who need it most." %}
+      </p>
+      <a class="button button--donate primary-nav__cta-button"
+         href="/{{ lang }}/donate/">{% translate "Donate" %}</a>
+    </div>
     <div class="site-header__controls">
       {% include "partials/theme_toggle.html" %}
     </div>

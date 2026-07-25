@@ -127,18 +127,27 @@ def test_renders_three_kpi_cards_and_no_revenue_card(client, dashboard):
     assert "Zakat visits" in content
     assert "Regular visits" in content
     # No fourth card, and no empty revenue table left behind either.
-    assert "dash__kpis--with-revenue" not in content
     assert 'data-role="kpi-revenue"' not in content
     assert 'data-role="revenue"' not in content
     assert "Revenue by service" not in content
 
 
-def test_side_cards_sit_two_up_without_revenue(client, dashboard):
+def test_side_cards_render_whether_or_not_revenue_exists(client, dashboard):
+    """Funding split and Gender sit side by side beneath the (absent) revenue
+    table, in the same auto-fitting pair they will occupy once it arrives.
+
+    Plan 18 Track B moved the table to its own full-width row, so unlike Plan
+    16's 1.75fr/1fr split this layout carries no `--no-revenue` modifier —
+    there is nothing left for `has_revenue` to switch. That absence is the
+    assertion: a modifier creeping back in means the two states diverged
+    again.
+    """
     aggregate(timezone.localdate())
 
     content = render(client, dashboard)
 
-    assert 'class="dash__split dash__split--no-revenue"' in content
+    assert 'class="dash__split"' in content
+    assert "dash__split--no-revenue" not in content
     assert 'data-role="funding-split"' in content
     assert 'data-role="gender"' in content
 
@@ -146,17 +155,23 @@ def test_side_cards_sit_two_up_without_revenue(client, dashboard):
 def test_revenue_branches_light_up_when_has_revenue_turns_true(
     client, dashboard, monkeypatch
 ):
-    """Phase 2's rehearsal: the same template renders the fourth KPI card,
-    the revenue table and the 1.75fr/1fr layout with no template change —
-    only ``dashboard.has_revenue`` flipping (Plan 16 D6)."""
+    """Phase 2's rehearsal: the same template renders the fourth KPI card and
+    the revenue table with no template change — only ``dashboard.has_revenue``
+    flipping (Plan 16 D6). The surrounding layout is unchanged by design
+    (Plan 18 D6), which is why only the two revenue surfaces are asserted."""
     aggregate(timezone.localdate())
     monkeypatch.setattr(dashboard_module, "has_revenue", lambda rows: True)
 
     content = render(client, dashboard)
 
-    assert "dash__kpis--with-revenue" in content
+    assert content.count('class="dash__kpi"') == 4
     assert 'data-role="kpi-revenue"' in content
     assert 'data-role="revenue"' in content
+    assert "Revenue by service" in content
+    # The rows scroll as one block on a narrow screen rather than each
+    # crushing its own tracks — the head sits outside the scroller.
+    assert 'class="dash__revenue-scroll"' in content
+    assert 'class="dash__split"' in content
     assert "dash__split--no-revenue" not in content
 
 
@@ -205,6 +220,30 @@ def test_the_preset_matching_the_current_range_length_is_selected(client, dashbo
 
     selected = re.findall(r'dash__preset--selected"[^>]*>([^<]+)<', content)
     assert selected == ["7 days"]
+
+
+def test_range_controls_are_one_reflowing_stack_at_every_width(client, dashboard):
+    """The approved mobile pattern (option 1c, "everything visible") is a
+    reflow, not a second layout: presets and both dates are on the page at
+    390px exactly as they are at 1280px, behind no tap.
+
+    Plan 18 Track B. The widths themselves are CSS and aren't testable here;
+    what is testable — and what a regression would break first — is that the
+    markup carries no width-conditional branch and each date field is its own
+    labelled block rather than sharing one line with a separator.
+    """
+    aggregate(day(0))
+
+    content = render(client, dashboard, start=day(0), end=day(6))
+
+    form = re.search(r'<form class="dash__dates".*?</form>', content, re.S).group()
+    assert form.count('class="dash__date-field"') == 2
+    for field_id in ("dash-start", "dash-end"):
+        assert f'for="{field_id}"' in form
+        assert f'id="{field_id}"' in form
+    # The old single-line card's "–" between the two inputs is gone; the
+    # fields are stacked label-over-input in their own blocks now.
+    assert "dash__date-sep" not in form
 
 
 def test_date_form_is_a_get_form_with_a_visible_apply_and_no_script(client, dashboard):

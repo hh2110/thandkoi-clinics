@@ -144,18 +144,30 @@ padding `2.75rem 2.5rem 4rem`, sections stacked with `2rem` gap.
 - Range summary line, `1rem`, `--color-text-soft`, format:
   `26 Jun 2026 – 25 Jul 2026 · 30 days · 22 reporting days`
   (pluralise "day"/"days" and "reporting day"/"reporting days").
-- Right side, stacked and right-aligned:
-  - **Preset pill group** — surface background, 1px `--color-border-default`,
-    `border-radius:999px`, `4px` padding, `.35rem` gap. Buttons: Public Sans
-    600, `.82rem`, padding `.35rem .85rem`, radius 999px. Selected =
-    `--color-brand` background, white text; unselected = transparent,
-    `--color-text-soft`. Presets: **7 days, 14 days, 30 days, 90 days,
-    1 year** (all ending today). A preset is shown selected when the current
-    range length equals it.
-  - **From / To date inputs** — surface card, 1px border, `radius:10px`,
-    padding `.55rem .8rem`. Field labels "From"/"To" are Archivo 700,
-    `.65rem`, uppercase, `letter-spacing:.1em`, `--color-text-faint`.
-    Inputs are borderless and transparent, `.92rem`. `max` = today.
+- Right side, one control stack, `width: min(100%, 520px)`, `.6rem` gap.
+  **This is the same markup at every width** — it reflows, so there is no
+  separate mobile treatment (see "Responsive" below):
+  - **Preset tiles** — `display:grid; grid-template-columns: repeat(auto-fit,
+    minmax(92px,1fr)); gap:.4rem`. Each tile is 44px tall (touch minimum),
+    `radius:10px`, 1px `--color-border-default`, `--color-surface`
+    background, Public Sans 600 `.92rem`, `--color-text-soft`. Selected =
+    `--color-brand` background and border, white text. Presets: **7 days,
+    14 days, 30 days, 90 days, 1 year** (all ending today); one is shown
+    selected when the current range length equals it. Five across on desktop,
+    three across at 390px — no wrapping pill, no horizontal scroll.
+  - **Date card** — `--color-surface`, 1px border, `radius:12px`,
+    `.85rem` padding, `display:flex; flex-wrap:wrap; gap:.6rem`. From and To
+    are `flex:1 1 130px`; **Apply** is `flex:1 1 110px` so it sits beside
+    them on desktop and drops to full width on a phone. Field labels are
+    Archivo 700, `.64rem`, uppercase, `letter-spacing:.1em`,
+    `--color-text-faint`; inputs are 44px tall with a 1px border and
+    `radius:10px`, `.95rem`; `max` = today. Apply is a 44px
+    `--color-brand` pill, white, 600, `1rem`.
+
+  This layout was chosen from three mobile options (see
+  `Mobile Date Range Options.dc.html`, option **1c** — "everything visible").
+  Options 1a (scrolling chips + sheet) and 1b (single button + bottom sheet)
+  were rejected: they hide the dates behind a tap and need JavaScript.
 - Header has a `1px` bottom border `--color-border-default`,
   `padding-bottom:1.75rem`.
 
@@ -235,7 +247,7 @@ Match the existing chart's accessibility: `role="img"` + `aria-label`, and a
 `<details>` "View as table" fallback listing each bucket (Date, Zakat,
 Regular, Total) — as `report_index_page.html` already does.
 
-### 4. Revenue by service (left, 1.75fr) + side column (1fr)
+### 4. Revenue by service (full width)
 
 Table card: surface, 1px border, `radius:14px`, `overflow:hidden`.
 
@@ -243,10 +255,15 @@ Table card: surface, 1px border, `radius:14px`, `overflow:hidden`.
   `PKR · quantity in brackets` (`.82rem`, `--color-text-faint`).
 - **Every row — header, data, total — must use the same grid:**
   `grid-template-columns: minmax(0,1.4fr) repeat(3, minmax(0,1fr))`,
-  `gap:.75rem`, padding `.9rem 1.5rem`. The `minmax(0,…)` is required: with
-  plain `1fr`, wide figures blow the tracks out by a different amount in each
-  row and the columns stop lining up. Inner amount+qty wrappers need
-  `min-width:0`.
+  `min-width:520px`, `gap:.75rem`, padding `.9rem 1.5rem`. The
+  `minmax(0,…)` is required: with plain `1fr`, wide figures blow the tracks
+  out by a different amount in each row and the columns stop lining up. Inner
+  amount+qty wrappers need `min-width:0`.
+- **The rows sit in an `overflow-x:auto` wrapper.** Below ~520px the table
+  scrolls sideways as one block rather than crushing the columns into each
+  other — the service name and the figures stay on one line. Do not switch to
+  a stacked card list; the side-by-side Regular/Zakat comparison is the point
+  of the table.
 - Column heads: Archivo 700, `.7rem`, uppercase, `letter-spacing:.1em`,
   `--color-text-faint`; Service left, the other three right-aligned.
 - Data rows, bottom border `--color-border-default`:
@@ -261,8 +278,9 @@ Table card: surface, 1px border, `radius:14px`, `overflow:hidden`.
   `.95rem`; Regular/Zakat Archivo 700 `1rem` `--color-text-soft`; grand total
   Archivo 800 `1.3rem` `--color-stat-value`.
 
-Side column, two cards, `1.25rem` gap, each surface / 1px border /
-`radius:14px` / padding `1.6rem 1.7rem`:
+Beneath the table, two cards in `repeat(auto-fit, minmax(260px,1fr))` with
+`1.25rem` gap — side by side on desktop, stacked on a phone. Each is surface /
+1px border / `radius:14px` / padding `1.6rem 1.7rem`:
 
 - **Funding split** — 12px stacked bar, `radius:999px`, track
   `--color-track`; Zakat segment `--color-brand`, Regular
@@ -304,6 +322,24 @@ Server-rendered, no client framework. State is the URL:
 - Invalid/missing params fall back to the default silently.
 - Empty range (no reporting days): KPIs show `0` and "No data", chart shows
   an empty plot with axis, tables show zeros. No NaN, no crash.
+
+## Responsive
+
+No media queries are needed anywhere on this page — every section is an
+auto-fitting grid, so the same markup serves desktop and mobile:
+
+| Section | Rule |
+|---|---|
+| Page padding | `clamp(1.25rem,4vw,2.75rem) clamp(1rem,4vw,2.5rem) 4rem` |
+| Range controls | `width:min(100%,520px)`; tiles `repeat(auto-fit,minmax(92px,1fr))`; date card `flex-wrap` |
+| KPI row | `repeat(auto-fit,minmax(210px,1fr))` — 4 up, then 2, then 1 |
+| Footfall chart | bars are `flex:1; min-width:0`, so it simply narrows; bucketing already caps the bar count |
+| Revenue table | fixed `min-width:520px` rows inside `overflow-x:auto` |
+| Funding split + Gender | `repeat(auto-fit,minmax(260px,1fr))` |
+| Age bands | `repeat(auto-fit,minmax(150px,1fr))` — 4 up, then 2 |
+
+Check at 390px, 768px and 1280px. All tap targets in the range controls are
+44px.
 
 ## Dark theme
 
@@ -486,10 +522,14 @@ Phase 2 — the day revenue data exists, no template work should be needed:
 | `Clinic Dashboard.dc.html` | Work item 1 — the dashboard, interactive (presets and date inputs work) |
 | `Daily Report Redesign.dc.html` | Work item 2 — daily report incl. the new Revenue section |
 | `Dashboard Entry Points.dc.html` | Work item 3 — options 1a (approved), 1b, 1c (approved), 1d |
+| `Mobile Date Range Options.dc.html` | Mobile range-picker options; **1c approved** and already built into the dashboard file |
+| `mobile-menu/` | Separate, related work item — nav current-page marker, Donate placement and Donate text colour. Has its own README |
 | `screenshots/01–04-clinic-dashboard.png` | The dashboard, top to bottom |
 | `screenshots/01–03-daily-report.png` | Daily report incl. the Revenue section (dark theme) |
 | `screenshots/entry-point-1a-reports-page.png` | Approved entry point 1a |
 | `screenshots/entry-point-1c-home-impact-bar.png` | Approved entry point 1c |
+| `screenshots/range-picker-desktop.png` | The range controls at desktop width |
+| `screenshots/range-picker-mobile-1c.png` | The approved mobile pattern |
 | `support.js`, `fonts/` | Runtime + fonts so the above open offline in a browser |
 
 Note: the prototypes always show the revenue surfaces (they carry sample
