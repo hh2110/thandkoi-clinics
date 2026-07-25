@@ -82,18 +82,10 @@ from apps.pipeline.xls_compat import (
 )
 from conftest import _StubAnthropicClient
 
-XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-# A fixture export that includes real-looking direct identifiers alongside the
-# two columns we actually aggregate on. Nothing in the "identifying" columns may
-# ever survive aggregation or reach a model.
-EXPORT_HEADER = ["patient_name", "mrn", "phone", "gender", "diagnosis"]
-EXPORT_ROWS = [
-    ["Fatima Bibi", "MRN-001", "0300-1112222", "Female", "Hypertension"],
-    ["Ahmed Khan", "MRN-002", "0301-3334444", "Male", "Diabetes"],
-    ["Zainab Ali", "MRN-003", "0302-5556666", "Female", "Hypertension"],
-]
-# Identifier substrings that must never appear downstream of aggregation.
+# Identifier substrings that must never appear downstream of ingest. These are
+# the fake names/MRNs/phones written into the synthetic exports below (see
+# ``_build_tkc_daily_xls``); a guard asserts none of them survive into a
+# persisted row, an aggregate, or an AI payload.
 RAW_IDENTIFIERS = [
     "fatima",
     "bibi",
@@ -108,25 +100,6 @@ RAW_IDENTIFIERS = [
     "0301-3334444",
     "0302-5556666",
 ]
-
-
-def _build_export_xlsx() -> bytes:
-    """Build an in-memory .xlsx export with PHI columns; return its bytes."""
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.append(EXPORT_HEADER)
-    for row in EXPORT_ROWS:
-        sheet.append(row)
-    buffer = io.BytesIO()
-    workbook.save(buffer)
-    return buffer.getvalue()
-
-
-# Deterministic expected aggregate, computed here in the test independently of
-# the production aggregation code.
-EXPECTED_TOTAL = len(EXPORT_ROWS)
-EXPECTED_BY_GENDER = {"female": 2, "male": 1}
-EXPECTED_BY_DIAGNOSIS = {"diabetes": 1, "hypertension": 2}
 
 
 def _publish_report_page_with_summary(client_fixture, home_page, summary_sentence):
@@ -825,9 +798,9 @@ def _build_tkc_daily_xls(
     """A synthetic legacy ``.xls`` mirroring the clinic system's real layout.
 
     Same shape as the 2026-07-22 sample: banner row, ``Period:`` row, blank
-    row, header row, then data rows — with the same fake identifiers as
-    ``EXPORT_ROWS`` so the ``RAW_IDENTIFIERS`` guard applies. Built with
-    xlwt (dev dependency) because openpyxl cannot write BIFF.
+    row, header row, then data rows — carrying the fake identifiers that
+    ``RAW_IDENTIFIERS`` lists, so that guard applies. Built with xlwt (dev
+    dependency) because openpyxl cannot write BIFF.
 
     Extended (Plan 11 Track B8/B9, 2026-07-23) with the seven free-text
     columns via ``TKC_FREETEXT_ROWS`` above.
