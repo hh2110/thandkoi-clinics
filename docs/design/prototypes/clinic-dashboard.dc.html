@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face { font-family:"Archivo"; font-style:normal; font-weight:700 800; font-display:swap; src:url("./fonts/archivo-latin-700-800.woff2") format("woff2"); }
+@font-face { font-family:"Public Sans"; font-style:normal; font-weight:400 600; font-display:swap; src:url("./fonts/public-sans-latin-400-600.woff2") format("woff2"); }
+*{ box-sizing:border-box; }
+body{ margin:0; font-family:"Public Sans",sans-serif; }
+a{ color:#086c7e; } a:hover{ color:#12879b; }
+input[type="date"]{ font-family:"Public Sans",sans-serif; }
+</style>
+</helmet>
+
+<div style="{{ shellStyle }}">
+  <div style="max-width:1180px; margin:0 auto; padding:2.75rem 2.5rem 4rem; display:flex; flex-direction:column; gap:2rem;">
+
+    <header style="display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:1.5rem; border-bottom:1px solid var(--border); padding-bottom:1.75rem;">
+      <div>
+        <p style="font-family:var(--fh); text-transform:uppercase; letter-spacing:.14em; font-size:.78rem; font-weight:700; color:var(--accent); margin:0 0 .5rem;">Thandkoi Clinics</p>
+        <h1 style="font-family:var(--fh); font-weight:800; font-size:2.5rem; line-height:1; letter-spacing:-.01em; color:var(--text); margin:0 0 .6rem;">Clinic dashboard</h1>
+        <p style="margin:0; font-size:1rem; color:var(--text-soft);">{{ rangeSummary }}</p>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:.65rem; align-items:flex-end;">
+        <div style="display:flex; gap:.35rem; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:4px;">
+          <button type="button" onClick="{{ setP7 }}" style="{{ p7Style }}">7 days</button>
+          <button type="button" onClick="{{ setP14 }}" style="{{ p14Style }}">14 days</button>
+          <button type="button" onClick="{{ setP30 }}" style="{{ p30Style }}">30 days</button>
+          <button type="button" onClick="{{ setP90 }}" style="{{ p90Style }}">90 days</button>
+          <button type="button" onClick="{{ setP365 }}" style="{{ p365Style }}">1 year</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:.6rem; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:.55rem .8rem;">
+          <label style="display:flex; flex-direction:column; gap:.15rem;">
+            <span style="font-family:var(--fh); font-weight:700; font-size:.65rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">From</span>
+            <input type="date" value="{{ start }}" max="{{ today }}" onChange="{{ onStart }}" style="border:none; background:transparent; color:var(--text); font-size:.92rem; padding:0;">
+          </label>
+          <span style="color:var(--text-faint);">–</span>
+          <label style="display:flex; flex-direction:column; gap:.15rem;">
+            <span style="font-family:var(--fh); font-weight:700; font-size:.65rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">To</span>
+            <input type="date" value="{{ end }}" max="{{ today }}" onChange="{{ onEnd }}" style="border:none; background:transparent; color:var(--text); font-size:.92rem; padding:0;">
+          </label>
+        </div>
+      </div>
+    </header>
+
+    <section style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.35rem 1.5rem;">
+          <p style="font-family:var(--fh); font-weight:800; font-size:2.1rem; line-height:1; color:var(--value); margin:0; font-variant-numeric:tabular-nums;">{{ k.value }}</p>
+          <p style="margin:.55rem 0 0; font-size:.88rem; font-weight:600; color:var(--text-soft);">{{ k.label }}</p>
+          <p style="margin:.2rem 0 0; font-size:.8rem; color:var(--text-faint);">{{ k.sub }}</p>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.75rem 1.9rem;">
+      <div style="display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:1rem; margin-bottom:1.25rem;">
+        <h2 style="font-family:var(--fh); font-weight:800; font-size:1.25rem; color:var(--text); margin:0;">Patient footfall</h2>
+        <div style="display:flex; gap:1.25rem;">
+          <span style="display:flex; align-items:center; gap:.45rem; font-size:.88rem; color:var(--text-soft);"><span style="width:11px; height:11px; background:var(--brand); border-radius:2px;"></span>Zakat</span>
+          <span style="display:flex; align-items:center; gap:.45rem; font-size:.88rem; color:var(--text-soft);"><span style="width:11px; height:11px; background:var(--text-faint); border-radius:2px;"></span>Regular</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:.75rem;">
+        <div style="display:flex; flex-direction:column-reverse; justify-content:space-between; align-items:flex-end; height:calc(240px + .78rem); margin:-.39rem 0;">
+          <sc-for list="{{ yTicks }}" as="t" hint-placeholder-count="5">
+            <span style="font-size:.78rem; color:var(--text-faint); font-variant-numeric:tabular-nums; line-height:1;">{{ t }}</span>
+          </sc-for>
+        </div>
+        <div style="flex:1; position:relative;">
+          <div style="position:relative; display:flex; align-items:flex-end; gap:{{ barGap }}; height:240px;">
+            <div style="position:absolute; inset:0; display:flex; flex-direction:column-reverse; justify-content:space-between; pointer-events:none;">
+              <sc-for list="{{ yTicks }}" as="t" hint-placeholder-count="5">
+                <div style="height:1px; background:var(--border);"></div>
+              </sc-for>
+            </div>
+            <sc-for list="{{ days }}" as="d" hint-placeholder-count="24">
+              <div style="flex:1; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center;">
+                <div style="{{ d.barStyle }}">
+                  <div style="{{ d.regStyle }}"></div>
+                  <div style="{{ d.zakStyle }}"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex; gap:{{ barGap }}; margin-top:.5rem;">
+            <sc-for list="{{ days }}" as="d" hint-placeholder-count="24">
+              <span style="flex:1; min-width:0; text-align:center; font-size:.72rem; color:var(--text-faint); white-space:nowrap;">{{ d.label }}</span>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <p style="margin:1rem 0 0; font-size:.85rem; color:var(--text-faint); max-width:70ch;">{{ grainNote }}Sundays are omitted — the clinic is closed. A gap marks a Monday–Saturday day with nothing reported, including holidays.</p>
+    </section>
+
+    <section style="display:grid; grid-template-columns:1.75fr 1fr; gap:1.25rem; align-items:start;">
+
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem; padding:1.6rem 1.9rem 1.1rem;">
+          <h2 style="font-family:var(--fh); font-weight:800; font-size:1.25rem; color:var(--text); margin:0;">Revenue by service</h2>
+          <span style="font-size:.82rem; color:var(--text-faint);">PKR · quantity in brackets</span>
+        </div>
+        <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); gap:.75rem; padding:.7rem 1.5rem; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+          <span style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">Service</span>
+          <span style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Regular</span>
+          <span style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Zakat</span>
+          <span style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Total</span>
+        </div>
+        <sc-for list="{{ revenueRows }}" as="r" hint-placeholder-count="5">
+          <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); gap:1rem; align-items:center; padding:.9rem 1.9rem; border-bottom:1px solid var(--border);">
+            <span style="font-size:.95rem; font-weight:600; color:var(--text);">{{ r.label }}</span>
+            <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.3rem; min-width:0;">
+              <span style="font-size:.95rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">{{ r.regular }}</span>
+              <span style="font-size:.74rem; color:var(--text-faint); font-variant-numeric:tabular-nums; white-space:nowrap;">{{ r.regularQty }}</span>
+            </div>
+            <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.3rem; min-width:0;">
+              <span style="font-size:.95rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">{{ r.zakat }}</span>
+              <span style="font-size:.74rem; color:var(--text-faint); font-variant-numeric:tabular-nums; white-space:nowrap;">{{ r.zakatQty }}</span>
+            </div>
+            <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.3rem; min-width:0;">
+              <span style="font-family:var(--fh); font-weight:700; font-size:1rem; color:var(--text); font-variant-numeric:tabular-nums;">{{ r.total }}</span>
+              <span style="font-size:.74rem; color:var(--text-faint); font-variant-numeric:tabular-nums; white-space:nowrap;">{{ r.totalQty }}</span>
+            </div>
+          </div>
+        </sc-for>
+        <div style="display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr)); gap:.75rem; align-items:baseline; padding:1.15rem 1.5rem; background:var(--track);">
+          <span style="font-family:var(--fh); font-weight:800; font-size:.95rem; color:var(--text);">Total</span>
+          <span style="font-family:var(--fh); font-weight:700; font-size:1rem; color:var(--text-soft); text-align:right; font-variant-numeric:tabular-nums;">{{ totalRegular }}</span>
+          <span style="font-family:var(--fh); font-weight:700; font-size:1rem; color:var(--text-soft); text-align:right; font-variant-numeric:tabular-nums;">{{ totalZakat }}</span>
+          <span style="font-family:var(--fh); font-weight:800; font-size:1.3rem; line-height:1; color:var(--value); text-align:right; font-variant-numeric:tabular-nums;">{{ totalAll }}</span>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:1.25rem;">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.6rem 1.7rem;">
+          <h2 style="font-family:var(--fh); font-weight:800; font-size:1.1rem; color:var(--text); margin:0 0 1.1rem;">Funding split</h2>
+          <div style="display:flex; height:12px; border-radius:999px; overflow:hidden; background:var(--track);">
+            <div style="{{ fundZakatStyle }}"></div>
+            <div style="{{ fundRegularStyle }}"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:.7rem; margin-top:1.1rem;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem;">
+              <span style="display:flex; align-items:center; gap:.5rem; font-size:.92rem; color:var(--text-soft);"><span style="width:10px; height:10px; background:var(--brand); border-radius:2px;"></span>Zakat patients</span>
+              <span style="font-family:var(--fh); font-weight:700; font-size:.95rem; color:var(--text); font-variant-numeric:tabular-nums;">{{ zakatVisits }}</span>
+            </div>
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem;">
+              <span style="display:flex; align-items:center; gap:.5rem; font-size:.92rem; color:var(--text-soft);"><span style="width:10px; height:10px; background:var(--text-faint); border-radius:2px;"></span>Regular patients</span>
+              <span style="font-family:var(--fh); font-weight:700; font-size:.95rem; color:var(--text); font-variant-numeric:tabular-nums;">{{ regularVisits }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.6rem 1.7rem;">
+          <h2 style="font-family:var(--fh); font-weight:800; font-size:1.1rem; color:var(--text); margin:0 0 1.1rem;">Gender</h2>
+          <div style="display:flex; flex-direction:column; gap:.9rem;">
+            <sc-for list="{{ genderRows }}" as="g" hint-placeholder-count="2">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.35rem;">
+                  <span style="font-size:.92rem; color:var(--text-soft);">{{ g.label }}</span>
+                  <span style="font-family:var(--fh); font-weight:700; font-size:.95rem; color:var(--text); font-variant-numeric:tabular-nums;">{{ g.count }}</span>
+                </div>
+                <div style="height:6px; border-radius:999px; background:var(--track); overflow:hidden;">
+                  <div style="{{ g.barStyle }}"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:1.7rem 1.9rem;">
+      <h2 style="font-family:var(--fh); font-weight:800; font-size:1.25rem; color:var(--text); margin:0 0 1.3rem;">Age bands</h2>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1.25rem;">
+        <sc-for list="{{ ageRows }}" as="a" hint-placeholder-count="4">
+          <div style="display:flex; flex-direction:column; gap:.6rem;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:.75rem;">
+              <span style="font-size:.9rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">{{ a.label }}</span>
+              <span style="font-family:var(--fh); font-weight:800; font-size:1.4rem; line-height:1; color:var(--value); font-variant-numeric:tabular-nums;">{{ a.count }}</span>
+            </div>
+            <div style="height:8px; border-radius:999px; background:var(--track); overflow:hidden;">
+              <div style="{{ a.barStyle }}"></div>
+            </div>
+            <span style="font-size:.8rem; color:var(--text-faint);">{{ a.share }} of visits</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:10px; padding:1.1rem 1.4rem;">
+      <p style="font-family:var(--fh); font-weight:700; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); margin:0 0 .6rem;">Reporting gaps in this range</p>
+      <div style="display:flex; flex-wrap:wrap; gap:.4rem;">
+        <sc-for list="{{ gaps }}" as="g" hint-placeholder-count="4">
+          <span style="font-size:.82rem; color:var(--text-soft); background:var(--track); border-radius:6px; padding:.22rem .6rem;">{{ g }}</span>
+        </sc-for>
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1280, &quot;height&quot;: 1600}, &quot;theme&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;light&quot;, &quot;dark&quot;], &quot;default&quot;: &quot;light&quot;, &quot;tsType&quot;: &quot;string&quot;}}">
+const DAY = 86400000;
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const today = "2026-07-25";
+    this.state = { start: this.shift(today, -29), end: today };
+  }
+
+  shift(iso, n) { return new Date(Date.parse(iso) + n * DAY).toISOString().slice(0, 10); }
+  days(a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / DAY) + 1; }
+
+  // deterministic per-day sample data
+  seed(iso) {
+    let h = 2166136261;
+    for (let i = 0; i < iso.length; i++) { h ^= iso.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+  }
+
+  dayData(iso) {
+    const d = new Date(Date.parse(iso));
+    if (d.getUTCDay() === 0) return { iso, closed: true };
+    const r = this.seed(iso);
+    if (r() < 0.09) return { iso, missing: true };
+    const zakat = 1 + Math.floor(r() * 13);
+    const regular = Math.floor(r() * 6);
+    const total = zakat + regular;
+    const female = Math.round(total * (0.35 + r() * 0.3));
+    const a0 = Math.floor(total * (0.1 + r() * 0.15));
+    const a1 = Math.floor(total * (0.05 + r() * 0.15));
+    const a3 = Math.floor(total * (0.1 + r() * 0.2));
+    return {
+      iso, zakat, regular, total, female, male: total - female,
+      ages: [a0, a1, Math.max(0, total - a0 - a1 - a3), a3],
+    };
+  }
+
+  preset(n) {
+    const end = "2026-07-25";
+    this.setState({ start: this.shift(end, -(n - 1)), end });
+  }
+
+  setRange(start, end) {
+    if (Date.parse(end) < Date.parse(start)) end = start;
+    this.setState({ start, end });
+  }
+
+  renderVals() {
+    const { start, end } = this.state;
+    const theme = this.props.theme ?? "light";
+    const dark = theme === "dark";
+    const n = (v) => Math.round(v).toLocaleString("en-US");
+
+    const list = [];
+    for (let t = Date.parse(start); t <= Date.parse(end); t += DAY) {
+      list.push(this.dayData(new Date(t).toISOString().slice(0, 10)));
+    }
+    const open = list.filter((d) => !d.closed && !d.missing);
+
+    const sum = (f) => open.reduce((a, d) => a + f(d), 0);
+    const visits = sum((d) => d.total), zak = sum((d) => d.zakat), reg = sum((d) => d.regular);
+    const female = sum((d) => d.female), male = sum((d) => d.male);
+    const ages = [0, 1, 2, 3].map((i) => sum((d) => d.ages[i]));
+
+    // service pricing → revenue, quantities follow the patient mix
+    const services = [
+      { label: "Registration", price: 50, rate: 1 },
+      { label: "Consultation", price: 250, rate: 1 },
+      { label: "Pharmacy", price: 600, rate: 0.78 },
+      { label: "Laboratory", price: 900, rate: 0.46 },
+      { label: "Ultrasound", price: 1200, rate: 0.19 },
+    ];
+    const rows = services.map((s) => {
+      const zq = Math.round(zak * s.rate), rq = Math.round(reg * s.rate);
+      return {
+        label: s.label,
+        regular: n(rq * s.price), regularQty: "(" + rq + ")",
+        zakat: n(zq * s.price), zakatQty: "(" + zq + ")",
+        total: n((rq + zq) * s.price), totalQty: "(" + (rq + zq) + ")",
+        rAmt: rq * s.price, zAmt: zq * s.price,
+      };
+    });
+    const tReg = rows.reduce((a, r) => a + r.rAmt, 0);
+    const tZak = rows.reduce((a, r) => a + r.zAmt, 0);
+
+    // chart — bucket long ranges so the bar count stays legible
+    const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const chartDays = list.filter((d) => !d.closed);
+    const grain = chartDays.length > 400 ? "month" : chartDays.length > 90 ? "week" : "day";
+
+    const key = (iso) => {
+      const dt = new Date(Date.parse(iso));
+      if (grain === "month") return iso.slice(0, 7);
+      if (grain === "week") {
+        const back = (dt.getUTCDay() + 6) % 7;
+        return new Date(Date.parse(iso) - back * DAY).toISOString().slice(0, 10);
+      }
+      return iso;
+    };
+
+    const buckets = [];
+    const byKey = {};
+    chartDays.forEach((d) => {
+      const k = key(d.iso);
+      if (!byKey[k]) { byKey[k] = { iso: d.iso, total: 0, zakat: 0, regular: 0 }; buckets.push(byKey[k]); }
+      byKey[k].total += d.total || 0;
+      byKey[k].zakat += d.zakat || 0;
+      byKey[k].regular += d.regular || 0;
+    });
+
+    const peak = Math.max(5, ...buckets.map((b) => b.total));
+    const step = peak > 400 ? 200 : peak > 200 ? 100 : peak > 80 ? 50 : peak > 40 ? 20 : peak > 20 ? 10 : peak > 10 ? 5 : 2;
+    const top = Math.ceil(peak / step) * step;
+    const yTicks = [];
+    for (let v = 0; v <= top; v += step) yTicks.push(String(v));
+
+    const labelEvery = Math.ceil(buckets.length / 8);
+    const multiYear = Date.parse(end) - Date.parse(start) > 300 * DAY;
+    const days = buckets.map((b, i) => {
+      const t = b.total;
+      const dt = new Date(Date.parse(b.iso));
+      const stamp = grain === "month"
+        ? mon[dt.getUTCMonth()] + " " + String(dt.getUTCFullYear()).slice(2)
+        : dt.getUTCDate() + " " + mon[dt.getUTCMonth()] + (multiYear ? " " + String(dt.getUTCFullYear()).slice(2) : "");
+      return {
+        label: i % labelEvery === 0 ? stamp : "",
+        barStyle: `width:100%; max-width:20px; height:${(t / top) * 100}%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:2px 2px 0 0; overflow:hidden;`,
+        regStyle: `height:${t ? (b.regular / t) * 100 : 0}%; background:var(--text-faint);`,
+        zakStyle: `height:${t ? (b.zakat / t) * 100 : 0}%; background:var(--brand);`,
+      };
+    });
+    const grainNote = grain === "month"
+      ? "One bar per month. "
+      : grain === "week" ? "One bar per week, starting Monday. " : "One bar per day the clinic reported data. ";
+
+    const allGaps = list.filter((d) => d.missing).map((d) => {
+      const dt = new Date(Date.parse(d.iso));
+      return dt.getUTCDate() + " " + mon[dt.getUTCMonth()];
+    });
+    const gaps = allGaps.length > 12
+      ? allGaps.slice(0, 12).concat("+" + (allGaps.length - 12) + " more")
+      : allGaps;
+
+    const fmt = (iso) => {
+      const dt = new Date(Date.parse(iso));
+      return dt.getUTCDate() + " " + mon[dt.getUTCMonth()] + " " + dt.getUTCFullYear();
+    };
+    const span = this.days(start, end);
+    const gMax = Math.max(female, male, 1);
+    const aMax = Math.max(...ages, 1);
+    const pct = (v, t) => (t ? Math.round((v / t) * 100) : 0);
+
+    const chip = (on) => `border:none; cursor:pointer; font-family:var(--fb); font-weight:600; font-size:.82rem; padding:.35rem .85rem; border-radius:999px; background:${on ? "var(--brand)" : "transparent"}; color:${on ? "#fff" : "var(--text-soft)"};`;
+
+    return {
+      shellStyle: [
+        "--brand:#086c7e; --teal-bright:#12879b; --pale-aqua:#a0e0e8; --amber:#ce8a2c;",
+        dark
+          ? "--text:#f2f6f6; --text-soft:#abb4b6; --text-faint:#9ea0a1; --border:#195a67; --bg:#0a3e48; --surface:#0d4f5c; --track:#195a67; --accent:#e8b04a; --value:#a0e0e8;"
+          : "--text:#0e2025; --text-soft:#3e5257; --text-faint:#728a8f; --border:#e0e7e8; --bg:#f2f6f6; --surface:#ffffff; --track:#e6eded; --accent:#ce8a2c; --value:#086c7e;",
+        '--fh:"Archivo",sans-serif; --fb:"Public Sans",sans-serif;',
+        "background:var(--bg); color:var(--text); min-height:100vh; font-family:var(--fb);",
+      ].join(" "),
+
+      start, end, today: "2026-07-25",
+      rangeSummary: fmt(start) + " – " + fmt(end) + " · " + span + (span === 1 ? " day · " : " days · ") + open.length + (open.length === 1 ? " reporting day" : " reporting days"),
+      onStart: (e) => this.setRange(e.target.value, end),
+      onEnd: (e) => this.setRange(start, e.target.value),
+      setP7: () => this.preset(7), setP14: () => this.preset(14), setP30: () => this.preset(30),
+      setP90: () => this.preset(90), setP365: () => this.preset(365),
+      p7Style: chip(span === 7), p14Style: chip(span === 14), p30Style: chip(span === 30),
+      p90Style: chip(span === 90), p365Style: chip(span === 365),
+
+      kpis: [
+        { value: n(visits), label: "Patients seen", sub: open.length ? (visits / open.length).toFixed(1) + " per reporting day" : "No data" },
+        { value: n(zak), label: "Zakat visits", sub: pct(zak, visits) + "% of all visits" },
+        { value: n(reg), label: "Regular visits", sub: pct(reg, visits) + "% of all visits" },
+        { value: n(tReg + tZak), label: "Total revenue (PKR)", sub: visits ? n((tReg + tZak) / visits) + " per patient" : "No data" },
+      ],
+
+      yTicks, days, barGap: buckets.length > 60 ? "1px" : "2px", grainNote,
+      revenueRows: rows,
+      totalRegular: n(tReg), totalZakat: n(tZak), totalAll: n(tReg + tZak),
+      zakatVisits: n(zak), regularVisits: n(reg),
+      fundZakatStyle: `width:${pct(zak, visits)}%; background:var(--brand);`,
+      fundRegularStyle: `width:${100 - pct(zak, visits)}%; background:var(--text-faint);`,
+      genderRows: [
+        { label: "Female", count: n(female), barStyle: `height:100%; width:${pct(female, gMax)}%; background:var(--brand); border-radius:999px;` },
+        { label: "Male", count: n(male), barStyle: `height:100%; width:${pct(male, gMax)}%; background:var(--text-faint); border-radius:999px;` },
+      ],
+      ageRows: ["0–5", "6–18", "19–55", "56+"].map((label, i) => ({
+        label, count: n(ages[i]), share: pct(ages[i], visits) + "%",
+        barStyle: `height:100%; width:${pct(ages[i], aMax)}%; background:var(--brand); border-radius:999px;`,
+      })),
+      gaps: gaps.length ? gaps : ["None — every open day reported"],
+    };
+  }
+}
+</script>
+</body>
+</html>
