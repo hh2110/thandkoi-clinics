@@ -36,8 +36,8 @@ in `DailyAggregate` (which is why `zakat_avg_spend` on the home band is
 hand-typed, `apps/core/models.py`). Work items 1 and 3 ship now without it;
 work item 2 and the dashboard's revenue surfaces light up later when a
 `service_revenue` column exists. This plan is therefore **Phase 1 only** —
-Phase 2 is scoped at the bottom and parked pending one maintainer answer
-(Q1).
+Phase 2 is scoped at the bottom and parked pending a clinic-software release
+that nobody here controls (D13).
 
 Grounded against the real code before drafting (2026-07-25): `DailyAggregate`
 fields, `ReportIndexPage.get_funding_mix` and its slot/gap logic,
@@ -86,7 +86,8 @@ index and the home page.
 ### Out of scope (parked, deliberately)
 
 - **Work item 2 (daily-report Revenue section) and every revenue surface's
-  real data** — Phase 2, below. Blocked on Q1, not on effort.
+  real data** — Phase 2, below. Waiting on the clinic software's revenue
+  columns (D13), not on effort or on a decision.
 - **Urdu `.po` catalogue.** All new copy is wrapped in `{% translate %}` per
   repo convention, but the repo has **zero** `.po` files today (D8), so
   "Urdu translations required" from the handoff cannot be satisfied inside
@@ -209,14 +210,67 @@ from them is hardcoded; all figures are computed from `DailyAggregate`
 anywhere in this plan** — no summary sentence, no narrative. The reporting-gap
 chips list dates only. Nothing here touches invariants #1–#5.
 
+**D13 — Revenue will arrive as new columns on the existing daily patient
+export (maintainer, 2026-07-25).** Q1 answered: the register **does** record
+per-line charges, so the handoff's per-service split is real, not invented —
+and the clinic software is **being updated right now** to add revenue columns
+to the daily patient export. They are **not there yet**: the header row of a
+recent real export (`TKC July 23rd Stat.xls`, the latest clinic date to hand,
+read header-row-only per the PHI caution) carries 27 columns — `S#`, `MR #`,
+`Patient Name`, `Father's / Husband's Name`, `Date of Birth`, `Sex`,
+`Address`, `Status`, the vitals `BP`…`Waist`, the free-text columns
+(`Presenting Complaints` … `Plan`), `Next Visit Date`, `OPD Doctor` — and no
+fee column of any kind.
+
+Two consequences, both good for Phase 2: revenue rides the **existing**
+one-file-one-day ingest path — same upload, same parser, same
+`recompute_daily_aggregate` — so there is no new intake flow, no new file
+type and no per-row-date splitting to design; and Phase 2 is now waiting on
+a **software release** rather than on a decision.
+
+**The daily patient export is the only revenue source.** Other financial
+reports the clinic software can emit are explicitly **not** in play — the
+maintainer will not ask uploaders to supply a second file (decision,
+2026-07-25). So the service list, the column headers and the Regular/Zakat
+split all come from that one export, and none of them can be pinned down
+until the updated export exists. Confirm the exact headers header-row-only
+against the first export that carries them, exactly as the Plan 11 B8/B9
+column names were confirmed on 2026-07-23, and treat the handoff's five
+services (Registration, Consultation, Pharmacy, Laboratory, Ultrasound) as a
+design placeholder until then. See Q4.
+
+**D14 — `qty` is the count of non-zero fee cells (maintainer, 2026-07-25),
+which is "visits charged for this service", not "services delivered".** Per
+service, `amount` = sum of that fee column over the date's rows and `qty` =
+the number of rows where it is non-zero. The handoff defines `qty` as "the
+number of that service delivered … a patient can have several", but one
+visit's Medicine cell holds one summed amount however many items it covers,
+so the derived number cannot distinguish three lab tests from one. The
+figure is exact and useful — it just means something slightly different from
+the handoff's wording, and the bracketed number's label must match what it
+actually counts (Q5).
+
+**D15 — `*.csv` added to `.gitignore` in this PR.** Invariant #5's block list
+covers `*.xls`, `*.xlsx`, `/uploads/` and `/data/` — every raw-export format
+*except* CSV, even though the clinic software can emit patient-level reports
+in it (observed 2026-07-25, complete with a patient-name column). Nothing
+about the pipeline changes; this only stops such a file being committed if
+one is ever saved into a working copy. No CSV is tracked today (checked), so
+the rule costs nothing, and a deliberate fixture can still be added with
+`git add -f`. A pre-existing gap surfaced by this plan's grounding rather
+than created by it, and small enough to close in the same pass.
+
 ## Open questions for the maintainer
 
-- **Q1 (blocks Phase 2 only).** Does the clinic's source register actually
-  record **per-line charges** — Registration / Consultation / Pharmacy /
-  Laboratory / Ultrasound, each with a quantity and an amount, split
-  Regular/Zakat — or only a **per-visit total**? The handoff flags this
-  explicitly: if it is a per-visit total, the table collapses to a single
-  "Total charged" row rather than inventing a split. Phase 1 is unaffected.
+- **Q4 (Phase 2, answerable once the software update ships).** Which
+  services will the new columns actually cover, and under what headers? The
+  handoff assumes five (Registration, Consultation, Pharmacy, Laboratory,
+  Ultrasound); the display order and labels follow from whatever the export
+  really carries. No action needed now — the first export with fee columns
+  answers it.
+- **Q5 (Phase 2, cosmetic).** Given D14, should the bracketed number keep the
+  label "quantity" (`PKR · quantity in brackets`), or be relabelled to
+  something truthful like "visits charged"?
 - **Q2 (default assumed).** Should the dashboard appear in the primary nav?
   **Assumed no** — reachable from the reports index (1a) and home (1c), as
   the handoff's entry-point work item implies. Easy to flip later.
@@ -354,19 +408,33 @@ Conventional-Commit type.
 
 ---
 
-## Phase 2 — parked until Q1 is answered
+## Phase 2 — parked until the clinic software ships its revenue columns
 
-Not part of this plan's PRs; captured here so nothing is lost. Expected to
-need **no template work** if Phase 1 lands correctly.
+Q1 is **answered** (D13/D14): per-line charges are real, they will arrive as
+new columns on the existing daily patient export, and `qty` is the count of
+non-zero fee cells. What Phase 2 now waits on is the clinic software release
+that adds those columns — a date nobody here controls — so it stays out of
+this plan's PRs and gets its own plan file when the first export carrying
+them lands. Expected to need **no template work** if Phase 1 lands correctly.
+
+The trigger to start it: a daily patient export whose header row shows fee
+columns. Confirm the exact headers header-row-only (PHI caution), then:
 
 - [ ] Add `service_revenue` JSON column to `DailyAggregate` + migration
       (shape in the handoff: `{"consultation": {"regular": {"qty", "amount"},
-      "zakat": {...}}, ...}`; PKR integers; `qty` counts services, not
-      patients).
-- [ ] Populate it in `apps.pipeline.ingest.recompute_daily_aggregate` and the
-      `recompute_daily_aggregates` command — **after** confirming the source
-      register's shape (Q1); if it only carries a per-visit total, collapse to
-      one "Total charged" row rather than inventing a split.
+      "zakat": {...}}, ...}`; PKR integers; `qty` per D14).
+- [ ] Extend `parser_tkc_daily_v1`'s column map with the new fee headers —
+      the same `header_index` idiom, which degrades harmlessly (field stays
+      blank) on an export that predates the software update, so old and new
+      exports both keep parsing.
+- [ ] Carry the per-service amounts through `ParsedVisitRow` and populate the
+      aggregate in `apps.pipeline.ingest.recompute_daily_aggregate`, splitting
+      Regular/Zakat off the existing `Status` column; extend the
+      `recompute_daily_aggregates` command so historical dates backfill.
+- [ ] Decide whether per-visit revenue belongs on `DeidentifiedVisit` too
+      (it is a de-identified number, and the aggregate is meant to be
+      recomputable from the canonical row store — if it isn't stored per
+      visit, a recompute cannot rebuild it).
 - [ ] Confirm the gated surfaces light up on their own: the 4th KPI card,
       the "Revenue by service" card, the 1.75fr/1fr side-column layout, and
       the daily-report Revenue section with its split bar.
