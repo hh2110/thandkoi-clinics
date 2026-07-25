@@ -2888,6 +2888,32 @@ def test_funding_mix_slot_dates_reserves_a_slot_for_a_weekday_gap(home_page):
     ]
 
 
+@pytest.mark.parametrize(
+    "start,end",
+    [
+        # `end` before `start`.
+        (datetime.date(2026, 7, 20), datetime.date(2026, 7, 19)),
+        # A range that is nothing but a closed Sunday with no row.
+        (datetime.date(2026, 7, 19), datetime.date(2026, 7, 19)),
+    ],
+)
+def test_build_footfall_chart_with_no_slots_in_range_is_empty(db, start, end):
+    """A range that yields no slots returns the empty chart rather than
+    dividing by zero (Plan 16 16.1).
+
+    Unreachable from ``ReportIndexPage`` — its window is always 30 days
+    with ``end >= start`` — but the Plan 16 dashboard's range comes from
+    the reader, so the shared module has to hold the empty contract for
+    both degenerate cases.
+    """
+    row = DailyAggregateFactory(clinic_date=datetime.date(2026, 7, 20))
+
+    assert footfall_chart.build_footfall_chart([row], start, end) == {
+        "bars": [],
+        "ticks": [],
+    }
+
+
 def test_funding_mix_slot_dates_keeps_a_sunday_that_has_data(home_page):
     """An exceptional open Sunday (a row exists) is treated like any other
     day with data, not folded out."""

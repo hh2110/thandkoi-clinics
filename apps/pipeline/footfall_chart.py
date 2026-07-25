@@ -63,8 +63,12 @@ def build_footfall_chart(rows, start, end) -> dict:
 
     ``rows`` is any iterable of daily aggregates; ``start`` and ``end`` are
     the inclusive calendar bounds of the plotted window. Rows outside those
-    bounds get no bar (they have no slot), so the caller is responsible for
-    passing bounds that cover the rows it wants drawn.
+    bounds get no bar (they have no slot) but still set the y-scale, so the
+    caller is responsible for passing bounds that cover the rows it wants
+    drawn.
+
+    Returns the empty chart (``{"bars": [], "ticks": []}``) when there is
+    nothing to plot — no rows, or no slots in the range at all.
 
     Reuses the exact fields ``DailyReportPage.headline_stats`` already
     surfaces under the same labels: ``zakat_beneficiary_patients`` →
@@ -82,6 +86,13 @@ def build_footfall_chart(rows, start, end) -> dict:
         return {"bars": [], "ticks": []}
 
     dates = slot_dates(rows_by_date, start, end)
+    if not dates:
+        # No slots in range at all — ``end`` before ``start``, or a range
+        # that is only closed Sundays. The reports index can't produce
+        # either (its window is 30 days with ``end >= start``), but the
+        # dashboard's range is reader-supplied, so return the same empty
+        # contract as the no-rows case above rather than dividing by zero.
+        return {"bars": [], "ticks": []}
 
     plot_width = CHART_WIDTH - PAD_LEFT - PAD_RIGHT
     plot_height = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM
