@@ -26,7 +26,7 @@ env/
 *.xls
 *.xlsx
 # The clinic software can also emit patient-level reports as CSV (observed
-# 2026-07-25 while grounding Plan 15) — same invariant #5 rule as the Excel
+# 2026-07-25 while grounding Plan 16) — same invariant #5 rule as the Excel
 # exports above. No CSV is tracked in this repo; a deliberate fixture can
 # still be added with `git add -f`.
 *.csv

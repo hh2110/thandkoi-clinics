@@ -1,9 +1,15 @@
-# Plan 15 — Clinic dashboard (range view) + dashboard entry points
+# Plan 16 — Clinic dashboard (range view) + dashboard entry points
 
 **One-line:** a new `/reports/dashboard/` page that totals the daily reports
 across a reader-chosen date range — KPIs, a bucketed footfall chart, funding
 split, gender, age bands and reporting gaps — plus the two approved entry
 points that lead to it.
+
+> **Renumbered 15 → 16 (2026-07-25).** Drafted as Plan 15 while PR #128 was
+> still open; that PR merged first and took the number
+> ([code-review remediation](15-code-review-remediation-2026-07.md)). Only the
+> number changed — scope, decisions and tasks are unchanged. The branch and
+> worktree keep their original `plan/15-clinic-dashboard` name.
 
 ## Background — why now
 
@@ -130,7 +136,7 @@ divs with percentage heights; the repo's own chart (Plan 13,
 `ReportIndexPage.get_funding_mix`) computes paths, gridlines and tick
 positions in Python and emits inline SVG, so it renders fully without JS.
 Precedent wins. The geometry is **extracted into a shared module** rather
-than copy-pasted (task 15.1), because the dashboard needs the same
+than copy-pasted (task 16.1), because the dashboard needs the same
 stacked-bar, gap-slot and label-thinning logic with a different window and a
 bucket grain.
 
@@ -308,7 +314,7 @@ Gaps with no in-repo precedent, and how they are grounded instead:
 **No runtime flag**, consistent with every plan in this repo. The natural
 gates do the work here:
 
-- Nothing on the site links to the dashboard until task 15.4 lands, so a
+- Nothing on the site links to the dashboard until task 16.4 lands, so a
   half-finished page cannot reach a reader through any existing journey
   (it is reachable by URL, like any unlinked page — acceptable given Q3's
   public default and that it exposes nothing the daily reports don't).
@@ -323,12 +329,12 @@ gates do the work here:
   `code-review-tc` pass and green CI, then deployed by the existing
   human-triggered `workflow_dispatch` release (`.github/workflows/deploy.yml`)
   against a dated tag. The dashboard page creates itself on deploy via the
-  data migration (D1), but nothing links to it until task 15.4 ships — that
+  data migration (D1), but nothing links to it until task 16.4 ships — that
   ordering, not a flag or a manual step, is the staging point.
-- **Gating check per phase.** (1) 15.3 deployed — the page exists and is
+- **Gating check per phase.** (1) 16.3 deployed — the page exists and is
   correct at its URL, but no existing page links to it; walk the URL by hand
   in both themes and check a 7-day, a 90-day, a 1-year and an empty range.
-  (2) 15.4 deployed — entry points live; verify from home and `/reports/`
+  (2) 16.4 deployed — entry points live; verify from home and `/reports/`
   that both links appear and land on the dashboard.
 - **Access.** Public once linked (Q3). No new permissions.
 - **Informed.** Maintainer only; no downstream operators or customers.
@@ -343,27 +349,27 @@ One task = one PR, sequenced. Every PR: tests + lint green, `code-review-tc`
 loop clean **before** `gh pr create`, opened as draft, labelled by
 Conventional-Commit type.
 
-- [ ] **15.1 — Extract the footfall-chart geometry** (`refactor`/`chore`).
+- [ ] **16.1 — Extract the footfall-chart geometry** (`refactor`/`chore`).
       Move `get_funding_mix`'s geometry into `apps/pipeline/footfall_chart.py`
       taking (rows, start, end, grain) and returning the same dict.
       `ReportIndexPage.get_funding_mix` becomes a thin caller. **No behaviour
       change** — Plan 13's existing tests must pass untouched, which is the
       acceptance test for this PR.
-- [ ] **15.2 — Range aggregation module** (`feat`). New
+- [ ] **16.2 — Range aggregation module** (`feat`). New
       `apps/pipeline/dashboard.py`: param parse/clamp (D10), DB-side sums,
       funding/gender/age-band rows (D5), reporting-gap dates, slot count and
       grain selection (D3), `has_revenue` stub (D6). Unit tests including the
       90/91 and 400/401 boundaries, the empty range, `end < start`, the 5-year
       cap, and gap detection across a Sunday. No UI in this PR.
-- [ ] **15.3 — `ClinicDashboardPage` + template + CSS** (`feat`). Model,
+- [ ] **16.3 — `ClinicDashboardPage` + template + CSS** (`feat`). Model,
       schema migration, `subpage_types` update, the get-or-create helper plus
       the data migration that calls it (D1), template composing
-      header/presets/date form, KPI row, chart (via 15.1), funding split,
+      header/presets/date form, KPI row, chart (via 16.1), funding split,
       gender, age bands, reporting gaps; `static/css/dashboard.css`; revenue
       branches present and inert. Tests: renders with 3 KPI cards and no
       revenue card, side cards two-up, `View as table` fallback lists every
       bucket, no-JS form works.
-- [ ] **15.4 — Entry points 1a + 1c** (`feat`). Reports-index link in
+- [ ] **16.4 — Entry points 1a + 1c** (`feat`). Reports-index link in
       `.ri-funding-mix__head`; opt-in link tile in `stat_band.html` wired from
       the Home impact band (D7). Tests: both links present and pointing at the
       dashboard URL; newsletter and editorial stat bands render unchanged.
@@ -373,7 +379,7 @@ Conventional-Commit type.
       per the dark-mode trap (a token that reads correct in source can still
       fail to flip) and the broken-`resize_window` note (use the iframe
       harness, not the tool).
-- [ ] **Roadmap index** — flip this plan's row to ✅ Done when 15.4 merges,
+- [ ] **Roadmap index** — flip this plan's row to ✅ Done when 16.4 merges,
       in the same pass (Stage 9).
 
 ## Acceptance criteria

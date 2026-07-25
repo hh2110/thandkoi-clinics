@@ -41,7 +41,7 @@ for provenance and so the interactive light/dark reference travels with the repo
 ## Clinic dashboard handoff (2026-07-25)
 
 A second, later design reference: the maintainer-supplied handoff bundle for
-**[Plan 15](../../.claude/plans/15-clinic-dashboard.md)** — the range-aggregate
+**[Plan 16](../../.claude/plans/16-clinic-dashboard.md)** — the range-aggregate
 clinic dashboard, the daily report's revenue section, and the two approved
 dashboard entry points.
 
@@ -56,6 +56,6 @@ dashboard entry points.
 Same caveats as above, plus two specific to this bundle: the prototypes always
 show the revenue surfaces (they carry **invented** sample revenue), and the
 handoff's own token table lists a `--color-track` that does not exist in
-`tokens.css` — Plan 15 D4 reuses `--color-border-default` instead. The bundle's
+`tokens.css` — Plan 16 D4 reuses `--color-border-default` instead. The bundle's
 `fonts/` and `support.js` (included only so it rendered offline) are not
 committed, matching the existing prototypes here.
