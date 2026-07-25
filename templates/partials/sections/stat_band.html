@@ -18,11 +18,19 @@ Context:
   section_modifier — background modifier; defaults to "section--tinted
                      section--banded" (Plan 11 D12: full-bleed raised band
                      with a top+bottom hairline).
+  link_url         — optional. With `link_label`, appends a fourth card that
+                     is a whole-tile link (Plan 16 D7, entry point 1c: the
+                     home band's "See the live dashboard"). Opt-in on
+                     purpose — with it absent, every byte of this partial's
+                     output is what it was before 16.4, so the newsletter
+                     stat band is untouched. A test asserts that.
+  link_label       — the link tile's caption. Both are required together;
+                     either alone renders no tile.
 
 Numbers are inputs only — never baked in (they come from the CMS/pipeline).
 Empty state: with no stats it shows a "coming soon" line, not an empty band.
 {% endcomment %}
-<section class="section {{ section_modifier|default:'section--tinted section--banded' }} stat-band">
+<section class="section {{ section_modifier|default:'section--tinted section--banded' }} stat-band{% if link_url and link_label %} stat-band--with-link{% endif %}">
   <div class="wrapper stat-band__row">
     <div class="stat-band__title">
       {% if heading %}<p class="stat-band__heading">{{ heading }}</p>{% endif %}
@@ -37,6 +45,15 @@ Empty state: with no stats it shows a "coming soon" line, not an empty band.
       {% empty %}
         <p class="stat-band__empty text-faint">{% translate "Figures coming soon." %}</p>
       {% endfor %}
+      {% if link_url and link_label %}
+        {% comment %}The glyph is decorative — the label already says where
+        the tile goes — so it is hidden from screen readers rather than read
+        out as "right arrow" before the link text.{% endcomment %}
+        <a class="stat-band__card stat-band__link-card" href="{{ link_url }}">
+          <span class="stat-band__link-glyph" aria-hidden="true">→</span>
+          <span class="stat-band__link-label">{{ link_label }}</span>
+        </a>
+      {% endif %}
     </div>
   </div>
 </section>
