@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face { font-family:"Archivo"; font-style:normal; font-weight:700 800; font-display:swap; src:url("./fonts/archivo-latin-700-800.woff2") format("woff2"); }
+@font-face { font-family:"Public Sans"; font-style:normal; font-weight:400 600; font-display:swap; src:url("./fonts/public-sans-latin-400-600.woff2") format("woff2"); }
+*{ box-sizing:border-box; }
+body{ margin:0; font-family:"Public Sans",sans-serif; background:#dfe8e8; color:#0e2025; }
+a{ color:#086c7e; } a:hover{ color:#12879b; }
+</style>
+</helmet>
+
+<section style="padding:3rem; display:flex; flex-direction:column; gap:1.75rem;">
+  <div style="max-width:72ch;">
+    <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.12em; color:#728a8f; margin:0 0 .4rem;">Turn 1 · Getting to the dashboard</p>
+    <h1 style="font-family:Archivo,sans-serif; font-weight:800; font-size:2rem; line-height:1.1; margin:0 0 .6rem;">Two entry points, two options each</h1>
+    <p style="font-size:1rem; line-height:1.6; color:#3e5257; margin:0; text-wrap:pretty;">Existing page furniture is drawn to scale so the placement reads in context. Nothing new is introduced to the visual language — the dashboard link reuses the card, band and link styles already on those pages.</p>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:1.75rem; align-items:flex-start;">
+
+    <div id="1a" style="width:900px; display:flex; flex-direction:column; gap:.9rem;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1a</span>
+        <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.2rem; margin:0;">Reports page · link in the chart header</h2>
+      </div>
+      <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0; max-width:62ch;">The footfall card already answers "how busy has it been?" — the link sits where the reader's question naturally goes next. Cheapest change, and it keeps the page's single-column rhythm.</p>
+      <div style="background:#f2f6f6; border-radius:14px; padding:2rem;">
+        <div style="background:#fff; border:1px solid #e0e7e8; border-radius:14px; padding:1.75rem 1.9rem;">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:2rem;">
+            <div>
+              <h3 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.5rem; margin:0 0 .5rem;">Patient footfall — last 30 days</h3>
+              <p style="font-size:.88rem; line-height:1.5; color:#728a8f; margin:0; max-width:52ch;">Zakat-funded vs. regular visits, one bar per day the clinic reported data. Sundays are omitted — the clinic is closed.</p>
+            </div>
+            <a href="#1a" style="flex:none; display:inline-flex; align-items:center; gap:.45rem; font-weight:600; font-size:.95rem; color:#086c7e; text-decoration:none; border:1px solid #086c7e; border-radius:999px; padding:.5rem 1rem;" style-hover="background:#086c7e; color:#ffffff;">Open the dashboard →</a>
+          </div>
+          <div style="display:flex; align-items:flex-end; gap:4px; height:120px; margin-top:1.5rem; border-bottom:1px solid #e0e7e8; padding-bottom:2px;">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="20">
+              <div style="{{ b.style }}"></div>
+            </sc-for>
+          </div>
+          <p style="font-size:.88rem; margin:1rem 0 0; color:#086c7e;">▸ View as table</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="1b" style="width:900px; display:flex; flex-direction:column; gap:.9rem;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1b</span>
+        <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.2rem; margin:0;">Reports page · band below the chart</h2>
+      </div>
+      <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0; max-width:62ch;">A tinted band between the chart and the daily-report cards, using the page's existing <em>section--tinted</em> treatment. Louder, and it says what the dashboard adds that the chart doesn't: any date range, money as well as patients.</p>
+      <div style="background:#f2f6f6; border-radius:14px; padding:2rem; display:flex; flex-direction:column; gap:1.5rem;">
+        <div style="background:#fff; border:1px solid #e0e7e8; border-radius:14px; padding:1.5rem 1.9rem;">
+          <h3 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.35rem; margin:0 0 1rem;">Patient footfall — last 30 days</h3>
+          <div style="display:flex; align-items:flex-end; gap:4px; height:100px; border-bottom:1px solid #e0e7e8; padding-bottom:2px;">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="20">
+              <div style="{{ b.style }}"></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:#e4f4f6; border-radius:14px; padding:1.75rem 1.9rem; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1.5rem;">
+          <div style="max-width:52ch;">
+            <h3 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.35rem; margin:0 0 .45rem;">Look at any stretch of days</h3>
+            <p style="font-size:.98rem; line-height:1.55; color:#3e5257; margin:0;">The dashboard totals patients, funding split and service revenue across whatever date range you choose — a week, a month, a year.</p>
+          </div>
+          <a href="#1b" style="flex:none; display:inline-flex; align-items:center; gap:.5rem; font-weight:600; font-size:1rem; color:#fff; background:#086c7e; text-decoration:none; border-radius:999px; padding:.75rem 1.4rem;" style-hover="background:#12879b;">Open the dashboard →</a>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; opacity:.55;">
+          <sc-for list="{{ ghostCards }}" as="c" hint-placeholder-count="3">
+            <div style="background:#fff; border:1px solid #e0e7e8; border-radius:12px; padding:1.1rem 1.2rem;">
+              <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:#086c7e; margin:0 0 .4rem;">{{ c.date }}</p>
+              <p style="font-family:Archivo,sans-serif; font-weight:700; font-size:1.05rem; margin:0 0 .3rem; color:#0e2025;">{{ c.iso }}</p>
+              <p style="font-size:.85rem; color:#3e5257; margin:0;">{{ c.seen }}</p>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div id="1c" style="width:900px; display:flex; flex-direction:column; gap:.9rem;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1c</span>
+        <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.2rem; margin:0;">Home · fourth tile in the impact bar</h2>
+      </div>
+      <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0; max-width:62ch;">The three stat cards become three-plus-one: same card shape, amber arrow, no number. It reads as "and there's more where these came from", which is exactly what the dashboard is. Costs the stat cards a little width.</p>
+      <div style="background:#e4f4f6; padding:2.5rem 2rem;">
+        <div style="display:grid; grid-template-columns:auto repeat(4,1fr); gap:1.25rem; align-items:center;">
+          <div style="padding-right:.5rem;">
+            <h3 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.25rem; margin:0 0 .3rem;">Our impact so far</h3>
+            <p style="font-size:.88rem; color:#3e5257; margin:0;">Updated 25 Jul 2026</p>
+          </div>
+          <sc-for list="{{ stats }}" as="s" hint-placeholder-count="3">
+            <div style="background:#fff; border-radius:12px; padding:1.4rem 1.5rem;">
+              <p style="font-family:Archivo,sans-serif; font-weight:800; font-size:2rem; line-height:1; color:#086c7e; margin:0; font-variant-numeric:tabular-nums;">{{ s.value }}</p>
+              <p style="font-size:.9rem; color:#3e5257; margin:.5rem 0 0;">{{ s.label }}</p>
+            </div>
+          </sc-for>
+          <a href="#1c" style="background:#fff; border:1px solid #ce8a2c; border-radius:12px; padding:1.4rem 1.5rem; text-decoration:none; display:flex; flex-direction:column; justify-content:center; gap:.5rem; height:100%;" style-hover="background:#fdf4e6;">
+            <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.6rem; line-height:1; color:#ce8a2c;">→</span>
+            <span style="font-family:Archivo,sans-serif; font-weight:700; font-size:1rem; color:#0e2025;">See the live dashboard</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div id="1d" style="width:900px; display:flex; flex-direction:column; gap:.9rem;">
+      <div style="display:flex; align-items:center; gap:.6rem;">
+        <span style="font-family:Archivo,sans-serif; font-weight:800; font-size:.72rem; letter-spacing:.08em; color:#fff; background:#086c7e; border-radius:999px; padding:.2rem .55rem;">1d</span>
+        <h2 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.2rem; margin:0;">Home · link under the impact heading</h2>
+      </div>
+      <p style="font-size:.92rem; line-height:1.55; color:#3e5257; margin:0; max-width:62ch;">The three headline numbers keep their full width; the link sits with the "Updated" line as the source note — click through to see where the numbers come from. Quietest option, and the one that scales if a fourth stat is ever added.</p>
+      <div style="background:#e4f4f6; padding:2.5rem 2rem;">
+        <div style="display:grid; grid-template-columns:auto repeat(3,1fr); gap:1.25rem; align-items:center;">
+          <div style="padding-right:.5rem;">
+            <h3 style="font-family:Archivo,sans-serif; font-weight:800; font-size:1.25rem; margin:0 0 .3rem;">Our impact so far</h3>
+            <p style="font-size:.88rem; color:#3e5257; margin:0 0 .7rem;">Updated 25 Jul 2026</p>
+            <a href="#1d" style="font-weight:600; font-size:.95rem; color:#086c7e; text-decoration:underline; text-underline-offset:3px;" style-hover="color:#12879b;">See the full dashboard →</a>
+          </div>
+          <sc-for list="{{ stats }}" as="s" hint-placeholder-count="3">
+            <div style="background:#fff; border-radius:12px; padding:1.5rem 1.6rem;">
+              <p style="font-family:Archivo,sans-serif; font-weight:800; font-size:2.2rem; line-height:1; color:#086c7e; margin:0; font-variant-numeric:tabular-nums;">{{ s.value }}</p>
+              <p style="font-size:.92rem; color:#3e5257; margin:.5rem 0 0;">{{ s.label }}</p>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1000, &quot;height&quot;: 1400}}">
+class Component extends DCLogic {
+  renderVals() {
+    const data = [8, 13, 11, 10, 13, 6, 6, 6, 12, 2, 8, 2, 7, 4, 4, 8, 2, 1, 6, 9, 9, 1, 5];
+    const extra = [9, 3, 1, 0, 0, 2, 0, 0, 3, 1, 0, 3, 0, 2, 1, 0, 0, 0, 1, 7, 1, 3, 2];
+    const top = 20;
+    return {
+      bars: data.map((z, i) => ({
+        style: `flex:1; min-width:0; height:${((z + extra[i]) / top) * 100}%; background:linear-gradient(#728a8f ${(extra[i] / (z + extra[i])) * 100}%, #086c7e ${(extra[i] / (z + extra[i])) * 100}%); border-radius:2px 2px 0 0;`,
+      })),
+      stats: [
+        { value: "487", label: "Clinic patients" },
+        { value: "312", label: "Zakat beneficiaries" },
+        { value: "163", label: "Avg spend per Zakat visit (PKR)" },
+      ],
+      ghostCards: [
+        { date: "JULY 25, 2026", iso: "2026-07-25", seen: "7 patients seen" },
+        { date: "JULY 24, 2026", iso: "2026-07-24", seen: "4 patients seen" },
+        { date: "JULY 23, 2026", iso: "2026-07-23", seen: "10 patients seen" },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

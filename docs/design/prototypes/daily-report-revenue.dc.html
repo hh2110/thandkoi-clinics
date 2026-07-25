@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face { font-family:"Archivo"; font-style:normal; font-weight:700 800; font-display:swap; src:url("./fonts/archivo-latin-700-800.woff2") format("woff2"); }
+@font-face { font-family:"Public Sans"; font-style:normal; font-weight:400 600; font-display:swap; src:url("./fonts/public-sans-latin-400-600.woff2") format("woff2"); }
+*{ box-sizing:border-box; }
+body{ margin:0; font-family:"Public Sans",sans-serif; background:#e6eded; }
+.rpt{
+  --teal-brand:#086c7e; --teal-deep:#0a3e48; --teal-bright:#12879b; --pale-aqua:#a0e0e8;
+  --ink:#0e2025; --ink-soft:#3e5257; --ink-faint:#728a8f; --border:#e0e7e8;
+  --paper:#f2f6f6; --card:#ffffff; --track:#e0e7e8;
+  --bg:var(--paper); --surface:var(--card); --text:var(--ink); --text-soft:var(--ink-soft); --text-faint:var(--ink-faint);
+  --accent:var(--teal-bright); --value:var(--teal-brand);
+  --fh:"Archivo",sans-serif; --fb:"Public Sans",sans-serif;
+}
+.rpt[data-theme="dark"]{
+  --ink:#f2f6f6; --ink-soft:#c2cccd; --ink-faint:#89999c; --border:#1c5561;
+  --paper:#0a3e48; --card:#0d4c58; --track:#1c5561;
+  --accent:var(--pale-aqua); --value:var(--pale-aqua);
+}
+</style>
+</helmet>
+<div style="padding:2rem; display:flex; flex-direction:column; align-items:center; gap:1.25rem;">
+  <div style="display:flex; align-items:center; gap:.6rem; font-family:Archivo,sans-serif;">
+    <span style="font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#728a8f;">Theme</span>
+    <div style="display:flex; background:#fff; border:1px solid #d4dede; border-radius:999px; padding:3px;">
+      <button type="button" onClick="{{ setLight }}" style="{{ btnLight }}">Light</button>
+      <button type="button" onClick="{{ setDark }}" style="{{ btnDark }}">Dark</button>
+    </div>
+  </div>
+
+  <div class="rpt" data-theme="{{ theme }}" style="width:960px; max-width:100%; background:var(--bg); color:var(--text); border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(10,62,72,.08),0 16px 40px rgba(10,62,72,.16);">
+    <div style="padding:3rem 3.5rem 3.5rem;">
+
+      <header style="border-bottom:1px solid var(--border); padding-bottom:1.75rem; margin-bottom:2rem;">
+        <p style="font-family:var(--fh); text-transform:uppercase; letter-spacing:.14em; font-size:.8rem; font-weight:700; color:var(--accent); margin:0 0 .5rem;">Daily report</p>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.5rem;">
+          <h1 style="font-family:var(--fh); font-weight:800; font-size:2.75rem; line-height:1; letter-spacing:-.01em; color:var(--text); margin:0;">{{ dateLong }}</h1>
+          <p style="margin:0; font-size:.95rem; color:var(--text-faint); font-variant-numeric:tabular-nums;">{{ dateIso }} · {{ weekday }}</p>
+        </div>
+      </header>
+
+      <section style="display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:2.25rem;">
+        <sc-for list="{{ metrics }}" as="m" hint-placeholder-count="3">
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.4rem 1.5rem;">
+            <p style="font-family:var(--fh); font-weight:800; font-size:2.6rem; line-height:1; color:var(--value); margin:0; font-variant-numeric:tabular-nums;">{{ m.value }}</p>
+            <p style="margin:.5rem 0 0; font-size:.9rem; font-weight:600; color:var(--text-soft);">{{ m.label }}</p>
+          </div>
+        </sc-for>
+      </section>
+
+      <section style="margin-bottom:2.5rem;">
+        <p style="font-size:1.15rem; line-height:1.6; color:var(--text); margin:0; max-width:60ch; text-wrap:pretty;">{{ lead }}</p>
+      </section>
+
+      <section style="margin-bottom:2.5rem;">
+        <h2 style="font-family:var(--fh); font-weight:800; font-size:1.05rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); margin:0 0 1.1rem;">Breakdown</h2>
+        <div style="display:grid; grid-template-columns:1fr 2fr; gap:1rem;">
+          <sc-for list="{{ groups }}" as="g" hint-placeholder-count="1">
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.35rem 1.4rem; display:flex; flex-direction:column; height:100%;">
+              <h3 style="font-family:var(--fh); font-weight:700; font-size:1rem; color:var(--text); margin:0 0 1rem;">{{ g.title }}</h3>
+              <div style="display:flex; flex-direction:column; gap:.85rem; flex:1; justify-content:space-around;">
+                <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="2">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.35rem;">
+                      <span style="font-size:.9rem; color:var(--text-soft);">{{ r.label }}</span>
+                      <span style="font-family:var(--fh); font-weight:700; font-size:.95rem; color:var(--text); font-variant-numeric:tabular-nums;">{{ r.count }}</span>
+                    </div>
+                    <div style="height:6px; border-radius:999px; background:var(--track); overflow:hidden;">
+                      <div style="{{ r.barStyle }}"></div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.35rem 1.4rem;">
+          <h3 style="font-family:var(--fh); font-weight:700; font-size:1rem; color:var(--text); margin:0 0 1.1rem;">Age</h3>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;">
+            <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:.55rem;">
+              <div style="width:56px; height:56px; border-radius:50%; background:var(--track); display:flex; align-items:center; justify-content:center;">
+                <svg viewBox="0 0 24 24" style="width:32px; height:32px; display:block;" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3.4"></circle><path d="M8 16a4 4 0 0 1 8 0l-.7 2.8a3.3 3.3 0 0 1-6.6 0z"></path></svg>
+              </div>
+              <span style="font-size:.85rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">0–5</span>
+              <span style="font-family:var(--fh); font-weight:800; font-size:1.5rem; line-height:1; color:var(--value); font-variant-numeric:tabular-nums;">2</span>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:.55rem;">
+              <div style="width:56px; height:56px; border-radius:50%; background:var(--track); display:flex; align-items:center; justify-content:center;">
+                <svg viewBox="0 0 24 24" style="width:32px; height:32px; display:block;" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="6.5" r="2.4"></circle><path d="M12 9v5"></path><path d="M12 10.5l-3.2-1.6M12 10.5l3.2-1.6"></path><path d="M12 14l-2.6 5M12 14l2.6 5"></path></svg>
+              </div>
+              <span style="font-size:.85rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">6–18</span>
+              <span style="font-family:var(--fh); font-weight:800; font-size:1.5rem; line-height:1; color:var(--value); font-variant-numeric:tabular-nums;">1</span>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:.55rem;">
+              <div style="width:56px; height:56px; border-radius:50%; background:var(--track); display:flex; align-items:center; justify-content:center;">
+                <svg viewBox="0 0 24 24" style="width:32px; height:32px; display:block;" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.8" r="2.6"></circle><path d="M12 7.4v8.2"></path><path d="M12 9.2l-3.2 4M12 9.2l3.2 4"></path><path d="M12 15.6l-3 4.4M12 15.6l3 4.4"></path></svg>
+              </div>
+              <span style="font-size:.85rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">19–55</span>
+              <span style="font-family:var(--fh); font-weight:800; font-size:1.5rem; line-height:1; color:var(--value); font-variant-numeric:tabular-nums;">3</span>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; text-align:center; gap:.55rem;">
+              <div style="width:56px; height:56px; border-radius:50%; background:var(--track); display:flex; align-items:center; justify-content:center;">
+                <svg viewBox="0 0 24 24" style="width:32px; height:32px; display:block;" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="5" r="2.6"></circle><path d="M10.5 7.6q-1.2 4-1 8"></path><path d="M10.5 9.6l3.4 2"></path><path d="M9.5 15.6l-2.4 4.4M9.5 15.6l2.6 4.4"></path><path d="M15 11.5v8.5"></path></svg>
+              </div>
+              <span style="font-size:.85rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">56+</span>
+              <span style="font-family:var(--fh); font-weight:800; font-size:1.5rem; line-height:1; color:var(--value); font-variant-numeric:tabular-nums;">1</span>
+            </div>
+          </div>
+          </div>
+        </div>
+      </section>
+
+      <section style="margin-bottom:2.5rem;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem; margin:0 0 1.1rem;">
+          <h2 style="font-family:var(--fh); font-weight:800; font-size:1.05rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); margin:0;">Revenue</h2>
+          <span style="font-size:.82rem; color:var(--text-faint);">All figures in PKR</span>
+        </div>
+
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden;">
+          <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr; gap:1rem; padding:.9rem 1.5rem; border-bottom:1px solid var(--border);">
+            <span style="font-family:var(--fh); font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint);">Service</span>
+            <span style="font-family:var(--fh); font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Regular</span>
+            <span style="font-family:var(--fh); font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Zakat</span>
+            <span style="font-family:var(--fh); font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); text-align:right;">Total</span>
+          </div>
+
+          <sc-for list="{{ revenueRows }}" as="r" hint-placeholder-count="4">
+            <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr; gap:1rem; align-items:center; padding:.95rem 1.5rem; border-bottom:1px solid var(--border);">
+              <span style="font-size:.95rem; font-weight:600; color:var(--text);">{{ r.label }}</span>
+              <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.4rem;">
+                <span style="font-size:.98rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">{{ r.regular }}</span>
+                <span style="font-size:.8rem; color:var(--text-faint); font-variant-numeric:tabular-nums;">{{ r.regularQty }}</span>
+              </div>
+              <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.4rem;">
+                <span style="font-size:.98rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">{{ r.zakat }}</span>
+                <span style="font-size:.8rem; color:var(--text-faint); font-variant-numeric:tabular-nums;">{{ r.zakatQty }}</span>
+              </div>
+              <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.4rem;">
+                <span style="font-family:var(--fh); font-weight:700; font-size:1rem; color:var(--text); font-variant-numeric:tabular-nums;">{{ r.total }}</span>
+                <span style="font-size:.8rem; color:var(--text-faint); font-variant-numeric:tabular-nums;">{{ r.totalQty }}</span>
+              </div>
+            </div>
+          </sc-for>
+
+          <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr; gap:1rem; align-items:baseline; padding:1.15rem 1.5rem; background:var(--track);">
+            <span style="font-family:var(--fh); font-weight:800; font-size:.95rem; color:var(--text);">Total</span>
+            <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.4rem;">
+              <span style="font-family:var(--fh); font-weight:700; font-size:1.05rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">{{ totalRegular }}</span>
+              <span style="font-size:.8rem; color:var(--text-faint); font-variant-numeric:tabular-nums;">{{ totalRegularQty }}</span>
+            </div>
+            <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.4rem;">
+              <span style="font-family:var(--fh); font-weight:700; font-size:1.05rem; color:var(--text-soft); font-variant-numeric:tabular-nums;">{{ totalZakat }}</span>
+              <span style="font-size:.8rem; color:var(--text-faint); font-variant-numeric:tabular-nums;">{{ totalZakatQty }}</span>
+            </div>
+            <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:.4rem;">
+              <span style="font-family:var(--fh); font-weight:800; font-size:1.35rem; line-height:1; color:var(--value); font-variant-numeric:tabular-nums;">{{ totalAll }}</span>
+              <span style="font-size:.8rem; color:var(--text-faint); font-variant-numeric:tabular-nums;">{{ totalAllQty }}</span>
+            </div>
+          </div>
+
+          <div style="padding:1.25rem 1.5rem;">
+            <div style="display:flex; height:10px; border-radius:999px; overflow:hidden; background:var(--track);">
+              <div style="{{ splitRegularStyle }}"></div>
+              <div style="{{ splitZakatStyle }}"></div>
+            </div>
+            <div style="display:flex; gap:1.5rem; margin-top:.7rem;">
+              <span style="display:flex; align-items:center; gap:.45rem; font-size:.85rem; color:var(--text-soft);">
+                <span style="width:9px; height:9px; border-radius:2px; background:var(--value); display:block;"></span>
+                Regular {{ pctRegular }}
+              </span>
+              <span style="display:flex; align-items:center; gap:.45rem; font-size:.85rem; color:var(--text-soft);">
+                <span style="width:9px; height:9px; border-radius:2px; background:var(--text-faint); display:block;"></span>
+                Zakat {{ pctZakat }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section style="margin-bottom:2rem;">
+        <h2 style="font-family:var(--fh); font-weight:800; font-size:1.5rem; color:var(--text); margin:0 0 1rem;">Today's notes, summarised</h2>
+        <div style="display:flex; flex-direction:column; gap:1rem; max-width:68ch;">
+          <sc-for list="{{ notes }}" as="p" hint-placeholder-count="3">
+            <p style="font-size:1.02rem; line-height:1.65; color:var(--text-soft); margin:0; text-wrap:pretty;">{{ p }}</p>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:10px; padding:1rem 1.25rem;">
+        <p style="font-family:var(--fh); font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-faint); margin:0 0 .55rem;">Empty columns for {{ dateIso }}</p>
+        <div style="display:flex; flex-wrap:wrap; gap:.4rem;">
+          <sc-for list="{{ emptyColumns }}" as="c" hint-placeholder-count="4">
+            <span style="font-size:.82rem; color:var(--text-soft); background:var(--track); border-radius:6px; padding:.2rem .55rem;">{{ c }}</span>
+          </sc-for>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1040, &quot;height&quot;: 1400}}">
+class Component extends DCLogic {
+  state = { theme: "dark" };
+
+  bar(count, max, kind) {
+    const pct = max > 0 ? Math.round((count / max) * 100) : 0;
+    const color = kind === "muted" ? "var(--text-faint)" : "var(--accent)";
+    return `height:100%; width:${pct}%; min-width:${count > 0 ? 6 : 0}px; border-radius:999px; background:${color};`;
+  }
+
+  renderVals() {
+    const { theme } = this.state;
+
+    const gender = [{ label: "Female", count: 4 }, { label: "Male", count: 3 }];
+    const gMax = 4;
+    const zakat = [{ label: "Zakat", count: 6 }, { label: "Regular", count: 1 }];
+    const zMax = 6;
+    const age = [
+      { label: "0–4", count: 2 }, { label: "5–12", count: 1 },
+      { label: "18–40", count: 1 }, { label: "41–60", count: 3 },
+    ];
+    const aMax = 3;
+
+    const rows = (arr, max, mutedIdx) => arr.map((r, i) => ({
+      ...r, barStyle: this.bar(r.count, max, i === mutedIdx ? "muted" : "accent"),
+    }));
+
+    // person glyph grows with the age band (16px → 30px)
+    const ageScale = [16, 20, 26, 30];
+    const ageRows = age.map((a, i) => ({
+      ...a, iconStyle: `width:${ageScale[i]}px; height:${ageScale[i]}px; display:block;`,
+    }));
+
+    const seg = (on) => `border:none; cursor:pointer; font-family:var(--fb); font-weight:600; font-size:.82rem; padding:.35rem .9rem; border-radius:999px; transition:all .15s; background:${on ? "#086c7e" : "transparent"}; color:${on ? "#fff" : "#3e5257"};`;
+
+    const revenue = [
+      { label: "Registration", regular: 300, regularQty: 3, zakat: 400, zakatQty: 4 },
+      { label: "Consultation", regular: 1200, regularQty: 3, zakat: 2400, zakatQty: 4 },
+      { label: "Pharmacy", regular: 3400, regularQty: 2, zakat: 5800, zakatQty: 4 },
+      { label: "Laboratory", regular: 2000, regularQty: 1, zakat: 3500, zakatQty: 3 },
+      { label: "Ultrasound", regular: 1500, regularQty: 1, zakat: 1000, zakatQty: 1 },
+    ];
+    const n = (v) => v.toLocaleString("en-US");
+    const sum = (k) => revenue.reduce((a, r) => a + r[k], 0);
+    const tReg = sum("regular"), tZak = sum("zakat"), tAll = tReg + tZak;
+    const pReg = tAll ? Math.round((tReg / tAll) * 100) : 0;
+
+    return {
+      theme,
+      revenueRows: revenue.map((r) => ({
+        label: r.label,
+        regular: n(r.regular), regularQty: "(" + r.regularQty + ")",
+        zakat: n(r.zakat), zakatQty: "(" + r.zakatQty + ")",
+        total: n(r.regular + r.zakat), totalQty: "(" + (r.regularQty + r.zakatQty) + ")",
+      })),
+      totalRegular: n(tReg),
+      totalRegularQty: "(" + sum("regularQty") + ")",
+      totalZakat: n(tZak),
+      totalZakatQty: "(" + sum("zakatQty") + ")",
+      totalAll: n(tAll),
+      totalAllQty: "(" + (sum("regularQty") + sum("zakatQty")) + ")",
+      pctRegular: pReg + "%",
+      pctZakat: (100 - pReg) + "%",
+      splitRegularStyle: `width:${pReg}%; background:var(--value);`,
+      splitZakatStyle: `width:${100 - pReg}%; background:var(--text-faint);`,
+      dateLong: "20 July 2026",
+      dateIso: "2026-07-20",
+      weekday: "Monday",
+      metrics: [
+        { value: "7", label: "Patients seen" },
+        { value: "6", label: "Zakat" },
+        { value: "1", label: "Regular" },
+      ],
+      lead: "On 2026-07-20, the clinic recorded 7 total visits — 4 female and 3 male patients, of whom 6 were zakat beneficiaries and 1 was a paying patient.",
+      groups: [
+        { title: "Gender", rows: rows(gender, gMax, 1) },
+      ],
+      ageRows,
+      notes: [
+        "Patients presented with ocular, musculoskeletal, gastrointestinal, and dermatological complaints, plus trauma, weight loss, and urinary findings. Management focused on iron and multivitamin supplementation, with antacids for digestive symptoms. One patient had diabetes; another was asked to bring prior records. No investigations, treatment plans, or diet-and-drug-compliance notes were recorded.",
+      ],
+      emptyColumns: ["Diet & Drug Compliance", "Investigation", "Plan", "Provisional Diagnosis"],
+      setLight: () => this.setState({ theme: "light" }),
+      setDark: () => this.setState({ theme: "dark" }),
+      btnLight: seg(theme === "light"),
+      btnDark: seg(theme === "dark"),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -72,7 +72,10 @@ rules are architectural constraints, not preferences — never weaken them:
    to make deliberately again, not something a future plan should assume by
    analogy.
 5. **Never commit patient data or raw exports.** `.gitignore` blocks `*.xls`,
-   `*.xlsx`, `/uploads/`, `/data/`. Do not override this.
+   `*.xlsx`, `*.csv`, `/uploads/`, `/data/`. Do not override this. (`*.csv`
+   added 2026-07-25, Plan 16 D15: the clinic software can also emit
+   patient-level reports as CSV — the block list previously covered only
+   the Excel exports.)
 
 ## Stack
 

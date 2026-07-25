@@ -37,3 +37,25 @@ for provenance and so the interactive light/dark reference travels with the repo
 > only**. Real figures come from the CMS (Plan 04 impact stats) and the data
 > pipeline (Plan 08). Photos are placeholders — see the dignity & consent rule
 > in `docs/brand-guidelines.md` §5.
+
+## Clinic dashboard handoff (2026-07-25)
+
+A second, later design reference: the maintainer-supplied handoff bundle for
+**[Plan 16](../../.claude/plans/16-clinic-dashboard.md)** — the range-aggregate
+clinic dashboard, the daily report's revenue section, and the two approved
+dashboard entry points.
+
+| File | What it is |
+|---|---|
+| `clinic-dashboard-handoff.md` | The handoff spec itself — layout, tokens, copy, interaction, revenue-optional behaviour, checklist |
+| `prototypes/clinic-dashboard.dc.html` | Work item 1 — the dashboard (presets and date inputs work) |
+| `prototypes/daily-report-revenue.dc.html` | Work item 2 — daily report incl. the new Revenue section |
+| `prototypes/dashboard-entry-points.dc.html` | Work item 3 — options 1a and 1c (approved) plus 1b/1d (**not** chosen) |
+| `clinic-dashboard/*.png` | Screenshots of all of the above, dashboard top-to-bottom and both approved entry points |
+
+Same caveats as above, plus two specific to this bundle: the prototypes always
+show the revenue surfaces (they carry **invented** sample revenue), and the
+handoff's own token table lists a `--color-track` that does not exist in
+`tokens.css` — Plan 16 D4 reuses `--color-border-default` instead. The bundle's
+`fonts/` and `support.js` (included only so it rendered offline) are not
+committed, matching the existing prototypes here.
