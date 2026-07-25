@@ -1119,6 +1119,40 @@ def test_every_declared_og_card_exists_and_fits_whatsapps_limit():
         assert Image.open(path).size == (1200, 630), f"{path.name} is not 1200x630"
 
 
+def test_every_template_card_reference_resolves_to_a_real_file():
+    """No template names a card that isn't on disk.
+
+    This one guards a production-only failure mode. Under the dev/test static
+    storage a bad `{% static %}` path renders a broken URL and nothing
+    complains, but production uses a *manifest* storage, where a missing entry
+    raises at render time -- so a single typo'd card filename would sail
+    through CI and then 500 that page in production. Only two page types are
+    covered by the request-level tests above; this closes the gap for the
+    rest without rendering every page type.
+    """
+    import re
+
+    templates = [
+        *(settings.BASE_DIR / "apps" / "core" / "templates").rglob("*.html"),
+        *(settings.BASE_DIR / "templates").rglob("*.html"),
+    ]
+    cards_dir = settings.BASE_DIR / "static" / "images" / "og"
+
+    referenced = set()
+    for template in templates:
+        text = template.read_text()
+        if "social_card.html" not in text:
+            continue
+        for match in re.finditer(r'card="([^"]+)"', text):
+            referenced.add((template.name, match.group(1)))
+
+    assert referenced, "no template references a social card"
+    for template_name, card in sorted(referenced):
+        assert (cards_dir / card).exists(), (
+            f"{template_name} references {card}, which is not in static/images/og/"
+        )
+
+
 def _declared_og_cards():
     """The card slugs declared in the generator, read without importing it.
 
