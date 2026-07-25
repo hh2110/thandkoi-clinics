@@ -285,6 +285,48 @@ the rule costs nothing, and a deliberate fixture can still be added with
 than created by it, small enough to close in the same pass, and confirmed
 by the maintainer (2026-07-25) as staying in this change.
 
+**D16 — Bucketing belongs to 16.2; the `grain`/slot argument on
+`footfall_chart` belongs to 16.3 (decided 2026-07-25, while implementing
+16.2).** The task list gave 16.2 "slot count and grain selection" and 16.3
+"chart (via 16.1)", which left one thing unassigned: who actually folds
+daily rows into week/month buckets, and who teaches
+`build_footfall_chart` to lay out non-daily slots. Note first that these
+really are two jobs, not one — feeding bucket objects to the chart
+unchanged does **not** work. `build_footfall_chart` calls `slot_dates`
+itself, which walks the range day by day, so a 400-day range of week
+buckets would get ~340 day slots with bars only on Mondays. The slot
+layout has to change too.
+
+Split along the existing module boundary: **`dashboard.py` owns data,
+`footfall_chart.py` owns geometry.**
+
+- **16.2 owns the folding** (`bucket_footfall`). Summing daily rows into
+  week/month totals is range aggregation — the thing this module is named
+  for — it needs no rendering to be correct, and its boundary cases are
+  exactly what D3's tests are about (they are written and passing).
+  `FootfallBucket` is duck-typed to the four attributes `footfall_chart`
+  already reads off a row, so no adapter is ever needed.
+- **16.3 owns the argument on `footfall_chart`**, because 16.3 is the
+  first caller that renders a chart, and 16.1's own rule was that "a
+  `grain` parameter with no caller would be speculation" — which applies
+  just as much to 16.2, which renders nothing.
+
+One refinement to 16.1's docstring seam, to settle when 16.3 gets there:
+the argument should be an **explicit ordered slot list**, not a `grain`
+enum. `bucket_footfall` already returns `BucketedFootfall.slots`, so a
+`grain` enum inside `footfall_chart` would duplicate calendar policy in
+two modules. 16.3 confirms the final signature against what its template
+needs and updates 16.1's "Seam for Plan 16.2/16.3" note in the same PR.
+
+Plan 13's two rules survive at every grain, which is why `slots` and
+`buckets` are returned as separate lists rather than one zero-filled
+list: a bucket with no reporting days is **omitted** from `buckets` while
+keeping its slot, so it renders as a visible gap rather than a zero-height
+bar the tooltip and the "View as table" fallback would report as a real
+zero. Sundays keep getting no slot of their own at day grain; at week and
+month grain the question dissolves, since a Sunday that did report folds
+into its bucket like any other date and its figures are not lost.
+
 ## Open questions for the maintainer
 
 - **Q4 (Phase 2, answerable once the software update ships).** Which
@@ -371,7 +413,7 @@ One task = one PR, sequenced. Every PR: tests + lint green, `code-review-tc`
 loop clean **before** `gh pr create`, opened as draft, labelled by
 Conventional-Commit type.
 
-- [ ] **16.1 — Extract the footfall-chart geometry** (`refactor`/`chore`).
+- [x] **16.1 — Extract the footfall-chart geometry** (`refactor`/`chore`).
       Move `get_funding_mix`'s geometry into `apps/pipeline/footfall_chart.py`
       taking (rows, start, end, grain) and returning the same dict.
       `ReportIndexPage.get_funding_mix` becomes a thin caller. **No behaviour
@@ -380,12 +422,15 @@ Conventional-Commit type.
 - [ ] **16.2 — Range aggregation module** (`feat`). New
       `apps/pipeline/dashboard.py`: param parse/clamp (D10), DB-side sums,
       funding/gender/age-band rows (D5), reporting-gap dates, slot count and
-      grain selection (D3), `has_revenue` stub (D6). Unit tests including the
+      grain selection (D3), week/month bucket folding (D16), `has_revenue`
+      stub (D6). Unit tests including the
       90/91 and 400/401 boundaries, the empty range, `end < start`, the 5-year
       cap, and gap detection across a Sunday. No UI in this PR.
 - [ ] **16.3 — `ClinicDashboardPage` + template + CSS** (`feat`). Model,
       schema migration, `subpage_types` update, the get-or-create helper plus
-      the data migration that calls it (D1), template composing
+      the data migration that calls it (D1), the caller-supplied slot-list
+      argument on `footfall_chart.build_footfall_chart` plus the update to
+      16.1's seam docstring (D16), template composing
       header/presets/date form, KPI row, chart (via 16.1), funding split,
       gender, age bands, reporting gaps; `static/css/dashboard.css`; revenue
       branches present and inert. Tests: renders with 3 KPI cards and no
