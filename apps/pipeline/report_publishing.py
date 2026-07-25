@@ -23,6 +23,7 @@ from datetime import date
 from apps.core.models import HomePage
 from apps.pipeline import ai, freetext
 from apps.pipeline.models import (
+    ClinicDashboardPage,
     DailyAggregate,
     DailyReportPage,
     DeidentifiedVisit,
@@ -31,6 +32,9 @@ from apps.pipeline.models import (
 
 REPORT_INDEX_TITLE = "Reports"
 REPORT_INDEX_SLUG = "reports"
+
+CLINIC_DASHBOARD_TITLE = "Clinic dashboard"
+CLINIC_DASHBOARD_SLUG = "dashboard"
 
 
 def _get_or_create_report_index() -> ReportIndexPage:
@@ -56,6 +60,48 @@ def _get_or_create_report_index() -> ReportIndexPage:
     home.add_child(instance=index)
     index.save_revision().publish()
     return index
+
+
+def _get_or_create_clinic_dashboard() -> ClinicDashboardPage:
+    """The single ``ClinicDashboardPage``, created once under the Reports index.
+
+    The same idiom as :func:`_get_or_create_report_index` above, one level
+    down the tree, and for the same reason (Plan 16 D1): the dashboard is a
+    Wagtail page for its URL and its place in the tree, so it has to *exist*
+    in the tree — and nothing about it is editable, so requiring a
+    maintainer to click it into being in ``/admin/`` (or to SSH into
+    production and run Wagtail's Python API by hand, the usual content-ops
+    route) would gate a code deploy on a content step that has no content
+    decision in it.
+
+    Called from two places, covering both directions:
+
+    * ``0016_create_clinic_dashboard_page`` — the data migration, which is
+      what makes the page appear on an *existing* database (production) as
+      part of the deploy that ships this model.
+    * :func:`publish_daily_report` below — which is what makes it appear on
+      a *fresh* database, where migrations run before any Reports index
+      exists and the migration therefore has nothing to hang the page off.
+      The first ingest creates both, in order.
+
+    Never returns ``None``: if the Reports index is missing it creates that
+    too, the same way ``publish_daily_report`` already does. It does raise
+    if no ``HomePage`` exists, propagating
+    :func:`_get_or_create_report_index`'s own error — the migration above
+    guards against that case by not calling this at all on a database with
+    no Reports index yet.
+    """
+    dashboard = ClinicDashboardPage.objects.first()
+    if dashboard is not None:
+        return dashboard
+
+    index = _get_or_create_report_index()
+    dashboard = ClinicDashboardPage(
+        title=CLINIC_DASHBOARD_TITLE, slug=CLINIC_DASHBOARD_SLUG, live=True
+    )
+    index.add_child(instance=dashboard)
+    dashboard.save_revision().publish()
+    return dashboard
 
 
 #: Maps each :data:`apps.pipeline.freetext.FREETEXT_SUMMARY_GROUPS` key onto
@@ -200,6 +246,13 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
         )
 
     index = _get_or_create_report_index()
+    # Plan 16 D1: the clinic dashboard is a sibling of the daily reports and
+    # is likewise created live rather than by hand. Its data migration
+    # covers every database that already has a Reports index; this covers
+    # the fresh-install order, where migrations run before one exists. Both
+    # calls are get-or-create, so whichever happens first wins and the other
+    # is a single indexed lookup.
+    _get_or_create_clinic_dashboard()
     page = DailyReportPage.objects.filter(report_date=clinic_date).first()
     if page is None:
         page = DailyReportPage(

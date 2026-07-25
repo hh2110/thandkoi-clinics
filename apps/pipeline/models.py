@@ -393,7 +393,7 @@ class ReportIndexPage(Page):
 
     max_count = 1
     parent_page_types = ["core.HomePage"]
-    subpage_types = ["pipeline.DailyReportPage"]
+    subpage_types = ["pipeline.DailyReportPage", "pipeline.ClinicDashboardPage"]
 
     def get_reports(self):
         """Published daily reports under this index, newest first.
@@ -625,6 +625,164 @@ class DailyReportPage(Page):
 
     class Meta:
         verbose_name = "Daily report"
+
+
+class ClinicDashboardPage(Page):
+    """Totals across a reader-chosen date range (Plan 16, task 16.3).
+
+    A Wagtail page for its URL and its place in the tree, **not** for
+    editing (D1, maintainer 2026-07-25): the title and every string on it
+    are code-driven and fixed, so it declares no editable fields at all and
+    there is no admin-entered intro that could drift out of step with the
+    figures. It lives under ``ReportIndexPage`` for the same reason every
+    other section here does — the index-plus-child pattern — rather than as
+    a routable route or a hand-wired Django view (both rejected in D1).
+
+    Exactly one exists, created by
+    ``report_publishing._get_or_create_clinic_dashboard`` rather than by a
+    maintainer clicking it into being in ``/admin/``, so no content-ops step
+    gates the deploy.
+
+    Every figure comes from ``apps.pipeline.dashboard``, which reads
+    ``DailyAggregate`` and nothing else — de-identified counts by
+    construction. **No AI call anywhere on this page** (D12): unlike
+    ``DailyReportPage`` there is no summary sentence and no narrative, so
+    this page adds no surface at all to CLAUDE.md's privacy invariants.
+    """
+
+    #: Preset range lengths, in days, in the order the pill group shows
+    #: them. "1 year" is 365 days — a plain day count, like
+    #: ``dashboard.MAX_RANGE_DAYS``, not a calendar year. Their captions are
+    #: in :meth:`_preset_label` rather than here, so ``gettext`` runs under
+    #: the request's active language instead of at import time.
+    PRESET_DAYS = [7, 14, 30, 90, 365]
+
+    #: Reporting-gap chips shown before the overflow chip takes over (the
+    #: design's "show at most 12 and append a ``+N more`` chip"). A long
+    #: range with sparse reporting can hold hundreds of gap dates, and
+    #: listing them all would bury the page's actual figures.
+    MAX_GAP_CHIPS = 12
+
+    max_count = 1
+    parent_page_types = ["pipeline.ReportIndexPage"]
+    subpage_types: list[str] = []
+
+    def _preset_label(self, days: int) -> str:
+        """The pill's caption for a ``days``-long preset.
+
+        One literal translatable message each — the design's exact strings
+        (D8) — rather than an interpolated "%(days)d days": "1 year" is not
+        a day count, so the group needs a fixed list either way.
+        """
+        return {
+            7: _("7 days"),
+            14: _("14 days"),
+            30: _("30 days"),
+            90: _("90 days"),
+            365: _("1 year"),
+        }[days]
+
+    def get_context(self, request, *args, **kwargs):
+        # Imported here, not at module scope: `apps.pipeline.dashboard`
+        # imports `DailyAggregate`/`DeidentifiedVisit` from this module, so a
+        # top-level import either way round is circular.
+        from apps.pipeline import dashboard
+
+        context = super().get_context(request, *args, **kwargs)
+        today = timezone.localdate()
+        date_range = dashboard.parse_range(
+            request.GET.get("start"), request.GET.get("end"), today
+        )
+        stats = dashboard.compute_dashboard_stats(date_range)
+
+        # A third query over the same range, on top of the two
+        # `compute_dashboard_stats` runs: the chart needs the rows
+        # themselves to fold into buckets, and that module deliberately
+        # returns figures rather than rows. One more indexed range scan over
+        # a one-row-per-calendar-day table — the same reasoning Plan 16
+        # records for not caching or indexing any of this.
+        rows = list(
+            DailyAggregate.objects.filter(
+                clinic_date__range=(date_range.start, date_range.end)
+            )
+        )
+        bucketed = dashboard.bucket_footfall(rows, date_range, stats.grain)
+
+        context["stats"] = stats
+        context["today"] = today
+        context["has_reporting_days"] = stats.reporting_days > 0
+        context["has_revenue"] = dashboard.has_revenue(rows)
+
+        base_url = self.get_url(request)
+        context["presets"] = [
+            {
+                "label": self._preset_label(days),
+                "url": (
+                    f"{base_url}?start="
+                    f"{(today - timedelta(days=days - 1)).isoformat()}"
+                    f"&end={today.isoformat()}"
+                ),
+                # Length alone, per the design: a preset reads as selected
+                # when the current range is that many days long, wherever in
+                # the calendar it sits.
+                "selected": stats.total_days == days,
+            }
+            for days in self.PRESET_DAYS
+        ]
+
+        context["chart"] = build_footfall_chart(
+            bucketed.buckets,
+            date_range.start,
+            date_range.end,
+            slots=bucketed.slots,
+            bar_class_prefix="dash-chart",
+        )
+        # Keyed off `dashboard`'s own grain constants, not the string
+        # literals behind them — the axis label under each bar, and the same
+        # date in the "View as table" fallback, which spells the year out
+        # because it is read away from the axis. Month grain shares one
+        # format: "Jul 2026" is already unambiguous.
+        axis_format, table_format = {
+            dashboard.GRAIN_DAY: ("j M", "j M Y"),
+            dashboard.GRAIN_WEEK: ("j M", "j M Y"),
+            dashboard.GRAIN_MONTH: ("M Y", "M Y"),
+        }[stats.grain]
+        context["chart_axis_date_format"] = axis_format
+        context["chart_table_date_format"] = table_format
+        context["chart_grain_caption"] = {
+            dashboard.GRAIN_DAY: _("One bar per day the clinic reported data."),
+            dashboard.GRAIN_WEEK: _("One bar per week, starting Monday."),
+            dashboard.GRAIN_MONTH: _("One bar per month."),
+        }[stats.grain]
+
+        # `compute_dashboard_stats` returns these rows in a fixed order and
+        # deliberately carries no key on them — it is a data module, and
+        # which swatch or fill colour a row gets is this page's presentation
+        # call (its own docstring says the same about icon templates).
+        # `strict=True` so a change to that order or length fails loudly
+        # here rather than silently mislabelling a bar.
+        context["funding_rows"] = [
+            {**row, "variant": variant, "legend_label": legend}
+            for row, (variant, legend) in zip(
+                stats.funding_rows,
+                [
+                    ("zakat", _("Zakat patients")),
+                    ("regular", _("Regular patients")),
+                ],
+                strict=True,
+            )
+        ]
+        context["gender_rows"] = [
+            {**row, "variant": variant}
+            for row, variant in zip(stats.gender_rows, ["female", "male"], strict=True)
+        ]
+
+        context["gap_chips"] = stats.gap_dates[: self.MAX_GAP_CHIPS]
+        context["gap_overflow"] = max(0, len(stats.gap_dates) - self.MAX_GAP_CHIPS)
+        return context
+
+    class Meta:
+        verbose_name = "Clinic dashboard"
 
 
 class NewsletterDraftRun(models.Model):

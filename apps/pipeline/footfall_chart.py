@@ -23,16 +23,31 @@ Two rules the geometry encodes on purpose, both from Plan 13 (see
 ``slot_dates``): Sundays get no slot because the clinic is closed, and a
 Mon–Sat day with no report keeps its slot and renders as a visible gap.
 
-**Seam for Plan 16.2/16.3.** The dashboard needs the same stacked bars over
-week and month buckets for longer ranges (D3). ``slot_dates`` *is* the
-day-grain bucketing step, and ``_bar`` reads its figures off a single row;
-a later ``grain`` argument selects a different slot builder and folds each
-bucket's rows into one set of figures before ``_bar`` sees them. Neither is
-built here — 16.1 is extraction only, and a ``grain`` parameter with no
-caller would be speculation. The other thing 16.3 will need is control over
-the ``ri-funding-mix__*`` CSS class names below, which are the reports
-index's own BEM scope; that too waits until there is a second caller to
-name a prefix for.
+**The Plan 16.2/16.3 seam, now closed** (task 16.3, 2026-07-25 — this
+replaces 16.1's forward-looking note, which described a future that has
+since arrived). 16.1 left two things unbuilt because they had no caller
+yet; the clinic dashboard is that caller, so both are now real arguments
+rather than speculation:
+
+* ``slots`` — a caller-supplied ordered slot list. The dashboard plots week
+  and month buckets on longer ranges (D3), and ``slot_dates`` below only
+  knows how to walk a range *day by day*, so a week-grain range would
+  otherwise get day slots carrying bars on Mondays alone. Deliberately an
+  explicit slot list rather than a ``grain`` enum (D16): calendar policy
+  lives in ``apps.pipeline.dashboard.bucket_footfall``, which already
+  returns ``BucketedFootfall.slots``, and a ``grain`` enum here would
+  duplicate that policy across two modules. Left optional, so the reports
+  index — whose window is always day-grain — keeps calling this with the
+  same three arguments 16.1 published.
+* ``bar_class_prefix`` — the BEM block each bar segment's CSS class is
+  built from (see :data:`DEFAULT_BAR_CLASS_PREFIX`). Those class names were
+  the reports index's own scope back when it was the only caller; the
+  dashboard names its own block instead of borrowing another page's
+  stylesheet.
+
+Nothing else here is grain-aware, and nothing needs to be: :func:`_bar`
+reads four attributes off whatever it is handed, and ``bucket_footfall``
+returns objects carrying exactly those four.
 """
 
 from __future__ import annotations
@@ -57,8 +72,19 @@ SUNDAY_WEEKDAY = 6  # date.weekday() — the clinic is closed Sundays
 # pack bars closer than a label is wide.
 MIN_LABEL_SPACING = 40
 
+#: BEM block the bar segments' CSS classes are built from, when the caller
+#: names none. This is the reports index's own block, which is where these
+#: class names started: they were written when ``get_funding_mix`` was the
+#: only caller and stayed literal through 16.1's extraction. Keeping it the
+#: default is what lets that caller — and the 16.1-era three-argument
+#: contract generally — go on working unchanged. Any *new* caller should
+#: pass its own block rather than style itself out of `report-index.css`.
+DEFAULT_BAR_CLASS_PREFIX = "ri-funding-mix"
 
-def build_footfall_chart(rows, start, end) -> dict:
+
+def build_footfall_chart(
+    rows, start, end, slots=None, *, bar_class_prefix=DEFAULT_BAR_CLASS_PREFIX
+) -> dict:
     """Stacked Zakat-vs-Regular bars for ``rows``, as SVG geometry.
 
     ``rows`` is any iterable of daily aggregates; ``start`` and ``end`` are
@@ -66,6 +92,19 @@ def build_footfall_chart(rows, start, end) -> dict:
     bounds get no bar (they have no slot) but still set the y-scale, so the
     caller is responsible for passing bounds that cover the rows it wants
     drawn.
+
+    ``slots`` overrides the day-by-day slot walk with an explicit ordered
+    list of slot dates — one per bar position, empty positions included (see
+    this module's docstring and Plan 16 D16). Each row is then matched to a
+    slot by its ``clinic_date``, so a caller plotting week or month buckets
+    passes buckets whose ``clinic_date`` is the bucket's first date, which
+    is exactly what ``dashboard.bucket_footfall`` returns. ``start``/``end``
+    are not consulted in that case: supplying the slots *is* deciding the
+    layout, and the caller has already windowed its rows to build them.
+
+    ``bar_class_prefix`` names the BEM block each segment's ``css_class`` is
+    built from, so a second caller can style the chart from its own
+    page-scoped stylesheet.
 
     Returns the empty chart (``{"bars": [], "ticks": []}``) when there is
     nothing to plot — no rows, or no slots in the range at all.
@@ -85,7 +124,7 @@ def build_footfall_chart(rows, start, end) -> dict:
     if not rows_by_date:
         return {"bars": [], "ticks": []}
 
-    dates = slot_dates(rows_by_date, start, end)
+    dates = slot_dates(rows_by_date, start, end) if slots is None else list(slots)
     if not dates:
         # No slots in range at all — ``end`` before ``start``, or a range
         # that is only closed Sundays. The reports index can't produce
@@ -117,7 +156,16 @@ def build_footfall_chart(rows, start, end) -> dict:
         row = rows_by_date.get(slot_date)
         if row is None:
             continue  # Mon–Sat, no report — leave the slot empty (a gap)
-        bar = _bar(row, i, slot_width, bar_width, baseline, y_for, date_label_y)
+        bar = _bar(
+            row,
+            i,
+            slot_width,
+            bar_width,
+            baseline,
+            y_for,
+            date_label_y,
+            bar_class_prefix,
+        )
         # Gap slots let real bars pack closer together than a date label
         # is wide (see MIN_LABEL_SPACING) — thin colliding labels rather
         # than let them overlap. Every bar still gets its hit-tooltip and
@@ -165,7 +213,9 @@ def slot_dates(rows_by_date, start, end):
     return dates
 
 
-def _bar(row, index, slot_width, bar_width, baseline, y_for, date_label_y):
+def _bar(
+    row, index, slot_width, bar_width, baseline, y_for, date_label_y, class_prefix
+):
     cx = round(PAD_LEFT + slot_width * index + slot_width / 2, 2)
     x = round(cx - bar_width / 2, 2)
     zakat_top = y_for(row.zakat_beneficiary_patients)
@@ -179,14 +229,14 @@ def _bar(row, index, slot_width, bar_width, baseline, y_for, date_label_y):
         segments = [
             {
                 "path": _rounded_top_path(x, total_top, bar_width, baseline),
-                "css_class": "ri-funding-mix__bar--regular",
+                "css_class": f"{class_prefix}__bar--regular",
             }
         ]
     elif row.paying_patients == 0:
         segments = [
             {
                 "path": _rounded_top_path(x, zakat_top, bar_width, baseline),
-                "css_class": "ri-funding-mix__bar--zakat",
+                "css_class": f"{class_prefix}__bar--zakat",
             }
         ]
     else:
@@ -194,11 +244,11 @@ def _bar(row, index, slot_width, bar_width, baseline, y_for, date_label_y):
         segments = [
             {
                 "path": _square_path(x, zakat_top, bar_width, baseline),
-                "css_class": "ri-funding-mix__bar--zakat",
+                "css_class": f"{class_prefix}__bar--zakat",
             },
             {
                 "path": _rounded_top_path(x, total_top, bar_width, regular_base),
-                "css_class": "ri-funding-mix__bar--regular",
+                "css_class": f"{class_prefix}__bar--regular",
             },
         ]
 

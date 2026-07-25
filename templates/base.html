@@ -109,6 +109,13 @@
     in this base.
     {% endcomment %}
     <link rel="stylesheet" href="{% static 'css/report-index.css' %}" />
+    {% comment %}
+    Clinic dashboard (Plan 16 task 16.3) — scoped to `.dash`/`.dash-chart`,
+    reads tokens.css only. Sitewide like report-index.css/daily-report.css
+    rather than a per-page block, since no page-scoped CSS block exists yet
+    in this base.
+    {% endcomment %}
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}" />
     {% block extra_head %}{% endblock %}
   </head>
   <body class="{% block body_class %}{% endblock %}">

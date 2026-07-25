@@ -327,6 +327,49 @@ zero. Sundays keep getting no slot of their own at day grain; at week and
 month grain the question dissolves, since a Sunday that did report folds
 into its bucket like any other date and its figures are not lost.
 
+**D16 settled in 16.3 (2026-07-25).** The final signature is
+`build_footfall_chart(rows, start, end, slots=None, *, bar_class_prefix=…)`.
+Both new arguments are optional, which is what keeps Plan 13's tests
+passing untouched — the reports index still calls it with three positional
+arguments and still gets day slots and its own class names. `slots=None`
+means "walk the range day by day", exactly as before; supplying a list
+means the caller has already decided the layout, so `start`/`end` go
+unread. `bar_class_prefix` defaults to `ri-funding-mix` because that is
+where the class names came from; the dashboard passes `dash-chart`.
+16.1's forward-looking "Seam for Plan 16.2/16.3" docstring paragraph is
+replaced by one describing what actually landed.
+
+## Decisions taken while implementing 16.3 (2026-07-25)
+
+Four calls the plan left to the implementer, recorded here rather than
+buried in the diff:
+
+- **CSS prefix: a new `dash-chart` block, not a shared one.** 16.1 noted
+  that the second caller "gets to name a prefix". The dashboard names its
+  own so it styles itself from `dashboard.css` rather than reaching into
+  the reports index's `report-index.css`; a test asserts the rendered page
+  contains no `ri-funding-mix` at all.
+- **`django.contrib.humanize` added to `INSTALLED_APPS`** for `intcomma`,
+  which the handoff's KPI spec requires ("thousands separators"). The
+  alternative, Django's `USE_THOUSAND_SEPARATOR`, is a site-wide switch
+  that would reformat every other figure on the site too. A year-long
+  range really does reach five figures, so this is not cosmetic.
+- **The Apply button is filled, not outlined** — mirroring
+  `.button--primary` in `components.css`. The outlined version the design
+  implies was built first and failed the dark-theme screenshot: brand teal
+  text on the dark card ground is about 1.5:1. The recorded dark-mode trap
+  ("a token that reads correct in source can still fail to flip") caught
+  exactly this. `View as table` and the preset hover take
+  `--color-stat-value` for the same reason — the token `tokens.css` added
+  for this problem. Note this leaves the reports index's own
+  `View as table` still unreadable in dark mode; it is a pre-existing bug
+  on a live page and belongs in its own branch, not this one.
+- **The revenue branches include the table markup**, driven by a
+  `revenue_rows` context key Phase 2 supplies. A test monkeypatches
+  `has_revenue` to `True` and asserts the fourth KPI card, the table and
+  the `1.75fr/1fr` layout all appear — so the branch is verified rather
+  than dead code, and Phase 2 needs no template work as promised.
+
 ## Open questions for the maintainer
 
 - **Q4 (Phase 2, answerable once the software update ships).** Which
@@ -426,7 +469,7 @@ Conventional-Commit type.
       stub (D6). Unit tests including the
       90/91 and 400/401 boundaries, the empty range, `end < start`, the 5-year
       cap, and gap detection across a Sunday. No UI in this PR.
-- [ ] **16.3 — `ClinicDashboardPage` + template + CSS** (`feat`). Model,
+- [x] **16.3 — `ClinicDashboardPage` + template + CSS** (`feat`). Model,
       schema migration, `subpage_types` update, the get-or-create helper plus
       the data migration that calls it (D1), the caller-supplied slot-list
       argument on `footfall_chart.build_footfall_chart` plus the update to

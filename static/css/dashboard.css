@@ -1,0 +1,599 @@
+/*
+ * Clinic dashboard (Plan 16, task 16.3). Scoped to `.dash` — the range view
+ * itself — and `.dash-chart`, the footfall chart block, which is its own
+ * block because `apps.pipeline.footfall_chart` builds the bar segments' CSS
+ * class names from it (see that module's `bar_class_prefix`). The reports
+ * index keeps its own `ri-funding-mix` block in report-index.css; neither
+ * page styles the other.
+ *
+ * Reads semantic tokens only (tokens.css), so light + dark come for free —
+ * and no new colour value is introduced anywhere here (Plan 16 D4/D10). Bar
+ * tracks reuse --color-border-default, which is what `.dr__bar-track`
+ * already does and what the handoff's absent `--color-track` token would
+ * have been within three hex points of (D4).
+ *
+ * Load after components.css, same as daily-report.css / report-index.css.
+ */
+
+.dash {
+  padding-block: var(--space-6) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* --- Header ---------------------------------------------------------------- */
+.dash__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  padding-bottom: var(--space-3);
+}
+.dash__eyebrow {
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-accent);
+  margin: 0 0 var(--space-1);
+}
+.dash__title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  margin: 0;
+}
+.dash__range {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-soft);
+  margin: var(--space-1) 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Preset pills + date form (no JS — see the template's comment) --------- */
+.dash__controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+.dash__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: 999px;
+  padding: 4px;
+}
+.dash__preset {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+  text-decoration: none;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+/* --color-stat-value, not --color-brand: see `.dash__apply` below for why
+   brand teal on the dark card ground is unreadable. This is the token
+   tokens.css added for exactly that problem — teal in light, pale aqua in
+   dark. */
+.dash__preset:hover {
+  color: var(--color-stat-value);
+}
+.dash__preset--selected,
+.dash__preset--selected:hover {
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+}
+
+.dash__dates {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  flex-wrap: wrap;
+}
+.dash__date-label {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-faint);
+}
+.dash__date-input {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  padding: 0;
+}
+.dash__date-sep {
+  color: var(--color-text-faint);
+}
+/* Filled rather than outlined, mirroring `.button--primary`
+   (components.css). An outlined version reading --color-brand for its text
+   was tried first and failed the dark-theme screenshot outright: brand teal
+   (#086c7e) on the dark card ground (#0d4f5c) lands around 1.5:1 — the
+   token doesn't flip per theme, so "it reads a token" guarantees nothing
+   here. Brand-on-white is legible in both themes, and Apply is the form's
+   primary action anyway. */
+.dash__apply {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+  color: var(--color-on-brand);
+  background: var(--color-brand);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  cursor: pointer;
+}
+.dash__apply:hover {
+  background: var(--color-brand-hover);
+}
+
+/* --- KPI row --------------------------------------------------------------- */
+.dash__kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+/* Phase 2 only — the fourth card appears with `has_revenue` (Plan 16 D6). */
+.dash__kpis--with-revenue {
+  grid-template-columns: repeat(4, 1fr);
+}
+.dash__kpi {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--card-radius);
+  padding: var(--space-2) var(--space-3);
+}
+.dash__kpi-value {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  color: var(--color-stat-value);
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+.dash__kpi-label {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+.dash__kpi-sub {
+  margin: 0.25rem 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Cards, bars and legends (shared by the split + age sections) ---------- */
+.dash__card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--card-radius);
+  padding: var(--space-3);
+}
+.dash__card-title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+}
+
+.dash__bar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.35rem;
+}
+.dash__bar-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-soft);
+}
+.dash__bar-count {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.dash__bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-border-default);
+  overflow: hidden;
+}
+.dash__bar-track--age {
+  height: 8px;
+}
+.dash__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+.dash__bar-fill--brand,
+.dash__bar-fill--female {
+  background: var(--color-brand);
+}
+.dash__bar-fill--male {
+  background: var(--color-text-faint);
+}
+
+.dash__swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  display: inline-block;
+}
+.dash__swatch--zakat {
+  background: var(--color-brand);
+}
+.dash__swatch--regular {
+  background: var(--color-text-faint);
+}
+
+/* --- Split section: revenue (Phase 2) + funding split / gender ------------- */
+.dash__split {
+  display: grid;
+  grid-template-columns: 1.75fr 1fr;
+  gap: var(--space-2);
+  align-items: start;
+}
+/* Today's layout: no revenue table, so the two side cards go two-up at full
+   width rather than stacking in a narrow column (Plan 16 D6). */
+.dash__split--no-revenue {
+  grid-template-columns: 1fr;
+}
+.dash__side {
+  display: grid;
+  gap: var(--space-2);
+}
+.dash__split--no-revenue .dash__side {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.dash__stack {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--color-border-default);
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+.dash__stack-seg--zakat {
+  background: var(--color-brand);
+}
+.dash__stack-seg--regular {
+  background: var(--color-text-faint);
+}
+.dash__legend-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.dash__legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dash__legend-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-soft);
+}
+.dash__legend-count {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.dash__bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Revenue table — inert until `has_revenue` turns true (Plan 16 D6/D13).
+   Every row shares one grid, `minmax(0, …)` so a wide figure can't blow a
+   track out in one row and misalign it against the others. */
+.dash__revenue {
+  padding: 0;
+  overflow: hidden;
+}
+.dash__revenue-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+.dash__revenue-head .dash__card-title {
+  margin: 0;
+}
+.dash__revenue-note {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+}
+.dash__revenue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.9rem var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  align-items: baseline;
+}
+.dash__revenue-row > * {
+  min-width: 0;
+  text-align: right;
+}
+.dash__revenue-row > *:first-child {
+  text-align: left;
+}
+.dash__revenue-row--head {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-faint);
+}
+.dash__revenue-service {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.dash__revenue-cell {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.dash__revenue-cell--total {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.dash__revenue-qty {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  margin-left: 0.3rem;
+}
+.dash__revenue-row--total {
+  background: var(--color-border-default);
+  border-bottom: 0;
+  font-family: var(--font-heading);
+  font-weight: 800;
+}
+.dash__revenue-cell--grand {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-md);
+  color: var(--color-stat-value);
+}
+
+/* --- Age bands ------------------------------------------------------------- */
+.dash__age-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+.dash__age-count {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-md);
+  line-height: 1;
+  color: var(--color-stat-value);
+  font-variant-numeric: tabular-nums;
+}
+.dash__age-share {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Reporting gaps -------------------------------------------------------- */
+.dash__gaps {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 10px;
+  padding: var(--space-2) var(--space-3);
+}
+.dash__gaps-label {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-faint);
+  margin: 0 0 var(--space-1);
+}
+.dash__gap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.dash__chip {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+  background: var(--color-border-default);
+  border-radius: 6px;
+  padding: 0.22rem 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Footfall chart -------------------------------------------------------- */
+.dash-chart {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--card-radius);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+.dash-chart__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.dash-chart__title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-md);
+  line-height: 1.1;
+  color: var(--color-text);
+  margin: 0;
+}
+.dash-chart__legend {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+}
+.dash-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.dash-chart__swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  display: inline-block;
+}
+.dash-chart__swatch--zakat {
+  background: var(--color-brand);
+}
+.dash-chart__swatch--regular {
+  background: var(--color-text-faint);
+}
+
+.dash-chart__scroll {
+  overflow-x: auto;
+}
+.dash-chart__plot {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Same rule as `.ri-funding-mix__chart`: fill the card above this width,
+     scroll the container below it rather than shrink bars and axis text
+     past legibility. */
+  min-width: 560px;
+}
+.dash-chart__gridline {
+  stroke: var(--color-border-default);
+  stroke-width: 1;
+}
+.dash-chart__axis-text {
+  fill: var(--color-text-faint);
+  font-size: 0.625rem;
+  font-family: var(--font-body);
+}
+.dash-chart__bar--zakat {
+  fill: var(--color-brand);
+}
+.dash-chart__bar--regular {
+  fill: var(--color-text-faint);
+}
+.dash-chart__empty {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+  margin: 0 0 var(--space-2);
+}
+.dash-chart__caption {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  margin: var(--space-1) 0 0;
+  max-width: 70ch;
+}
+
+.dash-chart__table-toggle {
+  margin: var(--space-1) 0;
+}
+/* Deliberately --color-stat-value where `.ri-funding-mix__table-toggle
+   summary` uses --color-brand: the same control on the reports index is
+   near-invisible on the dark card ground (~1.5:1), a pre-existing problem
+   there that this page has no reason to reproduce. Fixing the reports index
+   too is a change to a live page and belongs in its own branch. */
+.dash-chart__table-toggle summary {
+  font-size: var(--font-size-xs);
+  color: var(--color-stat-value);
+  cursor: pointer;
+  user-select: none;
+}
+.dash-chart__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-xs);
+  margin-top: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+.dash-chart__table th,
+.dash-chart__table td {
+  text-align: right;
+  padding: 0.25rem var(--space-1);
+  border-bottom: 1px solid var(--color-border-default);
+}
+.dash-chart__table th:first-child,
+.dash-chart__table td:first-child {
+  text-align: left;
+}
+.dash-chart__table th {
+  color: var(--color-text-faint);
+  font-weight: 500;
+}
+
+/* --- Narrow screens -------------------------------------------------------- */
+@media (max-width: 60rem) {
+  .dash__split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 40rem) {
+  .dash__header {
+    flex-direction: column;
+  }
+  .dash__controls {
+    align-items: stretch;
+    width: 100%;
+  }
+  .dash__kpis,
+  .dash__kpis--with-revenue {
+    grid-template-columns: 1fr;
+  }
+  .dash__split--no-revenue .dash__side {
+    grid-template-columns: 1fr;
+  }
+  .dash__age-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
