@@ -382,26 +382,6 @@
   }
 }
 
-/* --- Language switcher ------------------------------------------------------ */
-.language-switcher {
-  display: flex;
-  gap: var(--space-1);
-  font-size: var(--font-size-xs);
-}
-
-.language-switcher a {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
-  text-decoration: none;
-  color: var(--color-text-soft);
-}
-
-.language-switcher a[aria-current="true"] {
-  background-color: var(--color-brand);
-  border-color: var(--color-brand);
-  color: var(--color-on-brand);
-}
 
 /* --- Theme toggle ------------------------------------------------------------ */
 .theme-toggle {

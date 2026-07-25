@@ -849,30 +849,30 @@ class AiCallLog(models.Model):
     without cross-referencing Anthropic's own billing console.
 
     Deliberately no FK back to ``IngestRun``/``NewsletterDraftRun``/
-    ``DailyAggregate``, unlike those audit models. None of the five call
+    ``DailyAggregate``, unlike those audit models. None of the four call
     sites in ``apps.pipeline.ai`` share a *common* triggering record to hang
     one off: ``draft_daily_summary_sentence`` has a ``DailyAggregate``,
     ``draft_monthly_newsletter_body`` runs before its caller's
-    ``NewsletterDraftRun`` row even exists, ``draft_newsletter_prose``
-    (presently unused in production — see its call site's comment) takes an
-    in-memory ``ClinicAggregate`` that isn't a persisted row at all, and
+    ``NewsletterDraftRun`` row even exists, and
     ``draft_freetext_summary``/``draft_empty_columns_flag`` (B8/B9) take a
     bare ``clinic_date`` plus a dict, not a model instance. Adding a FK to
-    only some of the five would misleadingly suggest the others have one
+    only some of the four would misleadingly suggest the others have one
     too; ``call_site`` already identifies which caller produced a row. Add a
     nullable FK later if a real cross-referencing need shows up.
+
+    A fifth choice, ``newsletter_prose``, was removed on 2026-07-25 together
+    with the dead ``draft_newsletter_prose`` that was its only writer (see
+    that change's PR). ``call_site`` is a plain ``CharField`` — ``choices``
+    is validated in forms, never by a DB constraint — so any historical row
+    still holding that value stays readable; only its human-readable label
+    is gone, and ``get_call_site_display()`` falls back to the raw string.
     """
 
-    CALL_SITE_NEWSLETTER_PROSE = "newsletter_prose"
     CALL_SITE_DAILY_SUMMARY = "daily_summary"
     CALL_SITE_MONTHLY_NEWSLETTER = "monthly_newsletter"
     CALL_SITE_FREETEXT_SUMMARY = "freetext_summary"
     CALL_SITE_EMPTY_COLUMNS_FLAG = "empty_columns_flag"
     CALL_SITE_CHOICES = [
-        (
-            CALL_SITE_NEWSLETTER_PROSE,
-            "Newsletter prose (draft_newsletter_prose — currently unused)",
-        ),
         (CALL_SITE_DAILY_SUMMARY, "Daily report summary sentence"),
         (CALL_SITE_MONTHLY_NEWSLETTER, "Monthly newsletter drafting"),
         (CALL_SITE_FREETEXT_SUMMARY, "Free-text summary (B8)"),

@@ -46,9 +46,9 @@ def header_index(header_row: tuple, column_name: str) -> int | None:
     """Find a column by (case-insensitive) header name, or return ``None``.
 
     Shared by every concrete parser so a column that shifts position between
-    export runs (a common spreadsheet reality) doesn't break parsing — mirrors
-    ``apps.pipeline.aggregation._header_index``'s same idiom (Plan 02), made
-    public here so real parsers reuse one implementation.
+    export runs (a common spreadsheet reality) doesn't break parsing. Started
+    as a private helper in the Plan 02 prototype aggregator (deleted
+    2026-07-25), made public here so real parsers reuse one implementation.
     """
     wanted = column_name.strip().lower()
     for index, cell in enumerate(header_row):
