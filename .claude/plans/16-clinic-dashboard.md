@@ -125,6 +125,13 @@ mirroring `apps/pipeline/report_publishing.py`'s
 … so the first ever ingest doesn't depend on a maintainer having clicked it
 into existence in `/admin/`"), called from a data migration so production
 needs **no manual content-ops SSH step**.
+**No editable fields (maintainer, 2026-07-25).** The page is a Wagtail page
+for its URL and its place in the tree, not for editing: title and all copy are
+code-driven and fixed, so there is no admin-editable intro to keep in sync
+with the figures. Maintainer also confirmed the same day that living under
+Reports is right (rather than a top-level destination), and that D3's grain
+thresholds are right as specified.
+
 **The real URL is `/en/reports/dashboard/`, not `/reports/dashboard/`** —
 `config/urls.py` wraps Wagtail's catch-all in `i18n_patterns(...,
 prefix_default_language=True)`, so the unprefixed path in the handoff does
@@ -169,7 +176,9 @@ means Zakat% + Regular% (and the four age-band percentages) can legitimately
 sum to less than 100 when unknowns exist. That is honest and matches
 `DailyReportPage.get_context`, which already drops the same buckets from its
 gender bars. Counts stay authoritative and are always rendered next to the
-bars.
+bars. **Confirmed by the maintainer, 2026-07-25**: leave the shortfall
+implicit rather than naming the unknown counts on the page, and keep the
+Gender card to Female/Male only.
 
 **D6 — Revenue is gated on data, not on a feature flag.** `has_revenue` is a
 helper in `apps/pipeline/dashboard.py` that returns `False` today with a
@@ -183,7 +192,9 @@ revenue surface branches on it in the template from day one. No runtime flag
 band, `NewsletterStatBandBlock`, and the editorial `ImpactStatsBlock`. The
 link tile is therefore driven by optional `link_url` / `link_label` context —
 absent for the other two, so their markup and grid are unchanged. A test
-asserts that.
+asserts that. The knock-on — the home band's three stat values render smaller
+once a fourth column joins the row — was put to the maintainer and
+**accepted** (2026-07-25).
 
 **D8 — `{% translate %}` yes, Urdu catalogue no.** `LOCALE_PATHS` is
 configured but the repo contains **zero** `.po` files, so no UI string on the
@@ -194,14 +205,17 @@ something this plan can honestly claim.
 
 **D9 — No-JS first.** Preset pills are `<a>` links to the same URL with
 computed `start`/`end`. The From/To inputs sit in a GET form with a visible
-"Apply" submit. An optional ~10-line progressive enhancement may auto-submit
-on `change`, mirroring `funding-mix-chart.js`'s documented pattern ("the
-section renders fully without this script; this only adds…"). The page must
-be fully usable with JS off.
+"Apply" submit. **No auto-submit-on-change enhancement** — the maintainer chose the
+plain Apply button (2026-07-25), so the date form needs no JavaScript at all
+and none is written for it. The page is therefore fully functional with JS
+off by construction, not by fallback. Both link wordings stay as the handoff
+has them ("Open the dashboard →" on the reports index, "See the live
+dashboard" on home) — also confirmed 2026-07-25.
 
 **D10 — Range handling.** Default: last 30 days ending today. `end` earlier
 than `start` collapses `end` to `start`. Unparseable or missing params fall
-back to the default silently (no error page). Server-side safety cap: a range
+back to the default silently (no error page) — confirmed by the maintainer
+2026-07-25: no "we didn't understand that range" message. Server-side safety cap: a range
 longer than 5 years falls back to the default. Empty range renders zeros and
 "No data" — no NaN, no crash, no empty-state exception. Aggregation is one
 `.filter(clinic_date__range=(start, end))` with `.aggregate(Sum(...))` for the
@@ -245,16 +259,19 @@ column names were confirmed on 2026-07-23, and treat the handoff's five
 services (Registration, Consultation, Pharmacy, Laboratory, Ultrasound) as a
 design placeholder until then. See Q4.
 
-**D14 — `qty` is the count of non-zero fee cells (maintainer, 2026-07-25),
-which is "visits charged for this service", not "services delivered".** Per
-service, `amount` = sum of that fee column over the date's rows and `qty` =
-the number of rows where it is non-zero. The handoff defines `qty` as "the
-number of that service delivered … a patient can have several", but one
-visit's Medicine cell holds one summed amount however many items it covers,
-so the derived number cannot distinguish three lab tests from one. The
-figure is exact and useful — it just means something slightly different from
-the handoff's wording, and the bracketed number's label must match what it
-actually counts (Q5).
+**D14 — `qty` is the count of non-zero fee cells, i.e. service lines
+delivered (maintainer, 2026-07-25).** Per service, `amount` = sum of that fee
+column over the date's rows and `qty` = the number of rows where it is
+non-zero. That is the number of times the service was delivered, and it
+matches the handoff's definition — "the number of that service delivered (not
+the number of patients) — a patient can have several", where "several" means
+several *services*, one per fee column. So the display label stays
+**"quantity"**.
+
+The one thing the column format cannot express is **several units of the same
+service in one visit**: two separate lab tests both land in that visit's
+single Lab Fee cell as one summed amount, and count once. Worth re-checking
+against the updated export when it lands (Q5), but not a reason to relabel.
 
 **D15 — `*.csv` added to `.gitignore` in this PR.** Invariant #5's block list
 covers `*.xls`, `*.xlsx`, `/uploads/` and `/data/` — every raw-export format
@@ -274,15 +291,17 @@ than created by it, and small enough to close in the same pass.
   Ultrasound); the display order and labels follow from whatever the export
   really carries. No action needed now — the first export with fee columns
   answers it.
-- **Q5 (Phase 2, cosmetic).** Given D14, should the bracketed number keep the
-  label "quantity" (`PKR · quantity in brackets`), or be relabelled to
-  something truthful like "visits charged"?
+- **Q5 (Phase 2, minor).** Settled for now — the label stays "quantity"
+  (D14). The only thing to re-check when the updated export lands: whether a
+  single visit can ever be charged twice for the same service. If it can't,
+  `qty` is exactly "services delivered" with no caveat at all.
 - **Q2 (default assumed).** Should the dashboard appear in the primary nav?
   **Assumed no** — reachable from the reports index (1a) and home (1c), as
   the handoff's entry-point work item implies. Easy to flip later.
-- **Q3 (default assumed).** Public or staff-only? **Assumed public**, same as
-  the daily reports it aggregates — its audience in the handoff is "donor,
-  trustee, staff" and it exposes nothing the daily pages don't.
+- **Q3 — answered 2026-07-25: public.** Same as the daily reports it
+  aggregates. Put to the maintainer explicitly with the consequence spelled
+  out — the day the revenue columns land, the site shows clinic income by
+  service to any visitor — and confirmed.
 
 ## Precedent map (Stage 7)
 
