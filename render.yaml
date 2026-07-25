@@ -76,6 +76,14 @@ services:
       # only enables error reporting once set. See docs/deploying.md → Secrets.
       - key: SENTRY_DSN
         sync: false
+      # Sentry trace sample rate (Plan 17 Track A) — optional and not a secret.
+      # Blank means the code default (1.0), which the free plan's 5M-span
+      # budget absorbs many times over at this site's traffic. Set to 0 here to
+      # switch performance tracing off with no deploy and no code change; an
+      # unparseable value is ignored in favour of the default rather than
+      # failing boot. See docs/deploying.md → Secrets.
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        sync: false
       # Umami Cloud website ID (Plan 12 Track B) — not a secret, just optional:
       # blank until the maintainer registers a site, and base.html renders no
       # analytics script at all until it's set. See docs/deploying.md.
