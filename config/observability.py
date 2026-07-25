@@ -59,19 +59,35 @@ def before_send_transaction(event, hint):
 
 
 def before_send_log(record, hint):
-    """Pass structured log records through unchanged, for now.
+    """Filter structured log records on their way to Sentry.
 
-    Registered so that turning log forwarding on (Plan 17 Track B) has a
-    single, named place to scrub from if a future log call ever carries
-    something it shouldn't — rather than that scrub having to be retrofitted
-    under pressure, which is how Plan 15 Track A1 went.
+    **Drops 404s.** Django logs every 4xx response at ``WARNING`` through the
+    ``django.request`` logger (``django/utils/log.py``, ``log_response``), so
+    forwarding ``WARNING`` and above sends one Sentry log record per 404 — and
+    on a public site the overwhelming majority of those are bots probing for
+    ``/wp-login.php``, ``/.env`` and friends. Measured while building this:
+    four bot requests produced four ``django.request`` warning records.
 
-    Nothing is stripped today because the forwarded set is deliberately narrow
-    (``WARNING`` and above only) and its members were audited in Plan 17
-    Decision 5: log records carry the formatted message, never frame-locals,
-    and the one message that touches the export path is structural-only by the
-    ``ExportParseError`` contract.
+    Left unfiltered, that noise would bury the signal this whole track exists
+    to surface — the AI-drafting failures that Plan 12 found "degrade silently
+    forever" — in the very dashboard panel meant to show them. Other 4xx codes
+    are kept: a 400 means something is misconfigured (``DisallowedHost``) and a
+    403 is worth seeing, and neither arrives in bot-scan volumes.
+
+    This is also the single named place to scrub from if a future log call ever
+    carries something it shouldn't, rather than that scrub being retrofitted
+    under pressure (which is how Plan 15 Track A1 went). Nothing is scrubbed
+    today: the forwarded set is narrow by construction and was audited in
+    Plan 17 Decision 5 — log records carry the formatted message, never
+    frame-locals, and the one message touching the export path is
+    structural-only by the ``ExportParseError`` contract.
     """
+    attributes = record.get("attributes") or {}
+    if (
+        attributes.get("logger.name") == "django.request"
+        and attributes.get("status_code") == 404
+    ):
+        return None
     return record
 
 

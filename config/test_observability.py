@@ -74,19 +74,76 @@ def test_scrub_passes_through_events_without_a_request_body(hook, event):
     assert hook(event, {}) is not None
 
 
-def test_before_send_log_passes_records_through():
-    """Log forwarding is deliberately a pass-through today (Plan 17 Decision 5).
-
-    The hook is registered anyway so a future scrub has one named home rather
-    than needing to be retrofitted under pressure. This test pins the current
-    contract so changing it is a deliberate edit, not an accident.
-    """
+def test_application_warnings_are_forwarded():
+    """The signal this whole track exists to surface must survive the filter."""
     record = {
         "body": "Export upload failed to parse: missing column",
-        "severity": "warning",
+        "severity_text": "warn",
+        "attributes": {"logger.name": "apps.pipeline.admin_views"},
     }
 
     assert observability.before_send_log(record, {}) == record
+
+
+def test_bot_scan_404s_are_dropped():
+    """404s are dropped or they drown the warnings panel (Plan 17).
+
+    Django logs every 4xx at WARNING via ``django.request``, and on a public
+    site almost all 404s are bots probing for ``/wp-login.php`` and friends.
+    Measured against the real WSGI app while building this: four bot requests
+    produced four such records. Forwarding them would bury the AI-drafting
+    failures the dashboard is meant to show, in the panel meant to show them.
+    """
+    record = {
+        "body": "Not Found: /wp-login.php",
+        "severity_text": "warn",
+        "attributes": {"logger.name": "django.request", "status_code": 404},
+    }
+
+    assert observability.before_send_log(record, {}) is None
+
+
+@pytest.mark.parametrize("status_code", [400, 403, 500])
+def test_other_django_request_statuses_are_kept(status_code):
+    """Only 404 is noise. A 400 means something is misconfigured (DisallowedHost),
+    a 403 is worth seeing, and neither arrives in bot-scan volumes."""
+    record = {
+        "body": f"Something: {status_code}",
+        "severity_text": "warn",
+        "attributes": {"logger.name": "django.request", "status_code": status_code},
+    }
+
+    assert observability.before_send_log(record, {}) == record
+
+
+def test_a_404_from_another_logger_is_not_dropped():
+    """The filter is scoped to Django's request logger, not to the number 404.
+
+    An application warning that happens to carry a ``status_code`` of 404 —
+    say a failed outbound fetch — is real signal and must not be swallowed by
+    a filter aimed at Django's own request log.
+    """
+    record = {
+        "body": "Upstream returned 404",
+        "severity_text": "warn",
+        "attributes": {"logger.name": "apps.pipeline.ai", "status_code": 404},
+    }
+
+    assert observability.before_send_log(record, {}) == record
+
+
+@pytest.mark.parametrize(
+    "record",
+    [{}, {"attributes": None}, {"attributes": {}}],
+    ids=["no_attributes", "null_attributes", "empty_attributes"],
+)
+def test_before_send_log_tolerates_records_without_attributes(record):
+    """A record with no attributes must pass through, not raise.
+
+    Raising here would drop the log silently inside the SDK — turning a filter
+    bug into invisible loss of the signal.
+    """
+    assert observability.before_send_log(record, {}) is record
 
 
 # --- Trace sampling ----------------------------------------------------------
