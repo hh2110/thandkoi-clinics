@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% load i18n humanize %}
+{% comment %}
+Clinic dashboard — totals across a reader-chosen range (Plan 16, task 16.3).
+
+Every figure comes from `stats`, an apps.pipeline.dashboard.DashboardStats
+built live in ClinicDashboardPage.get_context from DailyAggregate rows —
+never from a stored field on this page, which has none (D1). No AI-written
+prose anywhere on this page (D12).
+
+No JavaScript, by construction rather than as a fallback (D9): the presets
+are plain <a> links carrying the range in the query string, and the From/To
+form is a GET form with a visible Apply submit. Nothing here auto-submits,
+so nothing here needs a script. The chart is server-rendered SVG for the
+same reason (D2) — see apps.pipeline.footfall_chart, whose geometry this
+shares with the reports index, styled through its own `dash-chart` block
+rather than that page's `ri-funding-mix` one.
+
+`pct` deliberately means two things, following DashboardStats' docstring:
+share of total_visits in funding_rows/age_bands, but share of the larger of
+Female/Male in gender_rows — which is why the Gender card renders no "%"
+text at all, only bars scaled to each other. Zakat% + Regular% can sum to
+under 100 when a range holds unknown-payment visits; that shortfall is left
+implicit and the counts beside every bar stay authoritative (D5).
+
+Revenue surfaces (the 4th KPI card, the "Revenue by service" table and the
+side-column layout switch) are written against `has_revenue` and are inert
+today — `dashboard.has_revenue` returns False until the clinic software
+ships fee columns (D6/D13), so Phase 2 lights them up with no template work.
+
+All colour is from semantic tokens (tokens.css); component styles live in
+static/css/dashboard.css. `dash` is the page-scoped root class.
+{% endcomment %}
+
+{% block content %}
+  <div class="dash wrapper">
+
+    <header class="dash__header">
+      <div class="dash__header-titles">
+        <p class="dash__eyebrow">{% translate "Thandkoi Clinics" %}</p>
+        <h1 class="dash__title">{% translate "Clinic dashboard" %}</h1>
+        <p class="dash__range">
+          {{ stats.start|date:"j M Y" }} – {{ stats.end|date:"j M Y" }}
+          ·
+          {% blocktranslate count days=stats.total_days %}{{ days }} day{% plural %}{{ days }} days{% endblocktranslate %}
+          ·
+          {% blocktranslate count days=stats.reporting_days %}{{ days }} reporting day{% plural %}{{ days }} reporting days{% endblocktranslate %}
+        </p>
+      </div>
+
+      <div class="dash__controls">
+        <nav class="dash__presets" aria-label="{% translate 'Preset ranges' %}">
+          {% for preset in presets %}
+            <a class="dash__preset{% if preset.selected %} dash__preset--selected{% endif %}"
+               href="{{ preset.url }}"
+               {% if preset.selected %}aria-current="true"{% endif %}>{{ preset.label }}</a>
+          {% endfor %}
+        </nav>
+        <form class="dash__dates" method="get" action="{{ page.url }}">
+          <div class="dash__date-field">
+            <label class="dash__date-label" for="dash-start">{% translate "From" %}</label>
+            <input class="dash__date-input" type="date" id="dash-start" name="start"
+                   value="{{ stats.start|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" />
+          </div>
+          <span class="dash__date-sep" aria-hidden="true">–</span>
+          <div class="dash__date-field">
+            <label class="dash__date-label" for="dash-end">{% translate "To" %}</label>
+            <input class="dash__date-input" type="date" id="dash-end" name="end"
+                   value="{{ stats.end|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" />
+          </div>
+          <button class="dash__apply" type="submit">{% translate "Apply" %}</button>
+        </form>
+      </div>
+    </header>
+
+    {% comment %}
+    Three cards today, four once revenue exists (D6). funding_rows is always
+    [Zakat, Regular] in that order — get_context builds it with a strict zip
+    against that pair, so the two indexed lookups below cannot silently
+    swap.
+    {% endcomment %}
+    <section class="dash__kpis{% if has_revenue %} dash__kpis--with-revenue{% endif %}"
+             data-role="kpis">
+      <div class="dash__kpi">
+        <p class="dash__kpi-value">{{ stats.total_visits|intcomma }}</p>
+        <p class="dash__kpi-label">{% translate "Patients seen" %}</p>
+        <p class="dash__kpi-sub">
+          {% if has_reporting_days %}
+            {% with rate=stats.visits_per_reporting_day|floatformat:1 %}
+              {% blocktranslate %}{{ rate }} per reporting day{% endblocktranslate %}
+            {% endwith %}
+          {% else %}
+            {% translate "No data" %}
+          {% endif %}
+        </p>
+      </div>
+      <div class="dash__kpi">
+        <p class="dash__kpi-value">{{ stats.zakat_beneficiary_patients|intcomma }}</p>
+        <p class="dash__kpi-label">{% translate "Zakat visits" %}</p>
+        <p class="dash__kpi-sub">
+          {% blocktranslate with pct=funding_rows.0.pct %}{{ pct }}% of all visits{% endblocktranslate %}
+        </p>
+      </div>
+      <div class="dash__kpi">
+        <p class="dash__kpi-value">{{ stats.paying_patients|intcomma }}</p>
+        <p class="dash__kpi-label">{% translate "Regular visits" %}</p>
+        <p class="dash__kpi-sub">
+          {% blocktranslate with pct=funding_rows.1.pct %}{{ pct }}% of all visits{% endblocktranslate %}
+        </p>
+      </div>
+      {% if has_revenue %}
+        <div class="dash__kpi" data-role="kpi-revenue">
+          <p class="dash__kpi-value">{{ revenue_total_amount|intcomma }}</p>
+          <p class="dash__kpi-label">{% translate "Total revenue (PKR)" %}</p>
+          <p class="dash__kpi-sub">
+            {% if stats.total_visits %}
+              {% blocktranslate with amount=revenue_per_patient|intcomma %}{{ amount }} per patient{% endblocktranslate %}
+            {% else %}
+              {% translate "No data" %}
+            {% endif %}
+          </p>
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="dash-chart" data-role="footfall">
+      <div class="dash-chart__head">
+        <h2 class="dash-chart__title">{% translate "Patient footfall" %}</h2>
+        <div class="dash-chart__legend">
+          <span class="dash-chart__legend-item">
+            <span class="dash-chart__swatch dash-chart__swatch--zakat"></span>{% translate "Zakat" %}
+          </span>
+          <span class="dash-chart__legend-item">
+            <span class="dash-chart__swatch dash-chart__swatch--regular"></span>{% translate "Regular" %}
+          </span>
+        </div>
+      </div>
+
+      {% if chart.bars %}
+        <div class="dash-chart__scroll">
+          <svg class="dash-chart__plot"
+               viewBox="0 0 {{ chart.chart_width }} {{ chart.chart_height }}"
+               preserveAspectRatio="xMidYMid meet"
+               role="img"
+               aria-label="{% blocktranslate with start=stats.start|date:'j M Y' end=stats.end|date:'j M Y' %}Patient footfall from {{ start }} to {{ end }} — see the table below for exact figures.{% endblocktranslate %}">
+            {% for tick in chart.ticks %}
+              <line class="dash-chart__gridline"
+                    x1="{{ chart.grid_x1 }}" x2="{{ chart.grid_x2 }}"
+                    y1="{{ tick.y }}" y2="{{ tick.y }}" />
+              <text class="dash-chart__axis-text" x="{{ chart.axis_label_x }}" y="{{ tick.label_y }}"
+                    text-anchor="end">{{ tick.value }}</text>
+            {% endfor %}
+            {% for bar in chart.bars %}
+              {% for segment in bar.segments %}
+                <path class="{{ segment.css_class }}" d="{{ segment.path }}"></path>
+              {% endfor %}
+              {% if bar.show_label %}
+                <text class="dash-chart__axis-text" x="{{ bar.label_x }}" y="{{ bar.label_y }}"
+                      text-anchor="middle">{{ bar.date|date:chart_axis_date_format }}</text>
+              {% endif %}
+            {% endfor %}
+          </svg>
+        </div>
+        <details class="dash-chart__table-toggle">
+          <summary>{% translate "View as table" %}</summary>
+          <table class="dash-chart__table">
+            <thead>
+              <tr>
+                <th>{% translate "Date" %}</th>
+                <th>{% translate "Zakat" %}</th>
+                <th>{% translate "Regular" %}</th>
+                <th>{% translate "Total" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for bar in chart.bars %}
+                <tr>
+                  <td>{{ bar.date|date:chart_table_date_format }}</td>
+                  <td>{{ bar.zakat|intcomma }}</td>
+                  <td>{{ bar.regular|intcomma }}</td>
+                  <td>{{ bar.total|intcomma }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
+      {% else %}
+        <p class="dash-chart__empty">{% translate "No data" %}</p>
+      {% endif %}
+
+      <p class="dash-chart__caption">
+        {{ chart_grain_caption }}
+        {% translate "Sundays are omitted — the clinic is closed. A gap marks a Monday–Saturday day with nothing reported, including holidays." %}
+      </p>
+    </section>
+
+    {% comment %}
+    Revenue table left / Funding split + Gender stacked right once revenue
+    exists; without it the two side cards go two-up at full width and no
+    empty table is rendered at all (D6, the handoff's revenue-optional
+    table). `revenue_rows`/`revenue_totals` are Phase 2's context keys —
+    unset today, which is why this whole branch is unreachable for now.
+    {% endcomment %}
+    <section class="dash__split{% if not has_revenue %} dash__split--no-revenue{% endif %}"
+             data-role="split">
+
+      {% if has_revenue %}
+        <div class="dash__card dash__revenue" data-role="revenue">
+          <div class="dash__revenue-head">
+            <h2 class="dash__card-title">{% translate "Revenue by service" %}</h2>
+            <p class="dash__revenue-note">{% translate "PKR · quantity in brackets" %}</p>
+          </div>
+          <div class="dash__revenue-row dash__revenue-row--head">
+            <span>{% translate "Service" %}</span>
+            <span>{% translate "Regular" %}</span>
+            <span>{% translate "Zakat" %}</span>
+            <span>{% translate "Total" %}</span>
+          </div>
+          {% for row in revenue_rows %}
+            <div class="dash__revenue-row">
+              <span class="dash__revenue-service">{{ row.label }}</span>
+              <span class="dash__revenue-cell">{{ row.regular_amount|intcomma }}<span class="dash__revenue-qty">({{ row.regular_qty|intcomma }})</span></span>
+              <span class="dash__revenue-cell">{{ row.zakat_amount|intcomma }}<span class="dash__revenue-qty">({{ row.zakat_qty|intcomma }})</span></span>
+              <span class="dash__revenue-cell dash__revenue-cell--total">{{ row.total_amount|intcomma }}<span class="dash__revenue-qty">({{ row.total_qty|intcomma }})</span></span>
+            </div>
+          {% endfor %}
+          <div class="dash__revenue-row dash__revenue-row--total">
+            <span>{% translate "Total" %}</span>
+            <span class="dash__revenue-cell">{{ revenue_totals.regular_amount|intcomma }}</span>
+            <span class="dash__revenue-cell">{{ revenue_totals.zakat_amount|intcomma }}</span>
+            <span class="dash__revenue-cell dash__revenue-cell--grand">{{ revenue_totals.total_amount|intcomma }}</span>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="dash__side">
+        <div class="dash__card" data-role="funding-split">
+          <h2 class="dash__card-title">{% translate "Funding split" %}</h2>
+          <div class="dash__stack">
+            {% for row in funding_rows %}
+              <span class="dash__stack-seg dash__stack-seg--{{ row.variant }}"
+                    style="width: {{ row.pct }}%;"></span>
+            {% endfor %}
+          </div>
+          <div class="dash__legend-rows">
+            {% for row in funding_rows %}
+              <div class="dash__legend-row">
+                <span class="dash__legend-name">
+                  <span class="dash__swatch dash__swatch--{{ row.variant }}"></span>{{ row.legend_label }}
+                </span>
+                <span class="dash__legend-count">{{ row.count|intcomma }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% comment %}
+        No "%" text here on purpose: gender_rows' `pct` is the share of the
+        larger of Female/Male (mirroring DailyReportPage), so it scales the
+        bars against each other and would be wrong read as "% of visits".
+        {% endcomment %}
+        <div class="dash__card" data-role="gender">
+          <h2 class="dash__card-title">{% translate "Gender" %}</h2>
+          <div class="dash__bars">
+            {% for row in gender_rows %}
+              <div class="dash__bar-row">
+                <div class="dash__bar-head">
+                  <span class="dash__bar-label">{{ row.label }}</span>
+                  <span class="dash__bar-count">{{ row.count|intcomma }}</span>
+                </div>
+                <div class="dash__bar-track">
+                  <div class="dash__bar-fill dash__bar-fill--{{ row.variant }}"
+                       style="width: {{ row.pct }}%;"></div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="dash__card dash__ages" data-role="age-bands">
+      <h2 class="dash__card-title">{% translate "Age bands" %}</h2>
+      <div class="dash__age-grid">
+        {% for band in stats.age_bands %}
+          <div class="dash__age-item">
+            <div class="dash__bar-head">
+              <span class="dash__bar-label">{{ band.label }}</span>
+              <span class="dash__age-count">{{ band.count|intcomma }}</span>
+            </div>
+            <div class="dash__bar-track dash__bar-track--age">
+              <div class="dash__bar-fill dash__bar-fill--brand" style="width: {{ band.bar_pct }}%;"></div>
+            </div>
+            <p class="dash__age-share">
+              {% blocktranslate with pct=band.pct %}{{ pct }}% of visits{% endblocktranslate %}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="dash__gaps" data-role="reporting-gaps">
+      <p class="dash__gaps-label">{% translate "Reporting gaps in this range" %}</p>
+      <div class="dash__gap-chips">
+        {% for gap in gap_chips %}
+          <span class="dash__chip">{{ gap|date:"j M" }}</span>
+        {% empty %}
+          <span class="dash__chip">{% translate "None — every open day reported" %}</span>
+        {% endfor %}
+        {% if gap_overflow %}
+          <span class="dash__chip dash__chip--more">
+            {% blocktranslate with n=gap_overflow %}+{{ n }} more{% endblocktranslate %}
+          </span>
+        {% endif %}
+      </div>
+    </section>
+
+  </div>
+{% endblock %}

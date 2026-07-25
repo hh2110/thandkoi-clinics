@@ -65,6 +65,11 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Plan 16 task 16.3: `intcomma`, for the clinic dashboard's thousands
+    # separators. Enabled rather than hand-rolled because `USE_THOUSAND_SEPARATOR`
+    # is a site-wide switch that would also re-format every year, ID and
+    # figure elsewhere on the site — this stays opt-in, one filter at a time.
+    "django.contrib.humanize",
 ]
 
 MIDDLEWARE = [
