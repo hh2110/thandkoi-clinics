@@ -471,7 +471,19 @@
   margin-block-start: var(--space-8);
 }
 
-.site-footer a {
+/* Paired selector, not a bare class. `:root[data-theme="light"] a` in base.css
+   is (0,2,1) and outranks a plain `.site-footer a` (0,1,1), so it used to win
+   here and paint footer links `--color-teal-deep` — which IS `--color-footer-bg`
+   in the light theme, i.e. #0a3e48 text on #0a3e48 ground, a 1:1 contrast ratio.
+   Every footer link was literally invisible in light mode; it went unnoticed
+   only because production has no footer links to lose — the Contact & Bank
+   Details setting has neither an email (the mailto:) nor any social links
+   entered, so both blocks render their "coming soon" <p> placeholder text
+   instead of an <a>. Repeating the themed shape at (0,2,2) wins
+   outright, in both themes. Same trick as `.feature-split__link--accent`
+   (layout.css) and report-index.css. Found 2026-07-25. */
+.site-footer a,
+:root[data-theme] .site-footer a {
   color: var(--color-pale-aqua);
 }
 
@@ -482,9 +494,13 @@
   grid-template-columns: 1fr;
 }
 
+/* Two columns, not three: the "Zakat & Sadaqa" bank column was removed on
+   2026-07-25 (see templates/partials/footer.html). On /contact/ the Contact
+   column is suppressed too, leaving a single column in this grid — that is
+   expected, it simply sits in the first track. */
 @media (min-width: 48rem) {
   .site-footer__grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

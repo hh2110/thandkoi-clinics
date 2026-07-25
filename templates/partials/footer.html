@@ -1,10 +1,18 @@
 {% load i18n %}
 {% comment %}
 Dark section (Teal Deep ground, in both themes — brand-guidelines.md's
-"Footer / deepest ground"). Contact/bank/social blocks read the site-wide
+"Footer / deepest ground"). Contact/social blocks read the site-wide
 Contact & Bank Details setting (settings.core.ContactBankSettings, Plan 04),
 never hardcoded values — editing that singleton in /admin/ updates the footer
 with no redeploy.
+
+The footer deliberately carries NO "Zakat & Sadaqa" bank column (removed
+2026-07-25, maintainer's ask). Every page already has a prominent Donate
+call to action, and the bank details render in full — account title, bank,
+IBAN, account number, branch — on both the Donate page
+(apps/core/templates/core/donate_page.html) and the Contact page
+(apps/core/templates/core/contact_page.html). The footer only ever repeated
+two of those five fields, so the column was duplication, not reach.
 
 500.html is rendered by Django's error handler with NO context (not even
 `request`), so the `settings` context processor doesn't run there and
@@ -31,15 +39,6 @@ is suppressed there to avoid showing it twice in a row on one page (feedback,
       {% endif %}
     </div>
     {% endif %}
-    <div>
-      <h2 class="site-footer__heading">{% translate "Zakat & Sadaqa" %}</h2>
-      {% if contact.bank_account_title or contact.bank_iban %}
-        {% if contact.bank_account_title %}<p>{{ contact.bank_account_title }}</p>{% endif %}
-        {% if contact.bank_iban %}<p>{% translate "IBAN" %}: {{ contact.bank_iban }}</p>{% endif %}
-      {% else %}
-        <p>{% translate "Bank details coming soon." %}</p>
-      {% endif %}
-    </div>
     <div>
       <h2 class="site-footer__heading">{% translate "Follow" %}</h2>
       {% if contact.social_links.all %}

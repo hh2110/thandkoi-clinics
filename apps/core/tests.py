@@ -395,6 +395,21 @@ def test_layout_css_uses_tokens_only_no_hardcoded_colours():
     assert "var(--color-" in css_no_comments
 
 
+def test_footer_link_colour_survives_the_themed_anchor_override():
+    """Footer links must be styled with a *paired* selector, not a bare class.
+
+    base.css sets `:root[data-theme="light"] a { color: var(--color-teal-deep) }`
+    at specificity (0,2,1), which outranks a plain `.site-footer a` (0,1,1). In
+    the light theme `--color-teal-deep` is also `--color-footer-bg`, so a bare
+    class lost the cascade and painted every footer link the exact colour of the
+    ground it sits on — a 1:1 contrast ratio, invisible (found 2026-07-25).
+    Repeating the themed shape restores (0,2,2) and wins in both themes.
+    """
+    css = (settings.BASE_DIR / "static" / "css" / "components.css").read_text()
+    css_no_comments = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    assert ":root[data-theme] .site-footer a" in css_no_comments
+
+
 # --- Plan 04: core content pages ---------------------------------------------
 
 
@@ -864,7 +879,36 @@ def test_footer_shows_placeholder_when_setting_empty(client, home_page):
     """With the setting unset, the footer shows its coming-soon placeholders."""
     content = client.get("/en/").content.decode()
     assert "Contact details coming soon." in content
-    assert "Bank details coming soon." in content
+    assert "Social links coming soon." in content
+
+
+def test_footer_no_longer_carries_the_zakat_sadaqa_bank_column(client, home_page):
+    """The footer's "Zakat & Sadaqa" bank column is gone (2026-07-25).
+
+    Every page already carries a prominent Donate call to action, and the bank
+    details render in full on the Donate and Contact pages, so repeating a
+    two-field subset of them in the site-wide footer was duplication. The
+    Donate page assertion below is the positive control: this test must fail if
+    the details stop rendering anywhere, not just if the footer keeps them.
+    """
+    DonatePageFactory(parent=home_page, slug="donate")
+    site = Site.objects.get(is_default_site=True)
+    contact = ContactBankSettings.for_site(site)
+    contact.bank_account_title = "The Thandkoi Clinics"
+    contact.bank_iban = "PK00EXMP0000000000000000"
+    contact.save()
+
+    # The footer renders on every page, so any page proves the column is gone.
+    home = client.get("/en/").content.decode()
+    assert "PK00EXMP0000000000000000" not in home
+    assert "Bank details coming soon." not in home
+    # Scoped to the footer's own heading markup: the bare words "Zakat &
+    # Sadaqa" also appear in the home hero's body copy, where they belong.
+    assert '<h2 class="site-footer__heading">Zakat &amp; Sadaqa</h2>' not in home
+
+    # ...but the details themselves are still reachable, on the Donate page.
+    donate = client.get("/en/donate/").content.decode()
+    assert "PK00EXMP0000000000000000" in donate
 
 
 def test_footer_contact_column_hidden_only_on_the_contact_page(client, home_page):
