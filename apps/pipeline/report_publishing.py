@@ -69,6 +69,40 @@ _FREETEXT_SUMMARY_GROUP_FIELDS = {
 }
 
 
+def _resolve_group_summary(
+    group: str,
+    *,
+    freetext_groups: dict[str, dict[str, list[str]]],
+    group_visit_counts: dict[str, int],
+    new_by_group: dict[str, str],
+) -> str | None:
+    """Decide one group's summary field value: a string to write, or ``None``.
+
+    Returns:
+
+    * ``""`` — *positively* blank this field, deterministically, regardless of
+      what the model returned. This is the case when the group is below the
+      Plan 15 Track C3 visit floor (:data:`freetext.MIN_GROUP_VISITS_TO_SUMMARISE`)
+      or collected no free-text entries at all today. A correction that
+      removes a group's visits (or all its free text) must clear the stale
+      PHI-derived prose that a prior upload published (Track B2), rather than
+      leave it stranded next to a now-zero count.
+    * the fresh model value — when the group is eligible (at/above the floor
+      *and* has entries) and the model returned a usable summary for it.
+    * ``None`` — *preserve* whatever the field already holds. Reserved
+      strictly for the genuine-call-failure case: an eligible group whose
+      model call failed, timed out, or returned nothing usable for this key
+      alone. Preserving here keeps a transient failure on a corrective
+      re-upload from silently blanking an already-public summary (Track B1/B2's
+      preserve-on-falsy rule, now applied only where it belongs). A brand-new
+      page has nothing to preserve, so its caller coerces ``None`` to ``""``.
+    """
+    below_floor = group_visit_counts[group] < freetext.MIN_GROUP_VISITS_TO_SUMMARISE
+    if below_floor or not freetext.group_has_freetext_entries(freetext_groups[group]):
+        return ""
+    return new_by_group.get(group) or None
+
+
 def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
     """Create/update and auto-publish the daily report page for ``clinic_date``.
 
@@ -111,6 +145,22 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
 
     visits = list(DeidentifiedVisit.objects.filter(visit_date=clinic_date))
     freetext_groups = freetext.collect_freetext_entries_by_group(visits)
+    # Plan 15 Track C3: a demographic group with fewer than
+    # ``MIN_GROUP_VISITS_TO_SUMMARISE`` visits that day is below the
+    # k-anonymity small-cell floor — never summarise it. Enforced in Python,
+    # not left to the prompt: a sub-floor group is dropped from the payload
+    # entirely (``payload_groups`` below substitutes an empty shape for it, so
+    # its free text is never even sent to the model) and its summary field is
+    # blanked deterministically further down.
+    group_visit_counts = freetext.count_visits_by_group(visits)
+    payload_groups = {
+        group: (
+            entries
+            if group_visit_counts[group] >= freetext.MIN_GROUP_VISITS_TO_SUMMARISE
+            else freetext.empty_group_entries()
+        )
+        for group, entries in freetext_groups.items()
+    }
     # Deliberately a second pass over `visits` (not
     # `freetext.empty_columns_from_entries` over `freetext_groups`), even
     # though the two used to share one pass before Plan 14 (see
@@ -130,7 +180,7 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
             ai.draft_daily_summary_sentence, aggregate, client
         )
         freetext_future = executor.submit(
-            ai.draft_freetext_summary, clinic_date, freetext_groups, client
+            ai.draft_freetext_summary, clinic_date, payload_groups, client
         )
         empty_future = executor.submit(
             ai.draft_empty_columns_flag, clinic_date, empty_columns, client
@@ -140,6 +190,14 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
             freetext_future.result() or ""
         )
         new_empty_columns_flag = empty_future.result()
+
+    def resolve(group: str) -> str | None:
+        return _resolve_group_summary(
+            group,
+            freetext_groups=freetext_groups,
+            group_visit_counts=group_visit_counts,
+            new_by_group=new_freetext_summary_by_group,
+        )
 
     index = _get_or_create_report_index()
     page = DailyReportPage.objects.filter(report_date=clinic_date).first()
@@ -152,19 +210,29 @@ def publish_daily_report(clinic_date: date, *, client=None) -> DailyReportPage:
             summary_sentence=summary_sentence,
             empty_columns_flag=new_empty_columns_flag or "",
             live=False,
+            # A brand-new page has nothing to preserve, so a "preserve"
+            # (``None``) resolution and a deterministic blank both mean "".
             **{
-                field_name: new_freetext_summary_by_group.get(group, "")
+                field_name: resolve(group) or ""
                 for group, field_name in _FREETEXT_SUMMARY_GROUP_FIELDS.items()
             },
         )
         index.add_child(instance=page)
     else:
         page.aggregate = aggregate
-        page.summary_sentence = summary_sentence
+        # Plan 15 Track B1: only overwrite an already-public sentence when the
+        # fresh call produced one — a transient Haiku failure on a corrective
+        # re-upload must not silently blank it (same preserve-on-falsy rule
+        # the free-text/empty-columns fields already had).
+        if summary_sentence:
+            page.summary_sentence = summary_sentence
         for group, field_name in _FREETEXT_SUMMARY_GROUP_FIELDS.items():
-            new_value = new_freetext_summary_by_group.get(group)
-            if new_value:
-                setattr(page, field_name, new_value)
+            resolved = resolve(group)
+            # ``None`` means "preserve the existing field" (a genuine
+            # per-group call failure); a string — including "" — is a
+            # deterministic decision to overwrite (Track B2/C3).
+            if resolved is not None:
+                setattr(page, field_name, resolved)
         if new_empty_columns_flag:
             page.empty_columns_flag = new_empty_columns_flag
 

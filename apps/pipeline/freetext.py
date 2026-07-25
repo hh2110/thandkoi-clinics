@@ -152,6 +152,65 @@ def collect_freetext_entries_by_group(
     }
 
 
+def group_has_freetext_entries(entries: dict[str, list[str]]) -> bool:
+    """``True`` if any free-text column in one group's ``entries`` is non-empty.
+
+    ``entries`` is one group's dict from
+    :func:`collect_freetext_entries_by_group`. Used by
+    ``apps.pipeline.report_publishing.publish_daily_report`` (Plan 15 Track
+    B2) to tell "this group has nothing to summarise today" (blank the field
+    deterministically, clearing any stale prose left by a prior upload) apart
+    from "the model's call for this group failed" (preserve the existing
+    field) — the two used to be indistinguishable falsy values, so a
+    correction that emptied a group left its old summary stranded on the
+    public page next to a zero count.
+    """
+    return any(values for values in entries.values())
+
+
+def count_visits_by_group(
+    visits: Iterable[DeidentifiedVisit],
+) -> dict[str, int]:
+    """How many visits fall into each of :data:`FREETEXT_SUMMARY_GROUPS`.
+
+    Visits with no group (``AGE_BAND_UNKNOWN``, or an adult of unknown sex —
+    see :func:`_group_for_visit`) are counted into no bucket, exactly as they
+    are excluded from :func:`collect_freetext_entries_by_group`. Used to
+    enforce the Plan 15 Track C3 minimum-cell floor
+    (:data:`MIN_GROUP_VISITS_TO_SUMMARISE`).
+    """
+    counts = dict.fromkeys(FREETEXT_SUMMARY_GROUPS, 0)
+    for visit in visits:
+        group = _group_for_visit(visit)
+        if group is not None:
+            counts[group] += 1
+    return counts
+
+
+def empty_group_entries() -> dict[str, list[str]]:
+    """The all-empty-lists shape :func:`collect_freetext_entries` returns for
+    no visits — one empty list per free-text column.
+
+    Used to substitute a sub-floor group out of the AI payload (Plan 15 Track
+    C3) so a group below :data:`MIN_GROUP_VISITS_TO_SUMMARISE` is never sent
+    to the model at all, not merely blanked afterwards.
+    """
+    return {field_name: [] for field_name, _label in FREETEXT_COLUMNS}
+
+
+#: Deterministic minimum number of visits a demographic group must have on a
+#: given day before its free-text is summarised at all (Plan 15 Track C3,
+#: Decision 2). A small-cell / k-anonymity floor matching the common HHS
+#: Safe-Harbor convention: a summary drawn from one or two visits can make a
+#: single patient recognisable even with no direct identifier attached, and
+#: the prompt alone cannot guarantee suppression. Enforced in Python (like
+#: every published number — CLAUDE.md invariant #3), independent of the
+#: model: a group below this floor is dropped from the payload and its
+#: summary field left blank. One named constant so the value is adjustable in
+#: one place.
+MIN_GROUP_VISITS_TO_SUMMARISE = 3
+
+
 #: Same tolerance as ``apps.pipeline.models._strip_markdown_fence`` (see that
 #: function's docstring — found in production 2026-07-25 on the sibling B9
 #: call using the same model and the same "no markdown" instruction it

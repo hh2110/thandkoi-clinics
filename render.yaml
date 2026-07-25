@@ -31,7 +31,14 @@ services:
       uv run python manage.py collectstatic --no-input
     # Apply migrations before the new version starts taking traffic.
     preDeployCommand: uv run python manage.py migrate --no-input
-    startCommand: uv run gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    # --timeout 120 (Plan 15 Track B3): the daily-report publish runs its AI
+    # calls inside the synchronous upload request, so a hung call would
+    # otherwise pin a worker on the default 30s timeout mid-ingest. 120s must
+    # exceed the worst-case sum of a request's in-flight AI calls (each bounded
+    # to 30s + 2 retries by the Anthropic client — see
+    # apps.pipeline.ai.get_anthropic_client); this is the outer backstop that
+    # kills a worker no single-call timeout caught.
+    startCommand: uv run gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --timeout 120
     healthCheckPath: /healthz
     envVars:
       - key: DJANGO_SETTINGS_MODULE

@@ -185,6 +185,22 @@ Production secrets live in two places, never in the repo:
 > will fail to boot until they are set. Create the R2 bucket and set them
 > **before** the next deploy — see the Plan 10 first-time-setup steps.
 
+> **Limitation — the media bucket is public; Wagtail collection privacy does
+> not gate it.** The R2 bucket is served as a public origin
+> (`querystring_auth: False`, `default_acl: None` in `config/settings/prod.py`),
+> so **any object in it is reachable by anyone who has (or guesses) its URL**,
+> regardless of the Wagtail collection it lives in. Marking a Wagtail
+> collection or document as *private* in the admin controls only who can see
+> it **inside `/admin/`** — it does **not** put the served object behind a
+> signed URL or an authentication check. Do not treat "private collection" as
+> access control for a document that must not be public. This is acceptable
+> today because no private documents exist — every uploaded image/document is
+> intended to be public (newsletter photos, camp-report PDFs). If a genuinely
+> private document is ever needed, the storage backend must first be
+> re-architected to issue signed, expiring URLs (`querystring_auth: True` on a
+> non-public bucket); enabling that is deliberately deferred until such a
+> document exists (Plan 15 Track D6, Decision 5).
+
 `SENTRY_DSN` is the deliberate exception to that "required" pattern: it's read
 with a blank default and Sentry is only initialized if it's non-empty, so the
 app boots and behaves identically whether or not it's set — see Plan 12's

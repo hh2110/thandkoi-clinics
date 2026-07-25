@@ -395,10 +395,17 @@ class ReportIndexPage(Page):
     subpage_types = ["pipeline.DailyReportPage"]
 
     def get_reports(self):
-        """Published daily reports under this index, newest first."""
+        """Published daily reports under this index, newest first.
+
+        ``select_related("aggregate")`` (Plan 15 Track D2): the archive
+        template reads each report's live figures off its ``aggregate`` FK, so
+        without this the paginated list fires one extra query per report
+        (N+1). The join fetches them in the same query as the pages.
+        """
         return (
             DailyReportPage.objects.live()
             .child_of(self)
+            .select_related("aggregate")
             .order_by("-report_date", "-pk")
         )
 

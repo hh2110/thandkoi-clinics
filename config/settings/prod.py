@@ -121,6 +121,28 @@ LOGGING = {
 # failure or a 500 (Plan 12 Decisions — observability must never become a new
 # reason the site goes down).
 SENTRY_DSN = env("SENTRY_DSN", default="")
+
+
+def _sentry_before_send(event, hint):
+    """Drop request bodies from every event before it leaves the process.
+
+    This is the PHI-scrub belt to ``max_request_body_size="never"``'s braces
+    (Plan 15 Track A1): the upload view receives a full patient export as a
+    multipart request body, and an unhandled error anywhere in the request —
+    not just in the upload path — would otherwise let Sentry attach that body
+    (or a URL/form representation of it) to the event. A daily clinic export
+    is raw PHI (CLAUDE.md invariant #1), so it must never cross into an
+    external error-tracking service. We positively delete the request body
+    representation rather than trust any single ``sentry_sdk.init`` knob to
+    cover every shape it can take.
+    """
+    request = event.get("request")
+    if isinstance(request, dict):
+        request.pop("data", None)
+        request.pop("body", None)
+    return event
+
+
 if SENTRY_DSN:
     # No release-tag env var is wired to the app yet (the Deploy workflow
     # passes the release commit to Render's deploy hook as a query param, not
@@ -128,8 +150,25 @@ if SENTRY_DSN:
     # RENDER_GIT_COMMIT is set automatically by Render for every build and is
     # the exact commit the deploying release tag points at, so it stands in
     # as the release identifier until a friendlier one is wired up.
+    #
+    # PHI scrubbing (Plan 15 Track A1) — this app handles raw patient exports
+    # in-request (CLAUDE.md invariant #1), so error tracking must never carry
+    # patient data out:
+    #   * include_local_variables=False strips every frame-local from the
+    #     stack traces Sentry captures — a parse/aggregation traceback would
+    #     otherwise pin locals holding raw cell values or a whole DataFrame.
+    #     Global, not targeted: for a PHI app the safe default is no
+    #     frame-local capture anywhere; the marginal debugging loss is
+    #     accepted (Plan 15 Decision 1).
+    #   * max_request_body_size="never" tells the SDK not to read or attach
+    #     request bodies at all — the upload view's body *is* a patient
+    #     export. _sentry_before_send is the belt-and-braces backstop that
+    #     positively drops any body representation that still slips through.
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         release=env.str("RENDER_GIT_COMMIT", default="") or None,
         environment="production",
+        include_local_variables=False,
+        max_request_body_size="never",
+        before_send=_sentry_before_send,
     )

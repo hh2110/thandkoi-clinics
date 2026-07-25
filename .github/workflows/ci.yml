@@ -58,5 +58,79 @@ jobs:
       - name: Check for missing migrations
         run: uv run python manage.py makemigrations --check --dry-run
 
+      # Plan 15 Track A2: prod settings are otherwise never imported in CI
+      # (both pytest and every step above run under config.settings.dev), so
+      # a misconfiguration in prod.py — the structural reason the Track A1
+      # Sentry PHI leak shipped uncaught — reaches production unexercised.
+      # This step imports config.settings.prod with placeholder values for
+      # every required secret and runs Django's deploy-readiness check,
+      # matching the makemigrations --check gate's "a management command is
+      # the CI gate" shape. SENTRY_DSN is a well-formed dummy so the
+      # sentry_sdk.init(...) path (and its new PHI-scrub kwargs) is actually
+      # executed at import, not skipped.
+      - name: Check production settings
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          SECRET_KEY: ci-prod-check-placeholder-secret-key-0123456789-not-used-anywhere
+          ALLOWED_HOSTS: thandkoiclinics.example
+          DATABASE_URL: postgres://thandkoi:thandkoi@localhost:5432/thandkoi
+          MEDIA_BUCKET_NAME: ci-placeholder-bucket
+          MEDIA_S3_ENDPOINT_URL: https://ci-placeholder.r2.cloudflarestorage.com
+          MEDIA_S3_ACCESS_KEY_ID: ci-placeholder-key-id
+          MEDIA_S3_SECRET_ACCESS_KEY: ci-placeholder-secret
+          MEDIA_CUSTOM_DOMAIN: media.thandkoiclinics.example
+          SENTRY_DSN: https://ci0placeholder0public0key@o0.ingest.sentry.io/0
+        run: uv run python manage.py check --deploy
+
       - name: Run tests
         run: uv run pytest
+
+  # Plan 15 Track C4: supply-chain gates, separate from the test job so a
+  # dependency CVE or a committed secret fails CI on its own signal rather
+  # than being buried in the test job's logs.
+  supply-chain:
+    runs-on: ubuntu-latest
+    # gitleaks-action reads the PR's commit list via the API on a
+    # pull_request event; the default GITHUB_TOKEN is restricted, so grant the
+    # read scopes it needs (the job never writes anything).
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks scans history, not just the tip — fetch it all so a
+          # secret committed earlier in the branch is still caught.
+          fetch-depth: 0
+
+      # Secret scan: fail if a credential was committed anywhere in history.
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      # Dependency-vulnerability scan against the locked dependency set. Export
+      # the frozen lockfile to a requirements file (excluding the unpublished
+      # project package itself) and audit that, so the scan matches exactly
+      # the versions production installs. Run via uvx so pip-audit needs no
+      # project dependency of its own; --strict fails the job on an audit-tool
+      # error too, not only on a finding.
+      #
+      # --no-hashes: pip-audit resolves the file via a pip dry-run, and a
+      # hash-pinned requirements file makes pip enforce per-wheel hashes
+      # (failing when the resolved platform/interpreter wheel isn't among the
+      # pinned set). We only need the pinned *versions* to audit against the
+      # advisory DB, so drop the hashes for this scan.
+      - name: Dependency audit (pip-audit)
+        run: |
+          uv export --frozen --no-dev --format requirements-txt \
+            --no-emit-project --no-hashes > requirements-audit.txt
+          uvx pip-audit --strict -r requirements-audit.txt
