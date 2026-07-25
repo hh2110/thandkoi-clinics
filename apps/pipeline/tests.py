@@ -43,7 +43,7 @@ from openpyxl import Workbook, load_workbook
 from wagtail.models import Site
 
 from apps.core.factories import HomePageFactory
-from apps.pipeline import ai, freetext
+from apps.pipeline import ai, footfall_chart, freetext
 from apps.pipeline.aggregation import aggregate_export
 from apps.pipeline.ai import PATIENT_IDENTIFYING_COLUMNS, draft_newsletter_prose
 from apps.pipeline.factories import (
@@ -2869,13 +2869,12 @@ def test_reports_index_omits_funding_mix_section_with_no_data(client, home_page)
 def test_funding_mix_slot_dates_reserves_a_slot_for_a_weekday_gap(home_page):
     """Mon–Sat days without a report still get a slot (rendered empty by
     the caller, i.e. a visible gap); a Sunday without a report gets none."""
-    index = ReportIndexPageFactory(parent=home_page)
     monday, wednesday = datetime.date(2026, 7, 20), datetime.date(2026, 7, 22)
     monday_row = DailyAggregateFactory(clinic_date=monday)
     wednesday_row = DailyAggregateFactory(clinic_date=wednesday)
     rows_by_date = {monday: monday_row, wednesday: wednesday_row}
 
-    dates = index._funding_mix_slot_dates(
+    dates = footfall_chart.slot_dates(
         rows_by_date, datetime.date(2026, 7, 18), datetime.date(2026, 7, 23)
     )
 
@@ -2889,14 +2888,39 @@ def test_funding_mix_slot_dates_reserves_a_slot_for_a_weekday_gap(home_page):
     ]
 
 
+@pytest.mark.parametrize(
+    "start,end",
+    [
+        # `end` before `start`.
+        (datetime.date(2026, 7, 20), datetime.date(2026, 7, 19)),
+        # A range that is nothing but a closed Sunday with no row.
+        (datetime.date(2026, 7, 19), datetime.date(2026, 7, 19)),
+    ],
+)
+def test_build_footfall_chart_with_no_slots_in_range_is_empty(db, start, end):
+    """A range that yields no slots returns the empty chart rather than
+    dividing by zero (Plan 16 16.1).
+
+    Unreachable from ``ReportIndexPage`` — its window is always 30 days
+    with ``end >= start`` — but the Plan 16 dashboard's range comes from
+    the reader, so the shared module has to hold the empty contract for
+    both degenerate cases.
+    """
+    row = DailyAggregateFactory(clinic_date=datetime.date(2026, 7, 20))
+
+    assert footfall_chart.build_footfall_chart([row], start, end) == {
+        "bars": [],
+        "ticks": [],
+    }
+
+
 def test_funding_mix_slot_dates_keeps_a_sunday_that_has_data(home_page):
     """An exceptional open Sunday (a row exists) is treated like any other
     day with data, not folded out."""
-    index = ReportIndexPageFactory(parent=home_page)
     sunday = datetime.date(2026, 7, 19)
     sunday_row = DailyAggregateFactory(clinic_date=sunday)
 
-    dates = index._funding_mix_slot_dates({sunday: sunday_row}, sunday, sunday)
+    dates = footfall_chart.slot_dates({sunday: sunday_row}, sunday, sunday)
 
     assert dates == [sunday]
 
@@ -2927,7 +2951,7 @@ def test_get_funding_mix_positions_bars_by_slot_not_row_order(home_page):
         later: DailyAggregate.objects.get(clinic_date=later),
     }
     window_start = today - datetime.timedelta(days=index.FUNDING_MIX_WINDOW_DAYS)
-    slot_dates = index._funding_mix_slot_dates(rows_by_date, window_start, today)
+    slot_dates = footfall_chart.slot_dates(rows_by_date, window_start, today)
     earlier_index = slot_dates.index(earlier)
     later_index = slot_dates.index(later)
     # At most one of the two days between `earlier` and `later` can be a
@@ -2936,9 +2960,10 @@ def test_get_funding_mix_positions_bars_by_slot_not_row_order(home_page):
 
     bars = {bar["date"]: bar for bar in funding_mix["bars"]}
     assert set(bars) == {earlier, later}
-    slot_width = round(
-        (index._CHART_WIDTH - index._PAD_LEFT - index._PAD_RIGHT) / len(slot_dates), 2
+    plot_width = (
+        footfall_chart.CHART_WIDTH - footfall_chart.PAD_LEFT - footfall_chart.PAD_RIGHT
     )
+    slot_width = round(plot_width / len(slot_dates), 2)
     expected_gap = round((later_index - earlier_index) * slot_width, 1)
     actual_gap = round(bars[later]["label_x"] - bars[earlier]["label_x"], 1)
     assert actual_gap == expected_gap

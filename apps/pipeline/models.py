@@ -32,6 +32,7 @@ from wagtail.models import Page
 
 from apps.core.models import CampReportIndexPage, paginate_archive
 from apps.pipeline.ai_pricing import compute_cost_usd
+from apps.pipeline.footfall_chart import build_footfall_chart
 
 #: Matches a response wrapped in a markdown code fence, with or without a
 #: leading language tag (` ```json ` or bare ` ``` `) — group(1) is the
@@ -409,197 +410,26 @@ class ReportIndexPage(Page):
             .order_by("-report_date", "-pk")
         )
 
-    # SVG chart geometry (Plan 13) — fixed marks, not configurable.
+    #: How far back this page's chart looks. The window is this page's own
+    #: policy, not the chart's — the geometry itself is range-agnostic (see
+    #: ``apps.pipeline.footfall_chart``), which is what lets Plan 16's
+    #: dashboard reuse it with a reader-chosen range.
     FUNDING_MIX_WINDOW_DAYS = 30
-    _CHART_WIDTH = 620
-    _CHART_HEIGHT = 220
-    _PAD_LEFT = 30
-    _PAD_RIGHT = 10
-    _PAD_TOP = 14
-    _PAD_BOTTOM = 26
-    _MAX_BAR_WIDTH = 24
-    _STACK_GAP = 2  # surface gap between stacked segments
-    _BAR_CORNER_RADIUS = 4
-    _SUNDAY_WEEKDAY = 6  # date.weekday() — the clinic is closed Sundays
-    # Minimum centre-to-centre spacing (viewBox units) between two date
-    # labels. Measured against the widest rendered label ("27 Jun", ~30
-    # units) with headroom for a longer translated month name — Plan 13's
-    # Mon–Sat gap slots (see _funding_mix_slot_dates) mean consecutive-day
-    # runs can now pack bars closer than a label is wide.
-    _MIN_LABEL_SPACING = 40
 
     def get_funding_mix(self) -> dict:
         """Rolling 30-day Zakat-vs-Regular funding mix, as SVG geometry (Plan 13).
 
-        Bar coordinates and path data are computed here rather than in the
-        template or client JS, so the chart renders fully without
-        JavaScript — mirrors ``circle-of-care.js``'s documented progressive-
-        enhancement precedent ("the section renders fully without this
-        script; this only adds the reveal"). ``funding-mix-chart.js`` only
-        wires up the hover tooltip on top of this.
-
-        Reuses the exact fields ``DailyReportPage.headline_stats`` already
-        surfaces under the same labels: ``zakat_beneficiary_patients`` →
-        "Zakat", ``paying_patients`` → "Regular" (models.py, above).
-
-        Bars are positioned by each day's slot in the full calendar range
-        (see ``_funding_mix_slot_dates``), not by its position in the query
-        result — so a Monday–Saturday day with no report reserves a blank
-        slot and renders as a visible gap, rather than the timeline
-        silently compressing around it. A Sunday with no report gets no
-        slot at all, since the clinic's closure that day is expected.
+        A thin caller: this method owns the window (30 days back from today,
+        extended forward to cover any future-dated row so it still gets a
+        slot) and the query; every mark, path and tick is computed by
+        ``apps.pipeline.footfall_chart``, which Plan 16's clinic dashboard
+        calls with its own range (Plan 16 D2/16.1).
         """
-        window_start = timezone.localdate() - timedelta(
-            days=self.FUNDING_MIX_WINDOW_DAYS
-        )
         today = timezone.localdate()
-        rows_by_date = {
-            row.clinic_date: row
-            for row in DailyAggregate.objects.filter(clinic_date__gte=window_start)
-        }
-        if not rows_by_date:
-            return {"bars": [], "ticks": []}
-
-        end_date = max([today, *rows_by_date.keys()])
-        slot_dates = self._funding_mix_slot_dates(rows_by_date, window_start, end_date)
-
-        plot_width = self._CHART_WIDTH - self._PAD_LEFT - self._PAD_RIGHT
-        plot_height = self._CHART_HEIGHT - self._PAD_TOP - self._PAD_BOTTOM
-
-        max_total = max(row.total_visits for row in rows_by_date.values()) or 1
-        tick_step = 5 if max_total <= 20 else 10
-        max_value = ((max_total // tick_step) + 1) * tick_step
-
-        def y_for(value):
-            raw = self._PAD_TOP + plot_height - (value / max_value) * plot_height
-            return round(raw, 2)
-
-        baseline = y_for(0)
-        slot_width = round(plot_width / len(slot_dates), 2)
-        bar_width = round(min(self._MAX_BAR_WIDTH, slot_width * 0.6), 2)
-
-        date_label_y = self._CHART_HEIGHT - 8
-
-        bars = []
-        last_label_x = None
-        for i, slot_date in enumerate(slot_dates):
-            row = rows_by_date.get(slot_date)
-            if row is None:
-                continue  # Mon–Sat, no report — leave the slot empty (a gap)
-            bar = self._funding_mix_bar(
-                row, i, slot_width, bar_width, baseline, y_for, date_label_y
-            )
-            # Gap slots let real bars pack closer together than a date
-            # label is wide (see _MIN_LABEL_SPACING) — thin colliding
-            # labels rather than let them overlap. Every bar still gets
-            # its hit-tooltip and its row in the table below, so no date
-            # is actually hidden, just its always-visible axis text.
-            bar["show_label"] = (
-                last_label_x is None
-                or bar["label_x"] - last_label_x >= self._MIN_LABEL_SPACING
-            )
-            if bar["show_label"]:
-                last_label_x = bar["label_x"]
-            bars.append(bar)
-        ticks = [
-            {"value": t, "y": y_for(t), "label_y": y_for(t) + 3}
-            for t in range(0, max_value + 1, tick_step)
-        ]
-        return {
-            "bars": bars,
-            "ticks": ticks,
-            "chart_width": self._CHART_WIDTH,
-            "chart_height": self._CHART_HEIGHT,
-            "grid_x1": self._PAD_LEFT,
-            "grid_x2": self._CHART_WIDTH - self._PAD_RIGHT,
-            "axis_label_x": self._PAD_LEFT - 6,
-        }
-
-    def _funding_mix_slot_dates(self, rows_by_date, start, end):
-        """Ordered list of dates that get a chart slot between ``start``
-        and ``end`` inclusive.
-
-        A Sunday with no ``DailyAggregate`` row gets no slot at all — the
-        clinic is closed Sundays by design, so its absence is expected, not
-        a gap. Every other day in range gets a slot regardless of whether
-        it has data; the caller renders a bar for slots with data and
-        leaves the rest empty, which is what shows up as a gap in the
-        chart. A Sunday that does have a row (an exceptional open day) is
-        kept, same as any other day with data.
-        """
-        dates = []
-        d = start
-        while d <= end:
-            if d in rows_by_date or d.weekday() != self._SUNDAY_WEEKDAY:
-                dates.append(d)
-            d += timedelta(days=1)
-        return dates
-
-    def _funding_mix_bar(
-        self, row, index, slot_width, bar_width, baseline, y_for, date_label_y
-    ):
-        cx = round(self._PAD_LEFT + slot_width * index + slot_width / 2, 2)
-        x = round(cx - bar_width / 2, 2)
-        zakat_top = y_for(row.zakat_beneficiary_patients)
-        total_top = y_for(row.zakat_beneficiary_patients + row.paying_patients)
-
-        if row.zakat_beneficiary_patients == 0:
-            # Solo regular segment, resting on the baseline — mirrors the
-            # solo-zakat case below. Without this, the regular segment's
-            # base would be offset by _STACK_GAP above a degenerate
-            # zero-height zakat segment, floating it off the baseline.
-            segments = [
-                {
-                    "path": self._rounded_top_path(x, total_top, bar_width, baseline),
-                    "css_class": "ri-funding-mix__bar--regular",
-                }
-            ]
-        elif row.paying_patients == 0:
-            segments = [
-                {
-                    "path": self._rounded_top_path(x, zakat_top, bar_width, baseline),
-                    "css_class": "ri-funding-mix__bar--zakat",
-                }
-            ]
-        else:
-            regular_base = zakat_top - self._STACK_GAP
-            segments = [
-                {
-                    "path": self._square_path(x, zakat_top, bar_width, baseline),
-                    "css_class": "ri-funding-mix__bar--zakat",
-                },
-                {
-                    "path": self._rounded_top_path(
-                        x, total_top, bar_width, regular_base
-                    ),
-                    "css_class": "ri-funding-mix__bar--regular",
-                },
-            ]
-
-        return {
-            "date": row.clinic_date,
-            "zakat": row.zakat_beneficiary_patients,
-            "regular": row.paying_patients,
-            "total": row.total_visits,
-            "segments": segments,
-            "label_x": cx,
-            "label_y": date_label_y,
-            "hit_x": cx - slot_width / 2,
-            "hit_width": slot_width,
-        }
-
-    def _rounded_top_path(self, x, y_top, width, y_base):
-        r = min(self._BAR_CORNER_RADIUS, width / 2, max(0, y_base - y_top))
-        return (
-            f"M {x} {y_base} L {x} {y_top + r} Q {x} {y_top} {x + r} {y_top} "
-            f"L {x + width - r} {y_top} "
-            f"Q {x + width} {y_top} {x + width} {y_top + r} "
-            f"L {x + width} {y_base} Z"
-        )
-
-    def _square_path(self, x, y_top, width, y_base):
-        x_end, y_end = x + width, y_top
-        return f"M {x} {y_base} L {x} {y_top} L {x_end} {y_end} L {x_end} {y_base} Z"
+        window_start = today - timedelta(days=self.FUNDING_MIX_WINDOW_DAYS)
+        rows = list(DailyAggregate.objects.filter(clinic_date__gte=window_start))
+        end_date = max([today, *(row.clinic_date for row in rows)])
+        return build_footfall_chart(rows, window_start, end_date)
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
