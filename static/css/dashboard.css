@@ -92,7 +92,6 @@
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 0.92rem;
-  color: var(--color-text-soft);
   text-decoration: none;
   text-align: center;
   background: var(--color-surface);
@@ -100,17 +99,40 @@
   border-radius: 10px;
   white-space: nowrap;
 }
+.dash__preset--selected {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+
+/* The three `color` rules below are scoped two levels deeper than selecting
+   them needs — they need the *specificity*, not the reach (2026-07-25).
+
+   These tiles are anchors (D9's no-JS decision), and base.css colours links
+   at `:root[data-theme="dark"] a:not(:where(.button))` — (0,2,1). A lone
+   `.dash__preset` is (0,1,0) and even `.dash__presets .dash__preset` is only
+   (0,2,0), which loses the element-count tiebreak. So none of these colours
+   applied at all: the *selected* tile rendered teal-deep on its brand-teal
+   fill in light mode — 1.4:1, an unreadable label on the one control that
+   tells you which range you are looking at. Measured on the rendered page,
+   not inferred; it survived Plan 16 because the old pill had the same rule
+   and the two colours are hard to tell apart in a screenshot.
+
+   Same root cause as Plan 18 D10, but D10's exclusion covers `.button` and
+   this block is not one (it has its own geometry). Fixed locally at (0,3,0)
+   rather than by adding page-scoped names to base.css's exclusion list,
+   which would just move the trap. See Plan 18 D12. */
+.dash .dash__presets .dash__preset {
+  color: var(--color-text-soft);
+}
 /* --color-stat-value, not --color-brand: see `.dash__apply` below for why
    brand teal on the dark card ground is unreadable. This is the token
    tokens.css added for exactly that problem — teal in light, pale aqua in
    dark. */
-.dash__preset:hover {
+.dash .dash__presets .dash__preset:hover {
   color: var(--color-stat-value);
 }
-.dash__preset--selected,
-.dash__preset--selected:hover {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
+.dash .dash__presets .dash__preset--selected,
+.dash .dash__presets .dash__preset--selected:hover {
   color: var(--color-on-brand);
 }
 

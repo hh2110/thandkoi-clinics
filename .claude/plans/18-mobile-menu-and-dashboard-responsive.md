@@ -180,6 +180,19 @@ width.
   line up with. Block padding is taken, rounded onto the spacing scale
   (`clamp(var(--space-3), 4vw, var(--space-6))`), which is what actually
   tightens the page on a phone.
+- **D12 — the dashboard's preset tiles get the same treatment, locally.**
+  Found in review by measuring the rendered page: the tiles are anchors
+  (D9's no-JS decision), so D10's root cause hit them too — but D10's
+  exclusion covers `.button` and this block is not one. None of
+  `.dash__preset`'s colours were applying, which meant the **selected** tile
+  rendered teal-deep on its own brand-teal fill in light mode, **1.4:1** —
+  an unreadable label on the one control that tells the reader which range
+  they are looking at. Pre-existing since Plan 16 (the old pill carried the
+  identical rule) and invisible in a screenshot, because the wrong colour
+  and the right one are both dark. Fixed by scoping the three colour rules
+  to (0,3,0) in `dashboard.css` rather than by adding page-scoped class
+  names to `base.css`'s exclusion list — that list would need a new entry
+  for every future link-styled control, which is the same trap one level up.
 - **D8 — the `--color-track` token still does not exist.** Plan 16 D4
   resolved this once: the handoff's `--color-track` (light `#e6eded`) is
   within three hex points of `--color-border-default` (`#e0e7e8`), which is
