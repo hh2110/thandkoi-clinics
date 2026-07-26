@@ -875,6 +875,65 @@ def test_contact_page_and_footer_reflect_the_setting(client, home_page):
     assert "+92 344 4111235" in home
 
 
+def test_contact_page_map_accepts_a_full_length_google_embed_url(client, home_page):
+    """A real Google Maps ``pb=`` embed URL survives a round trip un-truncated.
+
+    Regression test for the live Contact page rendering a broken map (2026-07-26).
+    ``map_embed_url`` was a bare ``models.URLField()``, i.e. Django's default
+    ``max_length=200``. A genuine Google Maps embed URL is ~280 characters, so
+    Wagtail's admin rendered ``maxlength="200"`` on the input and the browser
+    silently discarded everything past character 200 as the URL was pasted —
+    chopping the place ID mid-string. Google then rejected the request with
+    "Invalid 'pb' parameter" and the page showed an empty grey box.
+
+    The URL below is the clinic's real embed, kept at full length on purpose:
+    the assertion that matters is that the *tail* survives, because truncation
+    only ever ate the end. If the field ever goes back to the 200-char default
+    this fails loudly at the ``full_clean()`` below (``ValidationError``:
+    "Ensure this value has at most 200 characters") — Django's own validator
+    trips first, before the value is ever handed to Postgres.
+    """
+    ContactPageFactory(parent=home_page, slug="contact")
+    site = Site.objects.get(is_default_site=True)
+    embed_url = (
+        "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3"
+        "!1d3305.353777877336!2d72.51284587641507!3d34.06044421729605"
+        "!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2"
+        "!1s0x38dee5000f2396fd%3A0x2f70349e9876ffa4"
+        "!2sThe%20ThandKoi%20Clinics!5e0!3m2!1sen!2spk"
+        "!4v1785088592877!5m2!1sen!2spk"
+    )
+    assert len(embed_url) > 200, "fixture must exceed the old default to be a guard"
+
+    contact = ContactBankSettings.for_site(site)
+    contact.map_embed_url = embed_url
+    contact.full_clean()  # URLField validators must accept it too, not just the DB.
+    contact.save()
+
+    contact.refresh_from_db()
+    assert contact.map_embed_url == embed_url
+    # The place ID's final character and everything after it are what got eaten.
+    assert contact.map_embed_url.endswith("!5m2!1sen!2spk")
+    assert "0x2f70349e9876ffa4" in contact.map_embed_url
+
+    content = client.get("/en/contact/").content.decode()
+    assert "google.com/maps/embed" in content
+    assert "0x2f70349e9876ffa4" in content
+
+
+def test_map_embed_url_field_is_long_enough_for_real_embed_urls():
+    """The field's declared ``max_length`` leaves headroom over a real embed URL.
+
+    Paired with the round-trip test above: that one proves today's URL fits,
+    this one states the intent, so shortening the field back toward the 200-char
+    default fails here with an obvious reason rather than as a validation error
+    buried in an unrelated test. Reads the field declaration only, so it needs
+    no database.
+    """
+    field = ContactBankSettings._meta.get_field("map_embed_url")
+    assert field.max_length >= 500
+
+
 def test_footer_shows_placeholder_when_setting_empty(client, home_page):
     """With the setting unset, the footer shows its coming-soon placeholders."""
     content = client.get("/en/").content.decode()
