@@ -600,9 +600,19 @@ class ContactBankSettings(ClusterableModel, BaseSiteSetting):
     phone = models.CharField(max_length=40, blank=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
+    # max_length is explicit and generous on purpose (2026-07-26). A real
+    # Google Maps embed URL is ~280 chars, which overruns URLField's 200-char
+    # default; Wagtail then renders maxlength="200" on the admin input and the
+    # browser silently drops the overflow *as the URL is pasted*, cutting the
+    # place ID mid-string. The map failed with "Invalid 'pb' parameter" and the
+    # truncation left no error behind to find. Don't lower this back.
     map_embed_url = models.URLField(
+        max_length=600,
         blank=True,
-        help_text="Optional map embed URL (e.g. an OpenStreetMap share link).",
+        help_text=(
+            "Optional map embed URL — the iframe src from Google Maps → Share → "
+            "Embed a map. A share link (maps.app.goo.gl/…) will not render."
+        ),
     )
 
     bank_account_title = models.CharField(max_length=140, blank=True)
