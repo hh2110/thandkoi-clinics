@@ -53,6 +53,9 @@ YES=0
 REMOTE_MAIN=""  # only set on the "cut a new tag" path; kept defined (empty)
                 # here so the --ref path's later fallback echo can't trip
                 # `set -u`'s unbound-variable check
+PREV_TAG=""     # set below on both paths; kept defined (empty) here for the
+                # same `set -u` reason — the release-notes step reads it
+                # regardless of which path set it
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -113,6 +116,11 @@ if [[ -z "$REF" ]]; then
 else
   log "Deploying an existing tag ($REF) — skipping main/CI checks"
   git rev-parse "refs/tags/$REF" >/dev/null 2>&1 || fail "Tag '$REF' not found locally after fetch. Check the tag name."
+  # Same computation as the "cut a new tag" path below, so a --ref redeploy
+  # that still needs to publish a Release (line ~286: only skipped if one
+  # already exists for $REF) pins --notes-start-tag too, not just the
+  # normal path.
+  PREV_TAG=$(git tag --list --sort=-creatordate | grep -vFx -- "$REF" | head -1 || true)
 fi
 
 log "Checking the deploy hook secret exists"
@@ -287,11 +295,33 @@ if gh release view "$REF" --repo "$REPO" >/dev/null 2>&1; then
   log "GitHub Release for $REF already exists — leaving it untouched"
 else
   log "Publishing GitHub Release for $REF"
+  # Pin the start point ourselves rather than letting --generate-notes guess
+  # it: GitHub's auto-detection compares tag names semver-style, and treats
+  # a same-day suffix like "v2026.07.25-8" as a *pre-release* of the bare
+  # "v2026.07.25" tag — i.e. older than it, not newer. That silently picked
+  # the first release of the previous day as the changelog's start point
+  # instead of that day's actual last release (observed 2026-07-26:
+  # v2026.07.26's notes came back diffed against v2026.07.25, re-listing PRs
+  # already shipped in v2026.07.25-2 through -8). $PREV_TAG is computed above
+  # by actual tag-creation order, which this repo's date-based naming can't
+  # confuse. Omitted below when there's no previous tag (first release
+  # ever) — --generate-notes' own default handles that case fine, and no
+  # bash arrays are used to build the flag conditionally: macOS's default
+  # /usr/bin/env bash is 3.2, where "${arr[@]}" on a zero-element array
+  # throws "unbound variable" under `set -u`, which would break exactly the
+  # first-release case this is meant to leave alone.
   RELEASE_ERR="$(mktemp)"
-  gh release create "$REF" --repo "$REPO" --title "$REF" --generate-notes 2>"$RELEASE_ERR" || {
-    echo "WARNING: could not create the GitHub Release for $REF (deploy itself succeeded): $(cat "$RELEASE_ERR")"
-    echo "Create it manually if wanted: gh release create $REF --repo $REPO --generate-notes"
-  }
+  if [[ -n "$PREV_TAG" ]]; then
+    gh release create "$REF" --repo "$REPO" --title "$REF" --generate-notes --notes-start-tag "$PREV_TAG" 2>"$RELEASE_ERR" || {
+      echo "WARNING: could not create the GitHub Release for $REF (deploy itself succeeded): $(cat "$RELEASE_ERR")"
+      echo "Create it manually if wanted: gh release create $REF --repo $REPO --generate-notes --notes-start-tag $PREV_TAG"
+    }
+  else
+    gh release create "$REF" --repo "$REPO" --title "$REF" --generate-notes 2>"$RELEASE_ERR" || {
+      echo "WARNING: could not create the GitHub Release for $REF (deploy itself succeeded): $(cat "$RELEASE_ERR")"
+      echo "Create it manually if wanted: gh release create $REF --repo $REPO --generate-notes"
+    }
+  fi
   rm -f "$RELEASE_ERR"
 fi
 
