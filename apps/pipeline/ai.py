@@ -835,11 +835,21 @@ def get_anthropic_client() -> _AnthropicLike:  # pragma: no cover - prod only
     # Bounded so a hung Anthropic call can never outlive the gunicorn worker
     # timeout (Plan 15 Track B3, Decision 3): the daily-report publish makes
     # its AI calls inside the synchronous upload request, so an unbounded call
-    # would pin a worker until gunicorn's own ``--timeout`` (120s, render.yaml)
-    # killed it. 30s per attempt with the SDK's 2 retries stays under that
-    # even in the worst case; every AI call in this codebase already degrades
-    # to "no text this run" on failure, so a timeout is a safe outcome, not a
-    # crash.
+    # would pin a worker until gunicorn's own ``--timeout`` killed it. 30s per
+    # attempt with the SDK's 2 retries is 90s worst case. Every AI call in this
+    # codebase already degrades to "no text this run" on failure, so a timeout
+    # is a safe outcome, not a crash.
+    #
+    # 2026-07-26: that 90s budget was sized against ``render.yaml``'s
+    # ``--timeout 120``, and this comment used to assert it "stays under that"
+    # as settled fact. It does not, in production. The live service's start
+    # command carries **no ``--timeout`` flag at all**, so gunicorn runs on its
+    # 30s default — 60s below the worst case above. `render.yaml` has never
+    # been applied to the running service (see its header note and
+    # docs/deploying.md). Until that drift is fixed in the Render dashboard, a
+    # daily-report publish whose AI call needs a retry can have its worker
+    # killed mid-ingest. Do not re-derive safety here from `render.yaml`; read
+    # the live service.
     return anthropic.Anthropic(
         api_key=os.environ["ANTHROPIC_API_KEY"],
         timeout=30,
