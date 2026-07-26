@@ -12,6 +12,9 @@ module actually *calls* the helper, because a guard on the helper alone would
 keep passing if a settings module quietly stopped wiring it up.
 """
 
+import logging
+
+import pytest
 from django.conf import settings
 
 from config import database
@@ -95,6 +98,57 @@ def test_keepalives_pinned_on_the_database_url_are_never_clobbered():
     )
 
     assert config["OPTIONS"]["keepalives_idle"] == 5
+
+
+# --- DB_CONNECT_TIMEOUT parsing ----------------------------------------------
+#
+# These exist because the obvious spelling, env.int("DB_CONNECT_TIMEOUT", ...),
+# raises ValueError on a blank value and kills every worker at boot. Blank is
+# the natural state of a sync:false key added in the Render dashboard but not
+# filled in, so this is the likely case, not the exotic one.
+
+
+@pytest.mark.parametrize("raw", ["", None], ids=["blank", "unset"])
+def test_an_unset_connect_timeout_falls_back_instead_of_raising(raw):
+    """The boot-crash case. Must return a value, never raise."""
+    assert database.parse_connect_timeout(raw) == (
+        database.DEFAULT_CONNECT_TIMEOUT_SECONDS
+    )
+
+
+@pytest.mark.parametrize("raw", ["5s", "abc", "1.5", [], "  "])
+def test_an_unparseable_connect_timeout_falls_back_instead_of_raising(raw):
+    """A typo in an operational dial must degrade, never take the site down."""
+    assert database.parse_connect_timeout(raw) == (
+        database.DEFAULT_CONNECT_TIMEOUT_SECONDS
+    )
+
+
+def test_a_valid_connect_timeout_is_honoured():
+    assert database.parse_connect_timeout("15") == 15
+
+
+@pytest.mark.parametrize(
+    "raw", ["0", "1", "-3"], ids=["zero", "below_floor", "negative"]
+)
+def test_a_connect_timeout_below_libpq_s_floor_is_refused(raw):
+    """0 means "wait forever" to libpq — the exact default this module replaces.
+
+    Honouring it would let a dashboard typo silently reinstate the 2026-07-26
+    outage. Values under libpq's floor of 2 are clamped up by libpq anyway, so
+    accepting them would only misreport what is actually in effect.
+    """
+    assert database.parse_connect_timeout(raw) == (
+        database.DEFAULT_CONNECT_TIMEOUT_SECONDS
+    )
+
+
+def test_a_refused_connect_timeout_is_logged_so_it_stays_discoverable(caplog):
+    """Silently ignoring an operator's setting would be its own trap."""
+    with caplog.at_level(logging.WARNING):
+        database.parse_connect_timeout("0")
+
+    assert "DB_CONNECT_TIMEOUT" in caplog.text
 
 
 # --- Backend safety ----------------------------------------------------------

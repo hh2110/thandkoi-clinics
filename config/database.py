@@ -35,6 +35,8 @@ hiding a fault: they convert "hang forever" into "raise ``OperationalError``
 promptly", which every caller in this codebase already handles.
 """
 
+import logging
+
 #: Seconds libpq may spend establishing a connection before giving up.
 #:
 #: libpq's default is ``0`` — wait indefinitely — which is what turned a
@@ -59,6 +61,11 @@ promptly", which every caller in this codebase already handles.
 #: dashboard with no deploy. Raise it there first, then measure, before
 #: changing this constant.
 DEFAULT_CONNECT_TIMEOUT_SECONDS = 5
+
+#: libpq silently clamps any positive connect_timeout below this up to it, and
+#: reads 0 as "wait forever". Both make values under 2 meaningless-to-harmful,
+#: so ``parse_connect_timeout`` refuses them rather than passing them through.
+_LIBPQ_MINIMUM_CONNECT_TIMEOUT_SECONDS = 2
 
 #: TCP keepalive probing for connections that are already established.
 #:
@@ -87,6 +94,55 @@ KEEPALIVE_OPTIONS = {
 #: would raise at connection time. The project is Postgres-only, but a settings
 #: helper that silently assumes so is a trap for whoever adds a second alias.
 _POSTGRESQL_BACKEND_MARKER = "postgresql"
+
+logger = logging.getLogger(__name__)
+
+
+def parse_connect_timeout(raw, default=DEFAULT_CONNECT_TIMEOUT_SECONDS):
+    """Coerce a ``DB_CONNECT_TIMEOUT`` string to a usable positive bound.
+
+    Soft-fail by design, mirroring ``observability.parse_sample_rate`` (Plan 17
+    Decision 4): a typo in an operational dial must degrade to the default,
+    never take the site down.
+
+    This is not hypothetical caution. The obvious spelling,
+    ``env.int("DB_CONNECT_TIMEOUT", default=...)``, calls ``int()`` on the raw
+    string, so a **blank** value raises ``ValueError`` during settings import
+    and every worker dies at boot. Blank is the natural state of a
+    ``sync: false`` key an operator has added in the Render dashboard but not
+    yet filled in — so the knob whose whole purpose is preventing an outage
+    would have been able to cause a total one. Read as a string and coerced
+    here instead.
+
+    ``0`` is rejected rather than honoured: to libpq it means "wait forever",
+    which is the exact default this module exists to replace, and no operator
+    typing it into a field labelled *timeout* means "never time out". Values
+    below libpq's floor of 2 are likewise refused rather than silently clamped.
+    """
+    if raw is None or raw == "":
+        return default
+
+    try:
+        timeout = int(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Ignoring unparseable DB_CONNECT_TIMEOUT %r; using %s seconds",
+            raw,
+            default,
+        )
+        return default
+
+    if timeout < _LIBPQ_MINIMUM_CONNECT_TIMEOUT_SECONDS:
+        logger.warning(
+            "Ignoring DB_CONNECT_TIMEOUT %r: 0 means 'wait forever' to libpq "
+            "and anything under %s is clamped up to it anyway; using %s seconds",
+            raw,
+            _LIBPQ_MINIMUM_CONNECT_TIMEOUT_SECONDS,
+            default,
+        )
+        return default
+
+    return timeout
 
 
 def harden_connection(

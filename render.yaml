@@ -16,16 +16,21 @@
 #   * runs migrations as a pre-deploy step,
 #   * serves the app with gunicorn.
 #
-# !! THIS FILE IS NOT APPLIED AUTOMATICALLY (verified 2026-07-26) !!
+# !! THIS FILE IS NOT REACHING THE LIVE SERVICE (observed 2026-07-26) !!
 #
-# The live service (srv-d9ej48n41pts73f1i3p0) was created in the dashboard and
-# is not linked to this blueprint, so nothing here reaches production on its
-# own. Editing this file changes documentation, not the running service — every
-# change must also be made by hand in the Render dashboard.
+# What was actually measured, and nothing more: on 2026-07-26 the live service
+# (srv-d9ej48n41pts73f1i3p0) differed from this file in the two fields listed
+# below, and a deploy that same day did not reconcile them. So editing this
+# file cannot be assumed to change production — mirror every change by hand in
+# the Render dashboard.
 #
-# That is not theoretical. Two fields below had silently diverged and were only
-# caught while diagnosing the 2026-07-26 outage; both had been wrong in
-# production for as long as they had existed here:
+# Why it diverges was NOT established. The service may never have been linked
+# to this blueprint, or a linked blueprint may not be syncing, or a dashboard
+# edit may be overriding it. If you intend to fix the mechanism rather than the
+# two values, find out which of those is true first — don't infer it from here.
+#
+# That the divergence is real is not in doubt. Both fields were caught only
+# while diagnosing the 2026-07-26 outage:
 #   * startCommand was missing --timeout 120, so gunicorn ran on its 30s
 #     default — meaning the Plan 15 Track B3 protection documented below had
 #     never actually been in effect.

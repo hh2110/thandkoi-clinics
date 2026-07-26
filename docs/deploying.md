@@ -263,10 +263,13 @@ These require account/billing access and are done by the maintainer:
    set `DATABASE_URL` and `ANTHROPIC_API_KEY`; grab the service's **Deploy
    Hook** URL.
 
-> **`render.yaml` is not linked to the live service** (verified 2026-07-26).
-> The running service was created in the dashboard, so the blueprint is
-> documentation, not automation: editing `render.yaml` changes nothing in
-> production, and every change must be mirrored by hand in the dashboard.
+> **`render.yaml` is not reaching the live service** (observed 2026-07-26).
+> Measured: the running service differed from the blueprint in two fields, and
+> a deploy that day did not reconcile them. So treat the blueprint as
+> documentation, not automation — mirror every change by hand in the dashboard.
+> *Why* it diverges was not established (never linked / linked but not syncing
+> / dashboard override); establish that first if you set out to fix the
+> mechanism rather than the two values.
 >
 > This is not hypothetical. Two fields had silently diverged and were caught
 > only while diagnosing the 2026-07-26 outage — `startCommand` was missing
