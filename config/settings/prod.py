@@ -10,7 +10,7 @@ import logging
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-from config import observability
+from config import database, observability
 
 from .base import *  # noqa: F403
 from .base import STORAGES, env
@@ -29,6 +29,21 @@ DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
+
+# Never wait forever for the database (2026-07-26 outage — see
+# ``config.database`` for the full incident note). libpq's default
+# ``connect_timeout`` is 0, "wait indefinitely", which let a network fault pin
+# every worker until gunicorn killed it and disarmed the /healthz probe's own
+# 503 fallback. DB_CONNECT_TIMEOUT is dialable from the Render dashboard with
+# no deploy, mirroring SENTRY_TRACES_SAMPLE_RATE; an unset value takes the
+# module default rather than reintroducing the unbounded wait.
+database.harden_connection(
+    DATABASES["default"],
+    connect_timeout=env.int(
+        "DB_CONNECT_TIMEOUT",
+        default=database.DEFAULT_CONNECT_TIMEOUT_SECONDS,
+    ),
+)
 
 # --- Security hardening ----------------------------------------------------
 

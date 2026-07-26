@@ -6,6 +6,8 @@ Sensible, insecure-by-design defaults so a fresh checkout boots without a
 ``config.settings.prod`` there).
 """
 
+from config import database
+
 from .base import *  # noqa: F403
 from .base import STORAGES, env
 
@@ -30,6 +32,14 @@ DATABASES = {
         default="postgres://thandkoi:thandkoi@localhost:5432/thandkoi",
     ),
 }
+
+# Same bounded-connect treatment as prod (see ``config.database``). Applied
+# here too rather than prod-only for two reasons: a stopped docker-compose
+# Postgres should fail a local run fast instead of hanging it, and the test
+# suite runs under these settings, so the wiring itself stays asserted — a
+# guard on the helper alone would keep passing if a settings module stopped
+# calling it.
+database.harden_connection(DATABASES["default"])
 
 # Print emails to the console instead of sending them.
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
