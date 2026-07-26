@@ -273,6 +273,10 @@ SOCIAL_LINKS = [
         "https://www.facebook.com/profile.php"
         "?id=61588951366955&name=xhp_nt__fb__action__open_user",
     ),
+    (
+        "Instagram",
+        "https://www.instagram.com/thandkoi.clinics/",
+    ),
 ]
 
 
