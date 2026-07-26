@@ -220,6 +220,25 @@ volume dialable without a deploy:
 | `0` | performance tracing off; errors and logs unaffected |
 | e.g. `0.25` | sample a quarter of requests |
 
+`DB_CONNECT_TIMEOUT` (PR #150, `config/database.py`) is optional and not a
+secret, in the same "dialable without a deploy" family. It caps how long libpq
+may spend opening a Postgres connection:
+
+| Value | Effect |
+|---|---|
+| unset / blank | code default, `5` seconds |
+| e.g. `15` | more headroom for a slow Neon resume |
+| `0` | **never set this** — libpq reads 0 as "wait forever" |
+
+It exists because that "wait forever" default *was* the effective setting until
+2026-07-26, when the Render instance lost outbound network and every worker
+blocked on a connection that could not complete — for 30 minutes, because a
+blocked connect is not an exception and so `/healthz`'s own 503 fallback could
+never fire. Raise it here if Neon cold starts ever start failing after an idle
+period (autosuspend is on at the 5-minute default; today the UptimeRobot
+`/healthz` poll keeps the compute warm, so resumes effectively don't happen).
+Measure before changing the code constant.
+
 `/healthz` is never traced at any setting (Plan 17 Decision 3) — a 60-second
 uptime poll is ~43k requests/month whose latency says nothing, and including it
 would drag every p50 widget toward zero. Sizing note: the free Developer plan
@@ -243,5 +262,21 @@ These require account/billing access and are done by the maintainer:
 2. **Render** — create one web service from `render.yaml` (Starter compute);
    set `DATABASE_URL` and `ANTHROPIC_API_KEY`; grab the service's **Deploy
    Hook** URL.
+
+> **`render.yaml` is not reaching the live service** (observed 2026-07-26).
+> Measured: the running service differed from the blueprint in two fields, and
+> a deploy that day did not reconcile them. So treat the blueprint as
+> documentation, not automation — mirror every change by hand in the dashboard.
+> *Why* it diverges was not established (never linked / linked but not syncing
+> / dashboard override); establish that first if you set out to fix the
+> mechanism rather than the two values.
+>
+> This is not hypothetical. Two fields had silently diverged and were caught
+> only while diagnosing the 2026-07-26 outage — `startCommand` was missing
+> `--timeout 120` (so gunicorn ran on its 30s default, meaning Plan 15 Track
+> B3's protection had never actually been live) and `healthCheckPath` was
+> empty (so Render had no health signal and never restarted the wedged
+> instance). **Read the live service before reasoning about production
+> config** — `mcp__render__get_service`, or the dashboard's Settings tab.
 3. **GitHub** — create a `production` Environment (no protection rule) and add
    `RENDER_DEPLOY_HOOK_URL` as an environment secret.

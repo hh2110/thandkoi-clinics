@@ -37,11 +37,17 @@ DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 # 503 fallback. DB_CONNECT_TIMEOUT is dialable from the Render dashboard with
 # no deploy, mirroring SENTRY_TRACES_SAMPLE_RATE; an unset value takes the
 # module default rather than reintroducing the unbounded wait.
+#
+# Read as a string and coerced in Python, NOT via ``env.int(...)`` — same
+# reason as SENTRY_TRACES_SAMPLE_RATE above (Plan 17 Decision 4). ``env.int``
+# calls ``int()`` on the raw value, so a blank DB_CONNECT_TIMEOUT — the natural
+# state of a ``sync: false`` key added in the Render dashboard but not filled
+# in — would raise at import and kill every worker at boot. A tuning knob for
+# preventing outages must not be able to cause one.
 database.harden_connection(
     DATABASES["default"],
-    connect_timeout=env.int(
-        "DB_CONNECT_TIMEOUT",
-        default=database.DEFAULT_CONNECT_TIMEOUT_SECONDS,
+    connect_timeout=database.parse_connect_timeout(
+        env("DB_CONNECT_TIMEOUT", default=""),
     ),
 )
 
