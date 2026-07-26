@@ -888,9 +888,10 @@ def test_contact_page_map_accepts_a_full_length_google_embed_url(client, home_pa
 
     The URL below is the clinic's real embed, kept at full length on purpose:
     the assertion that matters is that the *tail* survives, because truncation
-    only ever ate the end. Tests run on Postgres, which enforces varchar length,
-    so this fails loudly (DataError) rather than passing quietly if the field
-    ever goes back to the 200-char default.
+    only ever ate the end. If the field ever goes back to the 200-char default
+    this fails loudly at the ``full_clean()`` below (``ValidationError``:
+    "Ensure this value has at most 200 characters") — Django's own validator
+    trips first, before the value is ever handed to Postgres.
     """
     ContactPageFactory(parent=home_page, slug="contact")
     site = Site.objects.get(is_default_site=True)
@@ -920,12 +921,14 @@ def test_contact_page_map_accepts_a_full_length_google_embed_url(client, home_pa
     assert "0x2f70349e9876ffa4" in content
 
 
-def test_map_embed_url_field_is_long_enough_for_real_embed_urls(db):
+def test_map_embed_url_field_is_long_enough_for_real_embed_urls():
     """The field's declared ``max_length`` leaves headroom over a real embed URL.
 
     Paired with the round-trip test above: that one proves today's URL fits,
     this one states the intent, so shortening the field back toward the 200-char
-    default fails here with an obvious reason rather than as a DataError.
+    default fails here with an obvious reason rather than as a validation error
+    buried in an unrelated test. Reads the field declaration only, so it needs
+    no database.
     """
     field = ContactBankSettings._meta.get_field("map_embed_url")
     assert field.max_length >= 500

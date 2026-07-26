@@ -611,7 +611,8 @@ class ContactBankSettings(ClusterableModel, BaseSiteSetting):
         blank=True,
         help_text=(
             "Optional map embed URL — the iframe src from Google Maps → Share → "
-            "Embed a map. A share link (maps.app.goo.gl/…) will not render."
+            "Embed a map, or an OpenStreetMap embed URL. Must be an embed URL, "
+            "not a share link: maps.app.goo.gl/… links cannot render in a frame."
         ),
     )
 
