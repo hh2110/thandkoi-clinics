@@ -43,22 +43,39 @@ promptly", which every caller in this codebase already handles.
 #: expressible; 5 is comfortably above that floor while still failing fast
 #: enough to stay inside gunicorn's worker timeout.
 #:
-#: Sized against the real path rather than guessed: the app and its database
-#: are co-located (Render ``singapore`` / Neon ``aws-ap-southeast-1``), where a
-#: healthy connect is milliseconds. The margin here is for a Neon compute
-#: resuming from scale-to-zero, not for network round trips.
+#: What is actually known about the value: the app and its database are
+#: co-located (Render ``singapore`` / Neon ``aws-ap-southeast-1``), and healthy
+#: connects observed on 2026-07-26 were ~0.15s local and ~0.5s in production,
+#: so 5s is ~10x the observed healthy case.
+#:
+#: What is NOT known, deliberately stated rather than implied: Neon autosuspend
+#: is enabled on this project (``suspend_timeout_seconds: 0`` — the 5-minute
+#: default), and **no cold resume was ever timed**. Today the UptimeRobot
+#: ``/healthz`` poll queries the database often enough to keep the compute
+#: warm, so resumes effectively do not happen; if that monitor is ever paused,
+#: a resume slower than this bound would turn a slow first page load into a
+#: 503. That is the one scenario where this value could be wrong, and the
+#: reason it is overridable: ``DB_CONNECT_TIMEOUT`` is dialable from the Render
+#: dashboard with no deploy. Raise it there first, then measure, before
+#: changing this constant.
 DEFAULT_CONNECT_TIMEOUT_SECONDS = 5
 
 #: TCP keepalive probing for connections that are already established.
 #:
-#: ``connect_timeout`` alone would still leave a gap. ``CONN_MAX_AGE`` is 60 in
-#: production, so workers hold persistent connections between requests, and the
-#: same vanished-network fault can strand a query on a socket whose peer is
-#: gone. Without keepalives the kernel does not probe such a socket and the
-#: read blocks indefinitely — the identical failure shape, just reached through
-#: a different door.
+#: ``connect_timeout`` only covers opening a connection. ``CONN_MAX_AGE`` is 60
+#: in production, so a worker keeps a connection **idle between requests**, and
+#: a vanished network leaves that socket dead with nothing to notice — the next
+#: request then blocks on it. Keepalives make the kernel probe an idle socket
+#: and fail it, giving up after roughly idle + (interval x count) = 60s.
 #:
-#: Values give up after roughly idle + (interval x count) = 60s of silence.
+#: Be precise about the limit, because the gap is easy to misread as covered:
+#: keepalives probe **idle** connections only. A query already in flight is
+#: governed by TCP retransmission, not keepalives, so this does NOT bound a
+#: request that was mid-query when the network dropped — that would need
+#: ``tcp_user_timeout`` (Linux-only) or a server-side ``statement_timeout``.
+#: Neither is set here: the observed outage failed at connect, and adding
+#: query-deadline policy on top would be unverified scope. If a long-running
+#: query path is ever added, that gap is still open and must be closed then.
 KEEPALIVE_OPTIONS = {
     "keepalives": 1,
     "keepalives_idle": 30,
