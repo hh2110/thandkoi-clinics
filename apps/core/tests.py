@@ -35,6 +35,7 @@ from apps.core.factories import (
     ServiceFactory,
     TeamMemberFactory,
     TeamPageFactory,
+    UpcomingEventFactory,
 )
 from apps.core.models import (
     CampReportPage,
@@ -44,6 +45,7 @@ from apps.core.models import (
     NewsletterPage,
     Service,
     TeamMember,
+    UpcomingEvent,
 )
 
 
@@ -1975,3 +1977,145 @@ def test_robots_txt_does_not_disallow_the_report_pages(client):
     ]
     assert disallowed, "expected robots.txt to disallow at least the admin paths"
     assert not any("report" in path for path in disallowed)
+
+
+# --- Plan 19: "Upcoming events" hero corner card -----------------------------
+
+
+def test_home_page_get_upcoming_event_returns_none_with_no_events(home_page):
+    """No ``UpcomingEvent`` rows at all → the hero corner card degrades to
+    nothing, same "hide, don't leave a stale box" rule as the report/
+    newsletter teasers (home_page.html's own docstring)."""
+    assert home_page.get_upcoming_event() is None
+
+
+def test_home_page_get_upcoming_event_excludes_past_events(home_page, db):
+    """An event whose date has passed never surfaces — the design handoff's
+    "auto-hides once the event's date has passed" rule for option 1b."""
+    UpcomingEventFactory(
+        date=datetime.date.today() - datetime.timedelta(days=1), title="Past camp"
+    )
+
+    assert home_page.get_upcoming_event() is None
+
+
+def test_home_page_get_upcoming_event_includes_today(home_page, db):
+    """An event dated today still counts as upcoming (date__gte=today, not __gt)."""
+    UpcomingEventFactory(date=datetime.date.today(), title="Today's camp")
+
+    result = home_page.get_upcoming_event()
+
+    assert result is not None
+    assert result.title == "Today's camp"
+
+
+def test_home_page_get_upcoming_event_returns_only_the_soonest(home_page, db):
+    """Option 1b is a single-event card, by design (docs/design/
+    upcoming-events-handoff.md's reconciliation note) — with several
+    ``UpcomingEvent`` rows in the admin, only the earliest future date shows,
+    never a list. ``UpcomingEvent`` itself stays list-capable for a future
+    1a revisit; only the home-page query caps at one."""
+    today = datetime.date.today()
+    UpcomingEventFactory(date=today + datetime.timedelta(days=30), title="Later")
+    soonest = UpcomingEventFactory(
+        date=today + datetime.timedelta(days=3), title="Soonest"
+    )
+    UpcomingEventFactory(date=today + datetime.timedelta(days=10), title="Middle")
+
+    result = home_page.get_upcoming_event()
+
+    assert isinstance(result, UpcomingEvent)
+    assert result.pk == soonest.pk
+
+
+def test_home_page_omits_events_teaser_card_with_no_events(client, home_page):
+    """No upcoming events → no card markup at all on the rendered page."""
+    content = client.get("/en/").content.decode()
+
+    assert "events-teaser__card" not in content
+
+
+def test_home_page_renders_events_teaser_card_with_no_link_or_flyer(client, home_page):
+    """Bare event (no link_url, no flyer) → a plain, non-interactive card:
+    a <div>, not an <a> or a lightbox-triggering <button> (row-state
+    precedent: 'No link' rows aren't focusable)."""
+    UpcomingEventFactory(
+        date=datetime.date.today() + datetime.timedelta(days=5),
+        title="Free medical camp — Thandkoi",
+        description="Consultations, medicines and specialist care.",
+    )
+
+    content = client.get("/en/").content.decode()
+
+    assert "events-teaser__card" in content
+    assert "Free medical camp — Thandkoi" in content
+    assert "Consultations, medicines and specialist care." in content
+    assert '<div class="card events-teaser__card">' in content
+    assert "data-lightbox-trigger" not in content
+
+
+def test_home_page_renders_events_teaser_card_as_link_when_link_url_set(
+    client, home_page
+):
+    """A ``link_url``-only event renders the whole card as an <a>, per the
+    row-interaction states in the design handoff."""
+    UpcomingEventFactory(
+        date=datetime.date.today() + datetime.timedelta(days=5),
+        title="Women's health outreach",
+        link_url="https://example.org/womens-health",
+    )
+
+    content = client.get("/en/").content.decode()
+
+    assert (
+        '<a class="card events-teaser__card" href="https://example.org/womens-health">'
+        in content
+    )
+    assert "data-lightbox-trigger" not in content
+
+
+def test_home_page_renders_events_teaser_card_as_lightbox_trigger_when_flyer_set(
+    client, home_page
+):
+    """A ``flyer``-only event becomes a ``[data-lightbox-trigger]`` opening
+    the shared lightbox on the flyer's ``original`` rendition, exactly like
+    ``media_grid.html``'s gallery photos."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    flyer = Image.objects.create(
+        title="Free Sugar Camp flyer", file=get_test_image_file()
+    )
+    UpcomingEventFactory(
+        date=datetime.date.today() + datetime.timedelta(days=5),
+        title="Free medical camp — Thandkoi",
+        flyer=flyer,
+    )
+
+    content = client.get("/en/").content.decode()
+
+    assert "<button" in content
+    assert "data-lightbox-trigger" in content
+    assert "View the flyer" in content
+    assert 'data-lightbox-alt="Free Sugar Camp flyer"' in content
+
+
+def test_home_page_events_teaser_card_flyer_takes_precedence_over_link_url(
+    client, home_page
+):
+    """When both ``link_url`` and ``flyer`` are set, the flyer wins — the
+    checklist's stated precedence — so the card is a lightbox trigger, not a
+    link to ``link_url``."""
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    flyer = Image.objects.create(title="Flyer", file=get_test_image_file())
+    UpcomingEventFactory(
+        date=datetime.date.today() + datetime.timedelta(days=5),
+        title="Community health talk",
+        link_url="https://example.org/talk",
+        flyer=flyer,
+    )
+
+    content = client.get("/en/").content.decode()
+
+    assert "data-lightbox-trigger" in content
+    assert 'href="https://example.org/talk"' not in content

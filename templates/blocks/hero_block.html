@@ -19,9 +19,18 @@ was authored (a fixed {% translate %} string, not editor copy). If you ever
 reuse HeroBlock on a non-home page and do NOT want the wordmark, gate this with
 a new `show_wordmark` BooleanBlock field on HeroBlock and only set `tkc_wordmark`
 when it's true.
+
+Plan 19: `upcoming_event` is not a block field — HeroBlock is only ever used
+on HomePage (no other page type composes it), so it's read straight off the
+ambient page context that `HomePage.get_context` sets, the same way this
+template is itself rendered inside that same context by `{% include_block %}`
+(no `only`). The flyer rendition is resolved here, mirroring how `value.image`
+is resolved into `hero_img` above — `original` (not a fixed crop) because the
+flyer is a designed graphic, not a photo (docs/design/upcoming-events-handoff.md).
 {% endcomment %}
 {% if value.image %}{% image value.image fill-760x950 as hero_img %}{% endif %}
+{% if upcoming_event.flyer %}{% image upcoming_event.flyer original as upcoming_event_flyer %}{% endif %}
 {% firstof value.primary_cta_donate|yesno:"button--donate," "button--primary" as hero_cta_class %}
 {% if value.primary_cta_page %}{% firstof value.primary_cta_label "" as hero_cta_label %}{% endif %}
 {% translate "The Thandkoi Clinics" as tkc_wordmark %}
-{% include "partials/sections/hero.html" with wordmark=tkc_wordmark eyebrow=value.eyebrow title=value.headline intro=value.intro primary_cta_label=hero_cta_label primary_cta_url=value.primary_cta_page.url primary_cta_class=hero_cta_class secondary_cta_label=value.secondary_cta_label secondary_cta_url=value.secondary_cta_page.url tagline=value.tagline media_image=hero_img.url media_alt=value.image.title media_caption=value.media_caption stat_value=value.stat_value stat_label=value.stat_label %}
+{% include "partials/sections/hero.html" with wordmark=tkc_wordmark eyebrow=value.eyebrow title=value.headline intro=value.intro primary_cta_label=hero_cta_label primary_cta_url=value.primary_cta_page.url primary_cta_class=hero_cta_class secondary_cta_label=value.secondary_cta_label secondary_cta_url=value.secondary_cta_page.url tagline=value.tagline media_image=hero_img.url media_alt=value.image.title media_caption=value.media_caption stat_value=value.stat_value stat_label=value.stat_label upcoming_event=upcoming_event upcoming_event_flyer_url=upcoming_event_flyer.url upcoming_event_flyer_alt=upcoming_event.flyer.title %}

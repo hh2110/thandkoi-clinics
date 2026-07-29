@@ -25,6 +25,14 @@ Context (all optional — a section renders whatever it's given):
                          match the slot's --media-ratio (layout.css).
   media_caption        — caption for the placeholder when no image is set.
   stat_value / stat_label   — optional floating stat card over the media.
+  upcoming_event        — optional (Plan 19, design handoff option 1b). A
+                         dict/object with date/title/description and
+                         optionally link_url or flyer_url+flyer_alt (mutually
+                         exclusive — flyer wins if both are set). Renders a
+                         second floating card at the media's trailing edge,
+                         mirroring stat_value/stat_label's leading-edge card.
+                         Falls back to a static block below the hero content
+                         under 56rem (partials/event_card.html + layout.css).
 
 Numbers and copy are inputs only — nothing here is baked in.
 {% endcomment %}
@@ -64,6 +72,9 @@ Numbers and copy are inputs only — nothing here is baked in.
           <p class="hero__stat-value">{{ stat_value }}</p>
           {% if stat_label %}<p class="hero__stat-label">{{ stat_label }}</p>{% endif %}
         </div>
+      {% endif %}
+      {% if upcoming_event %}
+        {% include "partials/event_card.html" with event=upcoming_event flyer_url=upcoming_event_flyer_url flyer_alt=upcoming_event_flyer_alt %}
       {% endif %}
     </div>
   </div>

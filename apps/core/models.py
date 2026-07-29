@@ -259,6 +259,23 @@ class HomePage(Page):
             return body_blocks, []
         return body_blocks[:circle_index], body_blocks[circle_index:]
 
+    def get_upcoming_event(self):
+        """The single soonest not-yet-passed event, for the hero corner card.
+
+        Plan 19 (design handoff, option 1b — approved): the corner card shows
+        exactly one event, never a list, so this returns one instance or
+        ``None`` rather than a queryset — mirrors ``get_latest_report``'s own
+        degrade-to-``None`` pattern. ``UpcomingEvent`` stays a plain
+        site-wide snippet (not scoped to this page's tree, unlike
+        ``get_latest_report``/``get_latest_newsletter``) since there is only
+        one ``HomePage`` and no other page type will ever query it.
+        """
+        return (
+            UpcomingEvent.objects.filter(date__gte=datetime.date.today())
+            .order_by("date")
+            .first()
+        )
+
     def get_context(self, request, *args, **kwargs):
         # Imported here rather than at module scope, mirroring
         # ``get_live_impact_stats``'s own deferred pipeline import: this app
@@ -274,6 +291,7 @@ class HomePage(Page):
         # Entry point 1c (Plan 16.4): the impact band's fourth, link tile.
         # ``None`` leaves the band exactly as it was — a three-card row.
         context["dashboard_url"] = ClinicDashboardPage.entry_point_url()
+        context["upcoming_event"] = self.get_upcoming_event()
         body_before_circle, body_from_circle = self.get_body_split_on_circle_of_care()
         context["body_before_circle_of_care"] = body_before_circle
         context["body_from_circle_of_care"] = body_from_circle
@@ -281,6 +299,65 @@ class HomePage(Page):
 
     class Meta:
         verbose_name = "Home page"
+
+
+class UpcomingEvent(models.Model):
+    """A forward-looking event announcement (Plan 19) — a Wagtail snippet.
+
+    Distinct from ``CampReportPage``/the data pipeline: those describe a camp
+    *after* it happened, from real attendance data. This is a hand-entered,
+    pre-event announcement with no attendance figures at all — the two are
+    deliberately not conflated (design handoff decision). A snippet, not a
+    StreamField block on ``HomePage``, because ``HomePage.get_upcoming_event``
+    needs to filter/order live (date >= today, ascending) rather than reflect
+    whatever order an editor hand-arranged.
+
+    No photo-per-event field, deliberately: a future event doesn't have a
+    photo yet by definition. ``flyer`` is optional and is the clinic's own
+    designed announcement graphic, not identifiable patient/community
+    photography, so ``docs/brand-guidelines.md`` §5's photo-consent gate
+    (``GalleryImage.consent_confirmed`` / ``ConsentedImageBlock``) doesn't
+    apply to it.
+    """
+
+    date = models.DateField()
+    title = models.CharField(max_length=120)
+    description = models.CharField(
+        max_length=160,
+        blank=True,
+        help_text="Optional, ~140 characters of guidance from the design "
+        "handoff (field allows a little headroom).",
+    )
+    link_url = models.URLField(
+        blank=True,
+        help_text="Optional. Mutually exclusive with 'flyer' in the home-page "
+        "card — set one or the other, not both (if both are set, the flyer "
+        "takes precedence).",
+    )
+    flyer = models.ForeignKey(
+        "wagtailimages.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="Optional. When set, the home-page card opens this image "
+        "in the site's shared lightbox instead of linking to 'link_url'.",
+    )
+
+    panels = [
+        FieldPanel("date"),
+        FieldPanel("title"),
+        FieldPanel("description"),
+        FieldPanel("link_url"),
+        FieldPanel("flyer"),
+    ]
+
+    class Meta:
+        verbose_name = "Upcoming event"
+        ordering = ["date"]
+
+    def __str__(self):
+        return f"{self.date:%Y-%m-%d} — {self.title}"
 
 
 class AboutPage(Page):
