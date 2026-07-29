@@ -41,37 +41,43 @@ new scope, not a surfacing job.
 
 ## Design status
 
-**Currently in progress:** a design pass for this card is starting
-separately (see the design-agent brief below) before any task file or
-branch is opened. Per Stage 3/Stage 5, this settles the open design question
-— lightweight admin-editable snippet vs. a full page type, and where exactly
-the card sits in the home page's existing section order — before
-implementation, rather than guessing.
+**Done.** A design bundle landed 2026-07-29 with two placement options;
+**1b (hero corner card) is approved**. Landed as
+[`docs/design/upcoming-events-handoff.md`](../../docs/design/upcoming-events-handoff.md),
+which also documents two things caught while grounding the bundle against
+the real repo before implementation: an internal inconsistency between the
+bundle's approved-option screenshot and its generic checklist (resolved in
+favour of what was actually approved — 1b, single event, no new section
+partial), and a mobile-width overlap bug between the new card and the
+existing `.hero__stat-card` (found via live 390px verification and fixed by
+giving both cards the same stacked mobile treatment).
 
 ## Milestones
 
-- [ ] **1. Design pass.** Produce a handoff (spec + interactive prototype +
-      light/dark screenshots), matching the format of the existing
-      `docs/design/clinic-dashboard-handoff.md` /
-      `docs/design/mobile-menu-handoff.md` bundles, for an "Upcoming events"
-      card on the home page. Not started — design agent brief below.
-- [ ] **2. Task file + implementation**, once the design handoff lands:
-      data model (leaning admin-editable snippet — date, title, optional
-      link/description — per the existing `ContactBankSettings`-style
-      singleton/snippet pattern rather than a full page type, pending the
-      design pass confirming placement), template, and the home-page slot
-      itself.
+- [x] **1. Design pass.** Handoff landed:
+      [`docs/design/upcoming-events-handoff.md`](../../docs/design/upcoming-events-handoff.md)
+      + screenshots in `docs/design/upcoming-events/`, matching the format of
+      the existing `docs/design/clinic-dashboard-handoff.md` /
+      `docs/design/mobile-menu-handoff.md` bundles.
+- [x] **2. Implementation.** Shipped as `feat/home-upcoming-events`: a plain
+      `UpcomingEvent` Wagtail **snippet** (multi-row — not a singleton like
+      `ContactBankSettings`; the home page queries it and renders only the
+      soonest not-yet-passed row), the hero corner card template/CSS, and
+      the shared-lightbox interaction for events with a flyer. Verified live
+      (light/dark/mobile/RTL) with a real flyer image, not just tests.
 - [ ] **3. Content:** the maintainer adds the 2026-08-06 camp as the first
-      real entry once the feature ships.
+      real entry via `/admin/` → Snippets → Upcoming events, once this PR is
+      live. (A local-dev-only test entry was used for verification during
+      implementation — no production/committed data.)
 
 **Priority: P0** — time-sensitive; the camp this was raised about is
 2026-08-06.
 
 ## Sequencing
 
-Design (1) blocks implementation (2), which blocks content (3). Single
-branch/PR once the design handoff lands and a task file is written:
-`feat/home-upcoming-events` (indicative, confirm at branch-creation time).
+Design (1) blocked implementation (2), which blocks content (3). Landed as a
+single PR once the design handoff arrived, per the plan below:
+`feat/home-upcoming-events`.
 
 ## Feature flags (Stage 6)
 
