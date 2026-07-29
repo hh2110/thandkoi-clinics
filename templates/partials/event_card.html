@@ -1,0 +1,42 @@
+{% load i18n %}
+{% comment %}
+Plan 19 — the "Upcoming events" hero corner card (design handoff option 1b,
+approved: docs/design/upcoming-events-handoff.md). Single event only, by
+design — the clinic doesn't expect to run more than one at a time. Floats
+over the hero media's trailing edge at >=56rem; layout.css repositions it to
+a static block below that breakpoint instead of duplicating markup.
+
+Context:
+  event      — required. date/title/description/link_url (a model instance
+               or dict all work — only attribute/key access is used).
+  flyer_url  — optional resolved rendition URL. Mutually exclusive with
+               event.link_url in the design — when both are set, the flyer
+               wins (matches the checklist's stated precedence).
+  flyer_alt  — alt text for the flyer, used as the lightbox alt text.
+
+Wrapper element depends on the event's affordance: a lightbox-triggering
+<button> when a flyer is set, an <a> when only link_url is set, a plain
+<div> otherwise (row-state precedent: media_grid.html's gallery photos use
+the same [data-lightbox-trigger] <button> pattern).
+{% endcomment %}
+{% if flyer_url %}
+  {% blocktranslate asvar events_teaser_lightbox_label with subject=event.title %}View the flyer for {{ subject }}{% endblocktranslate %}
+  <button
+    type="button"
+    class="card events-teaser__card"
+    data-lightbox-trigger
+    data-lightbox-src="{{ flyer_url }}"
+    data-lightbox-alt="{{ flyer_alt|default:event.title }}"
+    aria-label="{{ events_teaser_lightbox_label }}"
+  >
+    {% include "partials/_event_card_content.html" with event=event show_flyer_affordance=True %}
+  </button>
+{% elif event.link_url %}
+  <a class="card events-teaser__card" href="{{ event.link_url }}">
+    {% include "partials/_event_card_content.html" with event=event %}
+  </a>
+{% else %}
+  <div class="card events-teaser__card">
+    {% include "partials/_event_card_content.html" with event=event %}
+  </div>
+{% endif %}

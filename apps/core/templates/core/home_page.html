@@ -57,6 +57,15 @@ link tile pointing at the clinic dashboard — opt-in context on the shared
 partial (D7), so the newsletter band that also includes it is unchanged.
 `dashboard_url` is None until the dashboard page exists and is live, and
 the tile simply doesn't render then.
+
+2026-07-29 (Plan 19): `upcoming_event` (a single soonest-not-yet-passed
+``UpcomingEvent`` snippet, or None) is set here for the hero corner card,
+even though this template never references it directly — HeroBlock reads it
+straight off this ambient context (see templates/blocks/hero_block.html's
+docstring), the same way `{% include_block %}` already passes this whole
+context into every block template. Degrades to nothing (no card) when None,
+same "hide, don't leave a stale box" rule as the report/newsletter teasers
+above.
 {% endcomment %}
 
 {% block content %}

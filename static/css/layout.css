@@ -185,6 +185,81 @@
   }
 }
 
+/* --- Upcoming-events hero corner card (Plan 19, design handoff option 1b) --
+   Mirrors .hero__stat-card but floats over the media's trailing edge
+   (`inset-inline-end`, flips under RTL) instead of the leading edge, and
+   only ever holds one event — HomePage.get_upcoming_event() returns at most
+   one row, by design (docs/design/upcoming-events-handoff.md); this is not
+   a list component. `.eyebrow` is reused as-is for the "Upcoming · 6 Aug"
+   label rather than a new text style. */
+.events-teaser__card {
+  position: absolute;
+  inset-inline-end: calc(-1 * var(--space-3));
+  inset-block-start: var(--space-3);
+  max-width: 13rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+}
+
+.events-teaser__card .eyebrow {
+  margin-block-end: 0;
+}
+
+a.events-teaser__card,
+button.events-teaser__card {
+  cursor: pointer;
+}
+
+a.events-teaser__card:hover,
+button.events-teaser__card:hover {
+  background-color: var(--color-accent-soft-bg);
+}
+
+.events-teaser__title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.events-teaser__description {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+}
+
+.events-teaser__affordance {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-brand);
+}
+
+/* Below the two-column hero breakpoint, two floating corner cards crowd an
+   already-narrow hero image — the design handoff asserts a "static block"
+   mobile treatment for the new card without a screenshot demonstrating it
+   (flagged in docs/design/upcoming-events-handoff.md). Live-checked at
+   390px: making only the new card static left it overlapping
+   `.hero__stat-card`, which stayed absolutely positioned and bottom-anchored
+   to a now-taller `.hero__media` — so both cards get the same static,
+   stacked treatment here, not just the new one. */
+@media (max-width: 55.99rem) {
+  .hero__stat-card,
+  .events-teaser__card {
+    position: static;
+    inset-inline-start: auto;
+    inset-inline-end: auto;
+    inset-block-start: auto;
+    inset-block-end: auto;
+    max-width: none;
+    margin-block-start: var(--space-3);
+  }
+}
+
 /* --- Inline stats (feature-split's daily-report teaser figures) ------------
    Distinct from the impact-stat band below: these sit inline beside body
    copy, not in their own cards. */

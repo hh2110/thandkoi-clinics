@@ -32,6 +32,7 @@ from apps.core.models import (
     Service,
     TeamMember,
     TeamPage,
+    UpcomingEvent,
 )
 
 # A ready-made StreamField body composing the Plan 03.5 section kit (hero +
@@ -271,3 +272,13 @@ class DonorFactory(factory.django.DjangoModelFactory):
 
     name = factory.Sequence(lambda n: f"Donor {n}")
     description = "Donated in-kind support."
+
+
+class UpcomingEventFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = UpcomingEvent
+
+    date = factory.LazyFunction(
+        lambda: datetime.date.today() + datetime.timedelta(days=7)
+    )
+    title = factory.Sequence(lambda n: f"Event {n}")

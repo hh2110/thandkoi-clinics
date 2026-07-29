@@ -1,0 +1,12 @@
+{% load i18n %}
+{% comment %}
+Inner content shared by event_card.html's three wrapper variants (button /
+a / div) — kept separate so the wrapper choice doesn't triplicate this markup.
+
+Context: event (date/title/description), show_flyer_affordance (bool).
+{% endcomment %}
+{% blocktranslate asvar events_teaser_label with date=event.date|date:"j M" %}Upcoming · {{ date }}{% endblocktranslate %}
+<span class="eyebrow">{{ events_teaser_label }}</span>
+<span class="events-teaser__title">{{ event.title }}</span>
+{% if event.description %}<span class="events-teaser__description">{{ event.description }}</span>{% endif %}
+{% if show_flyer_affordance %}<span class="events-teaser__affordance">{% translate "View the flyer" %} ↗</span>{% endif %}
