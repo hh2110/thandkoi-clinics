@@ -50,7 +50,7 @@ DEFAULT_HOME_BODY = [
             "headline": "Compassionate care for our community",
             "intro": "A not-for-profit, family-run primary care clinic funded on "
             "a Zakat & Sadaqa model.",
-            "tagline": "صحت سب کے لیے",
+            "tagline": "هر چا لپاره د شفا او امید څراغ",
             "stat_value": "Free",
             "stat_label": "for every Zakat beneficiary",
         },

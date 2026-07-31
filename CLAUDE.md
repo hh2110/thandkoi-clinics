@@ -219,3 +219,14 @@ Pashto may follow.
 > (maintainer's explicit ask, Plan 11 D4) — this is a content removal, not a
 > doc that fell out of sync. Newsletter branding instead carries a clay-lamp
 > ("chiragh") motif; see the newsletter archive template.
+
+> **2026-07-31:** "Pashto may follow" above is now partially done — the
+> tagline itself is now Pashto ("هر چا لپاره د شفا او امید څراغ"), replacing
+> the Urdu line, in two places: the site-wide footer (`footer.html`, a
+> template literal — takes effect on deploy, no admin action needed) and the
+> home page hero (`.hero__tagline` in layout.css got a font-size bump to
+> match), but the hero's own tagline *text* is Wagtail content, not a
+> template literal — the live home page still needs a one-time edit in the
+> admin to actually show the new line. This PR ships the code side only;
+> `seed_core_content`'s default is updated for fresh installs, but doesn't
+> touch already-published content.

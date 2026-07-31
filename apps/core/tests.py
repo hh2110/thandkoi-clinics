@@ -1937,16 +1937,17 @@ def test_home_page_shows_a_visible_org_name(client, home_page):
     assert '<p class="hero__wordmark">The Thandkoi Clinics</p>' in content
 
 
-def test_footer_urdu_tagline_no_longer_includes_chiragh_shafa(client, home_page):
-    """Plan 11 D4: "چراغ شفا" is retired from the site-wide footer.
+def test_footer_shows_pashto_tagline(client, home_page):
+    """2026-07-31: the footer's Urdu tagline is replaced by a Pashto one.
 
-    Maintainer's explicit ask (2026-07-23) — "صحت سب کے لیے" stays, the
-    "چراغ شفا" half is removed. The footer renders on every page (it's the
-    site chrome, not home-page-specific content), so the home page is enough
-    to exercise it.
+    Maintainer's explicit ask — "صحت سب کے لیے" is swapped for
+    "هر چا لپاره د شفا او امید څراغ" in the site-wide footer (still not the
+    retired "چراغ شفا" pairing, Plan 11 D4). The footer renders on every
+    page (it's site chrome, not home-page-specific content), so the home
+    page is enough to exercise it.
     """
     content = client.get("/en/").content.decode()
-    assert "صحت سب کے لیے" in content
+    assert "هر چا لپاره د شفا او امید څراغ" in content
     assert "چراغ شفا" not in content
 
 

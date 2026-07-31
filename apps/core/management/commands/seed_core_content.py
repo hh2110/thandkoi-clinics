@@ -237,7 +237,7 @@ HOME_BODY = [
             "intro": "A not-for-profit, family-run primary care clinic serving "
             "our community on a Zakat and Sadaqa model, free for those most in "
             "need.",
-            "tagline": "صحت سب کے لیے",
+            "tagline": "هر چا لپاره د شفا او امید څراغ",
             "stat_value": "100%",
             "stat_label": "donor-funded, free for those in need",
         },

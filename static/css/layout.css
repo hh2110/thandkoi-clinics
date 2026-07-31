@@ -123,7 +123,9 @@
 
 .hero__tagline {
   font-family: var(--font-urdu-display);
-  font-size: var(--font-size-lg);
+  /* Bumped from --font-size-lg (2026-07-31, Pashto tagline swap) — same
+     type-scale step used elsewhere for emphasis, not a one-off value. */
+  font-size: var(--font-size-xl);
   color: var(--color-brand);
   margin-block: var(--space-4) 0;
 }

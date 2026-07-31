@@ -1,6 +1,6 @@
 {% load i18n %}
 {% comment %}
-Two-column hero: headline + intro + CTA cluster + Urdu tagline on one side, an
+Two-column hero: headline + intro + CTA cluster + RTL tagline on one side, an
 optional media slot with a floating stat card on the other. Collapses to one
 column below 56rem (layout.css).
 
@@ -19,7 +19,8 @@ Context (all optional — a section renders whatever it's given):
                          Pass "button--donate" only for the Zakat/Sadaqa ask
                          (amber is Donate-only, brand-guidelines.md §7).
   secondary_cta_label / secondary_cta_url — optional outline action.
-  tagline              — Urdu tagline, rendered lang="ur" dir="rtl".
+  tagline              — RTL tagline, rendered lang="ps" dir="rtl" (Pashto,
+                         2026-07-31 — was Urdu/lang="ur" before this swap).
   media_image / media_alt   — hero image; falls back to the placeholder. Pass a
                          4:5 rendition (hero_block.html uses fill-760x950) to
                          match the slot's --media-ratio (layout.css).
@@ -59,7 +60,7 @@ Numbers and copy are inputs only — nothing here is baked in.
           {% endif %}
         </div>
       {% endif %}
-      {% if tagline %}<p class="hero__tagline" lang="ur" dir="rtl">{{ tagline }}</p>{% endif %}
+      {% if tagline %}<p class="hero__tagline" lang="ps" dir="rtl">{{ tagline }}</p>{% endif %}
     </div>
     <div class="hero__media">
       {% if media_image %}

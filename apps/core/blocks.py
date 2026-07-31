@@ -40,7 +40,7 @@ class HeroBlock(blocks.StructBlock):
     tagline = blocks.CharBlock(
         required=False,
         max_length=80,
-        help_text="Urdu tagline, rendered right-to-left.",
+        help_text="RTL tagline (currently Pashto), rendered right-to-left.",
     )
     image = ImageChooserBlock(required=False)
     media_caption = blocks.CharBlock(
