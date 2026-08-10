@@ -79,15 +79,42 @@ Report is now the only camp report. If camps become regular, the better answer
 is the model change (give `CampReportPage` the newsletter's blocks) rather
 than filing every camp under Newsletters.
 
-### Still outstanding: the photos
+### Photos ✅ added 2026-08-10
 
-Two photographs of the camp were supplied and the maintainer **confirmed
-consent** for publication. They are **not yet on the page** for a purely
-practical reason: the image files were pasted into chat and never saved to
-disk, so there was nothing to upload. Once the files exist, the two prose
-paragraphs "who came" and "what the screening found" should be converted to
-`feature_split` ("In focus") blocks with a photo each — that block *requires*
-an image, which is why they went in as plain paragraphs for now.
+Two camp photographs are live, with **consent confirmed by the maintainer** —
+which is exactly what `ConsentedImageBlock.consent_confirmed` attests to
+(brand-guidelines.md §5). The maintainer uploaded them to the Wagtail image
+library directly (image ids 50 and 49); the blocks were then wired via the SSH
+content-ops path.
+
+The body's first two prose paragraphs became `feature_split` ("In focus")
+blocks, each carrying one photo:
+
+| Split | Image | Layout |
+|---|---|---|
+| "A free day of screening" (eyebrow "In focus") | id 50, welcome banner | photo left |
+| "Who came" | id 49, waiting area | photo right (`reverse`), pull stats 93 / 61 |
+
+Verified in a real browser: both splits render with the right photo on the
+right side, the pull stats show, and the closing two paragraphs still follow.
+
+**Note on the browser route.** The maintainer asked for the upload to be done
+through Chrome. That stopped at the Wagtail login — entering a password is not
+something the agent does — so the maintainer uploaded the images themselves and
+the agent wired the blocks over SSH.
+
+**Two things worth knowing about `feature_split`:**
+
+- **It never renders `caption`.** `templates/blocks/newsletter_feature_split_block.html`
+  outputs only the image and `alt_text`; the caption field comes along with
+  `ConsentedImageBlock` but is ignored here. Captions were written and stored
+  anyway, so they'd appear if the template ever grew support — but today they
+  are invisible. Showing them is a template change, i.e. code and a PR.
+- **Consent is enforced at render time, not just at save.** The template wraps
+  the photo in `{% if value.photo.image and value.photo.consent_confirmed %}`,
+  precisely so a photo written by a non-form path (an SSH snippet like this one,
+  a migration, Plan 09's drafting flow) still cannot display unconsented. Worth
+  keeping in mind: it means the gate held here by design, not by luck.
 
 ### The original camp-report publish (superseded)
 
