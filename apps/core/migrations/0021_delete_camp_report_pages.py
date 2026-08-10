@@ -32,10 +32,12 @@ behind: Wagtail's page log entries outlive the pages they describe
 such rows for this subtree) and still reference those content types.
 ``manage.py remove_stale_contenttypes`` can sweep them by hand later.
 
-Irreversible: the pages, their revisions and their draft content are gone
-once this runs. That is the plan's accepted rollback trade — both pages were
-already unpublished and both URLs already redirect to live newsletter
-issues, so nothing a reader can reach depends on them.
+Irreversible, and marked so: the pages, their revisions and their draft
+content are gone once this runs, and a no-op reverse that silently
+"succeeded" would be a lie. Django raises ``IrreversibleError`` instead.
+That is the plan's accepted rollback trade — both pages were already
+unpublished and both URLs already redirect to live newsletter issues, so
+nothing a reader can reach depends on them.
 """
 
 from django.db import migrations
@@ -93,8 +95,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(
-            delete_camp_report_pages,
-            migrations.RunPython.noop,
-        ),
+        # No reverse_code: deleted pages cannot be brought back, so Django
+        # refuses to unapply rather than pretending. See the docstring.
+        migrations.RunPython(delete_camp_report_pages),
     ]

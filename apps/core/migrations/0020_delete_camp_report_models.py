@@ -30,9 +30,16 @@ type that has no model behind it — a state Wagtail tolerates deliberately
 API, which keeps ``path``/``depth``/``numchild`` correct. Verified on the
 replica: ``Page.find_problems()`` comes back clean.
 
-Both migrations belong to the same deploy. Neither is reversible in any
-useful sense: reversing this one recreates empty tables, and ``0021`` cannot
-bring back deleted content.
+Both migrations belong to the same deploy, and **both are deliberately
+marked irreversible.** Neither could be reversed in any useful sense anyway
+— this one would recreate empty tables, and ``0021`` cannot bring back
+deleted content — but left auto-reversible, ``migrate core 0019`` gets part
+way and then dies on a bare ``DuplicateColumn: column "page_ptr_id" ...
+already exists`` (Django's ``RemoveField(page_ptr)``/``DeleteModel`` pair
+for a multi-table-inheritance child does not round-trip). The no-op guard
+operation below makes Django raise ``IrreversibleError`` up front instead,
+naming the migration, before it touches any schema. Rollback is reverting
+the PR, not migrating backwards — see the plan's release section.
 """
 
 from django.db import migrations
@@ -44,6 +51,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Forward: does nothing. Backward: no reverse_code, so Django refuses
+        # to unapply this migration at all, with a clear error. See docstring.
+        migrations.RunPython(migrations.RunPython.noop),
         migrations.RemoveField(
             model_name="campreportpage",
             name="page_ptr",
