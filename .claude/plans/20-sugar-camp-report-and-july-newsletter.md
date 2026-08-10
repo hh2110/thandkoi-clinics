@@ -44,7 +44,31 @@ content is written out below ready to enter, and needs no code at all.
 
 ---
 
-## Track A — Free Sugar Camp report (content, ready to enter)
+## Track A — Free Sugar Camp report ✅ Published 2026-08-10
+
+**Published to production** on 2026-08-10 via the agent-driven SSH path
+([content-operations.md](../../docs/content-operations.md)) — page id 76,
+live at `/en/camp-reports/free-sugar-camp-report/`, listed above the
+Inauguration Report in the archive.
+
+Two things changed between the draft below and what shipped, both to match
+the precedent rather than the draft:
+
+- **Narrative markup.** The Inauguration Report's `narrative` is flowing
+  `<p>` prose with no headings or lists, so the published version mirrors
+  that voice instead of the headed/bulleted draft below. The figures are
+  identical.
+- **The PKR 20 registration fee** is stated plainly (option (a) below), on
+  the maintainer's go-ahead: "every clinical service at the camp was provided
+  free of cost. A registration fee of PKR 20 per person applied, PKR 1,860
+  across the camp as a whole." The BMI findings are included in full.
+
+Still outstanding on the page: **no photos**. Any added later need
+`consent_confirmed` ticked (brand-guidelines §5). No `report_document` is
+attached either — the Inauguration Report has one, so a camp PDF could be
+added the same way if one exists.
+
+
 
 ### The camp
 
