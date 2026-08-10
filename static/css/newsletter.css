@@ -178,9 +178,22 @@
   color: var(--color-text);
 }
 
-/* --- "In focus" splits — 4:3 photos, unlike the sitewide 16:9 default ----- */
+/* --- "In focus" splits — 4:3 photos, unlike the sitewide 16:9 default -----
+   The wrapper is a <figure> here (see newsletter_feature_split_block.html), so
+   the UA's default figure margin has to go. Scoped to `.nl-feature-split`
+   throughout: partials/sections/feature_split.html's callers pass a plain
+   <div> and must keep the sitewide 16:9 treatment untouched. */
 .nl-feature-split .feature-split__media {
   --media-ratio: 4 / 3;
+  margin: 0;
+}
+
+/* Same faint, small treatment as the media grid's caption (layout.css) — a
+   photo caption reads the same wherever it appears on the site. */
+.nl-feature-split .feature-split__caption {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  margin-block: var(--space-1) 0;
 }
 
 .nl-feature-split h3 {

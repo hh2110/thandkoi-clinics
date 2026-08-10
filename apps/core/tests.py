@@ -1416,6 +1416,82 @@ def test_newsletter_masthead_and_structured_blocks_render(client, home_page):
     assert "69%" in content and 'alt="Inauguration photo"' in content
 
 
+def test_newsletter_feature_split_renders_photo_caption(client, home_page):
+    """The split's photo caption is displayed, not just stored.
+
+    It was silently dropped until 2026-08-10: `ConsentedImageBlock` has always
+    carried a `caption`, but this block's template rendered only the image and
+    alt text, so captions entered against a split were invisible on the page.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Camp photo", file=get_test_image_file())
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="captioned-split",
+        body=[
+            (
+                "feature_split",
+                {
+                    "eyebrow": "",
+                    "heading": "Who came",
+                    "text": "<p>Ninety-three people attended.</p>",
+                    "photo": {
+                        "image": image,
+                        "alt_text": "People waiting in the clinic",
+                        "caption": "Most of those who came were women.",
+                        "consent_confirmed": True,
+                    },
+                    "reverse": False,
+                    "pull_stats": [],
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/captioned-split/").content.decode()
+    assert "Most of those who came were women." in content
+    assert "feature-split__caption" in content
+
+
+def test_newsletter_feature_split_caption_hidden_without_consent(client, home_page):
+    """An unconsented photo takes its caption down with it.
+
+    The caption describes the photo, so leaking it while suppressing the image
+    would defeat the point of the consent gate — and the caption sits *inside*
+    the same `consent_confirmed` branch precisely so it cannot drift out.
+    """
+    from wagtail.images.tests.utils import Image, get_test_image_file
+
+    image = Image.objects.create(title="Ungated photo", file=get_test_image_file())
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="uncaptioned-split",
+        body=[
+            (
+                "feature_split",
+                {
+                    "eyebrow": "",
+                    "heading": "Text still shows",
+                    "text": "<p>Body text renders regardless.</p>",
+                    "photo": {
+                        "image": image,
+                        "alt_text": "",
+                        "caption": "A caption that must not appear.",
+                        "consent_confirmed": False,
+                    },
+                    "reverse": False,
+                    "pull_stats": [],
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/uncaptioned-split/").content.decode()
+    assert "Text still shows" in content
+    assert "A caption that must not appear." not in content
+
+
 def test_newsletter_feature_split_never_renders_unconsented_photo(client, home_page):
     """Mirrors test_newsletter_never_renders_an_unconsented_photo for the new
     feature_split block's own nested ConsentedImageBlock."""

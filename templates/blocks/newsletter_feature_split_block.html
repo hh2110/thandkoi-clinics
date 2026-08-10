@@ -7,6 +7,14 @@ markup — only the photo's aspect ratio (4:3 here vs. the sitewide 16:9
 default) is newsletter-specific, scoped via `.nl-feature-split` in
 newsletter.css so no other .feature-split caller is affected.
 
+The media wrapper is a `<figure>` rather than a plain `<div>` so the block's
+caption has somewhere semantically correct to live. Unlike media_grid's
+`.media-grid__item`, `.feature-split__media` sets no `overflow`/`aspect-ratio`
+of its own — it only carries `--media-ratio`, which the *image* consumes — so
+a caption inside it is not clipped and needs no sibling-wrapper dance. It also
+has to stay the grid child, since `.feature-split--reverse .feature-split__media`
+(layout.css) uses `order` to swap the columns.
+
 The `value.photo.consent_confirmed` guard mirrors consented_image_block.html's
 own comment: `clean()` only runs through the admin-form StreamField widget, so
 this render-time check is the actual guarantee that an unconsented photo is
@@ -17,10 +25,13 @@ flow, a migration, an SSH content-ops snippet).
   <div class="wrapper">
     <div class="feature-split nl-feature-split {% if value.reverse %}feature-split--reverse{% endif %}">
       {% if value.photo.image and value.photo.consent_confirmed %}
-        <div class="feature-split__media">
+        <figure class="feature-split__media">
           {% image value.photo.image fill-800x600 as photo %}
           <img class="feature-split__image" src="{{ photo.url }}" alt="{{ value.photo.alt_text|default:value.photo.image.title }}" />
-        </div>
+          {% if value.photo.caption %}
+            <figcaption class="feature-split__caption">{{ value.photo.caption }}</figcaption>
+          {% endif %}
+        </figure>
       {% endif %}
       <div class="feature-split__body">
         {% if value.eyebrow %}<p class="eyebrow">{{ value.eyebrow }}</p>{% endif %}
