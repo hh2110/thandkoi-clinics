@@ -58,10 +58,15 @@ the precedent rather than the draft:
   `<p>` prose with no headings or lists, so the published version mirrors
   that voice instead of the headed/bulleted draft below. The figures are
   identical.
-- **The PKR 20 registration fee** is stated plainly (option (a) below), on
-  the maintainer's go-ahead: "every clinical service at the camp was provided
-  free of cost. A registration fee of PKR 20 per person applied, PKR 1,860
-  across the camp as a whole." The BMI findings are included in full.
+- **The PKR 20 registration fee is not mentioned at all** — option (b).
+  Published first with the fee stated plainly, then **corrected the same day**:
+  the maintainer confirmed the PKR 20 is a **bug in the clinic software's
+  report**, not a charge anyone actually paid. The camp was free throughout,
+  exactly as the pamphlet advertised. The paragraph now reads: "Every service
+  at the camp was provided entirely free of cost, as advertised —
+  consultations, diagnostic tests and medicines alike. No consultation,
+  laboratory, ultrasound or pharmacy charge was recorded against any
+  attendee." The BMI findings are included in full.
 
 Still outstanding on the page: **no photos**. Any added later need
 `consent_confirmed` ticked (brand-guidelines §5). No `report_document` is
@@ -102,7 +107,7 @@ non-blank `MR #` agrees on 93.)
 | Median BMI | **30.0** |
 | BMI ≥ 25 (overweight or above) | 66 of 87 (75.9%) |
 | BMI ≥ 30 (obese range) | 43 of 87 (49.4%) |
-| Registration fee | PKR 20 per attendee, **PKR 1,860** total |
+| Registration fee | PKR 20 per attendee, PKR 1,860 total — **spurious, a report bug; not published** (see Track C, finding 4) |
 | Consultation / lab / ultrasound / pharmacy charges | **PKR 0** — none recorded against any attendee |
 | Distinct localities in the address field | 22 (free text; indicative only) |
 
@@ -113,22 +118,18 @@ are **empty for all 93 attendees**, as are Next Visit Date and OPD Doctor. The
 report therefore cannot say anything about what was diagnosed, prescribed or
 followed up. Worth fixing at the next camp (Track C, finding 5).
 
-### Open question before publishing (maintainer's call)
+### The PKR 20 registration fee — resolved 2026-08-10, option (b)
 
-**The pamphlet promised "ALL SERVICES 100% FREE", but every attendee was
-charged a PKR 20 registration fee.** Every clinical charge really was zero,
-so the clinical services *were* free — but the site's own reports page
-promises figures "straight from the clinic's daily patient register — no
-estimates, no rounding for effect", and the inauguration report leads on
-"free consultation and examination". Please confirm which is right before
-this publishes:
+The pamphlet promised "ALL SERVICES 100% FREE", but the export charged every
+attendee a PKR 20 registration fee (PKR 1,860 total). Raised as an open
+question before publishing, with two options: (a) it's a token charge the
+camp intended, say so plainly, or (b) it's an error and shouldn't be
+mentioned.
 
-- (a) The PKR 20 is a token registration charge that the camp always
-  intended — say so plainly in the report ("all clinical services free; a
-  PKR 20 registration fee applied"), which is the honest version; **or**
-- (b) it was recorded in error and should not be mentioned.
-
-The draft below takes option (a). It is the only sentence that changes.
+**Answer: (b).** The maintainer confirmed the PKR 20 is a bug in the clinic
+software's report — nobody paid it. The published page states the camp was
+free throughout and says nothing about a fee. See Track C, finding 4, for why
+this matters well beyond this page.
 
 ### Second editorial call: how much of the BMI finding to publish
 
@@ -187,9 +188,9 @@ Report. Fields map 1:1 onto `CampReportPage`:
 >
 > **Cost to patients**
 >
-> No consultation, laboratory, ultrasound or pharmacy charge was recorded
-> against any attendee — every clinical service at the camp was free. A PKR 20
-> registration fee applied, PKR 1,860 across the camp.
+> Every service at the camp was provided entirely free of cost, as advertised
+> — consultations, diagnostic tests and medicines alike. No consultation,
+> laboratory, ultrasound or pharmacy charge was recorded against any attendee.
 >
 > **Reach**
 >
@@ -346,10 +347,21 @@ This is the finding with the longest tail, and it is code, not content.
    dashboard's funding split would need to render a third category they have
    never had to show.
 
-4. **First real fee data.** The camp export has non-zero
-   `Registration Fee (PKR)` (PKR 20 × 93). Plan 16 Phase 2 (revenue) is
-   parked waiting on exactly these columns — this is the first sample where
-   they aren't all zero, though a flat registration fee is a thin test case.
+4. **The fee columns are not trustworthy — corrected 2026-08-10.** The camp
+   export carries a non-zero `Registration Fee (PKR)` (a flat PKR 20 × 93 =
+   PKR 1,860), and this plan originally read that as "the first real fee
+   data" for Plan 16 Phase 2. **That was wrong.** The maintainer confirmed
+   the PKR 20 is a **bug in the clinic software's report** — nobody paid it;
+   the camp was free throughout. The correction has already been applied to
+   the published camp report.
+
+   The consequence is bigger than this one page: **[Plan 16](16-clinic-dashboard.md)
+   Phase 2 (revenue) is parked waiting on exactly these fee columns, and the
+   first sample of non-zero data in them turned out to be spurious.** Phase 2
+   cannot treat a non-zero fee column as ground truth without first
+   establishing, with the clinic team, which fee columns the software
+   populates reliably and which it fabricates. Building a revenue surface on
+   this column as it stands would publish invented income figures.
 
 5. **No clinical data was captured at the camp.** All seven free-text
    columns are empty for all 93 attendees, so the camp contributes nothing to
