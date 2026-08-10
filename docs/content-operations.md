@@ -62,26 +62,52 @@ step of its own, so:
   production-affecting action — this doc describes the mechanism, not a
   blanket standing approval to run arbitrary writes unattended.
 
-## Example: publishing a one-off Camp Report
+## Example: publishing a newsletter issue
+
+`NewsletterPage` is the site's one archive content type — a medical camp is
+published as an issue like any other, since Plan 21 (2026-08-10) retired the
+separate `CampReportPage`. Use `issue_label` to keep the camp framing in the
+masthead.
 
 ```python
-from wagtail.documents.models import Document
-from apps.core.models import CampReportPage, CampReportIndexPage
+from apps.core.models import NewsletterIndexPage, NewsletterPage
 
-doc = Document.objects.get(title="Inauguration report")
-parent = CampReportIndexPage.objects.first()
+parent = NewsletterIndexPage.objects.first()
 
-page = CampReportPage(
-    title="Inauguration Report",
-    camp_date="2026-XX-XX",  # never fabricated — ask if unknown
-    location="Thandkoi, Swabi, KPK",
-    narrative="<p>A short account of the camp.</p>",
-    report_document=doc,
+page = NewsletterPage(
+    title="Free Sugar Camp",
+    slug="free-sugar-camp",
+    issue_date="2026-XX-XX",  # never fabricated — ask if unknown
+    issue_label="Camp Report",  # masthead reads "AUGUST 2026 · CAMP REPORT"
+    summary="A short teaser for the archive listing.",
+    body=[
+        ("paragraph", "<p>A short account of the camp.</p>"),
+        (
+            "stat_band",
+            {"stats": [{"value": "379", "label": "patients seen"}]},
+        ),
+    ],
 )
 parent.add_child(instance=page)
 page.save_revision().publish()
 ```
 
-`CampReportPage` has a dedicated `report_document` field (see
-`apps/core/models.py`) — set it directly to a `Document` instance, as above,
-rather than linking the PDF into the rich-text `narrative` field.
+`body` is a StreamField, so an issue mixes prose with structured blocks —
+`paragraph`, `photo`, `stat_band`, `highlights` and `feature_split`. A
+`photo` block is consent-gated (`brand-guidelines.md` §5) and will refuse to
+save unless `consent_confirmed` is ticked.
+
+**Attaching a PDF.** `NewsletterPage` has no document field, deliberately.
+Upload the file as a `wagtaildocs.Document` and link it from a `paragraph`
+block instead:
+
+```python
+from wagtail.documents.models import Document
+
+doc = Document.objects.get(title="Inauguration report")
+# In a paragraph block's rich text:
+#   <a linktype="document" id="{doc.id}">Download the report (PDF)</a>
+```
+
+That is how the inauguration report's PDF is reached today, from the "A new
+chapter begins" issue — the only link to that document on the site.

@@ -1,11 +1,12 @@
 {% load i18n %}
 {% comment %}
-Minimal prev/next pager for a paginated archive listing (Newsletter and Camp
-Report indexes, Plan 06). Grounded on Django's own Paginator idiom — no
-in-repo precedent existed before these archives.
+Minimal prev/next pager for a paginated archive listing (the Newsletter
+index, Plan 06; the Camp Report index it also served was retired in Plan 21).
+Grounded on Django's own Paginator idiom — no in-repo precedent existed
+before these archives.
 
-Every listing this partial serves (reports, camp reports, newsletters,
-gallery) is ordered newest-first, so "next page" moves further back in time.
+Every listing this partial serves (reports, newsletters, gallery) is ordered
+newest-first, so "next page" moves further back in time.
 Labelled Newer/Older rather than Previous/Next (maintainer feedback,
 2026-07-24) so the direction of travel through the archive is unambiguous.
 

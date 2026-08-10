@@ -74,7 +74,9 @@ inspectable script over an agent-driven one) does the whole runbook:
 
 > **2026-07-23 observed gap:** `/healthz: 200` confirms *a* healthy instance
 > is responding, not that *every* access path is already on the new build.
-> After a real release (`v2026.07.23-4`, adding `CampReportPage.report_document`),
+> After a real release (`v2026.07.23-4`, adding `CampReportPage.report_document`
+> — a page type since retired in Plan 21, but the deploy behaviour below is
+> unchanged),
 > `scripts/release.sh` reported the health check passing and Render's own API
 > already showed the new deploy as `"live"` — but an SSH shell into the
 > instance (see [content-operations.md](content-operations.md)) still ran the
@@ -195,7 +197,7 @@ Production secrets live in two places, never in the repo:
 > signed URL or an authentication check. Do not treat "private collection" as
 > access control for a document that must not be public. This is acceptable
 > today because no private documents exist — every uploaded image/document is
-> intended to be public (newsletter photos, camp-report PDFs). If a genuinely
+> intended to be public (newsletter photos, the inauguration report PDF). If a genuinely
 > private document is ever needed, the storage backend must first be
 > re-architected to issue signed, expiring URLs (`querystring_auth: True` on a
 > non-public bucket); enabling that is deliberately deferred until such a

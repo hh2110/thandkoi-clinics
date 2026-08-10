@@ -5,8 +5,8 @@ Gallery page — Plan 06. Photos are orderable child objects (GalleryImage),
 each rendered through the Plan 03.5 media grid. `consent_confirmed` is
 mandatory on every image before publish (GalleryImage.clean()); `gallery_items`
 (built in GalleryPage.get_context) only ever includes images that passed that
-gate. Paginated (`gallery_page_obj`), same as the Newsletter/Camp Report
-archives, so a growing gallery doesn't load every photo on one request.
+gate. Paginated (`gallery_page_obj`), same as the Newsletter archive, so a
+growing gallery doesn't load every photo on one request.
 {% endcomment %}
 
 {% block social_image_tags %}
