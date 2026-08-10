@@ -70,7 +70,7 @@ committed, matching the existing prototypes here.
 > from a 1.75fr column beside Funding split / Gender to full width above them,
 > inside a horizontal scroller. A new "Responsive" section replaces the page's
 > media queries with auto-fitting grids. Implemented in
-> **[Plan 18](../../.claude/plans/18-mobile-menu-and-dashboard-responsive.md)**
+> **[Plan 18](../../.claude/plans/18b-mobile-menu-and-dashboard-responsive.md)**
 > Track B, where D9 records the one deliberate divergence (page padding).
 
 ## Mobile menu handoff (2026-07-25)
@@ -78,7 +78,7 @@ committed, matching the existing prototypes here.
 Shipped in the same `updates.zip` bundle as the dashboard revision above, but a
 separate work item: three fixes to the primary nav drawer, prompted by feedback
 that the open mobile menu read as "you are in Donate" whatever page you were on.
-Implemented in **[Plan 18](../../.claude/plans/18-mobile-menu-and-dashboard-responsive.md)**
+Implemented in **[Plan 18](../../.claude/plans/18b-mobile-menu-and-dashboard-responsive.md)**
 Track A.
 
 | File | What it is |
