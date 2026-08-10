@@ -44,12 +44,55 @@ content is written out below ready to enter, and needs no code at all.
 
 ---
 
-## Track A — Free Sugar Camp report ✅ Published 2026-08-10
+## Track A — Free Sugar Camp report ✅ Published 2026-08-10, as a newsletter issue
 
-**Published to production** on 2026-08-10 via the agent-driven SSH path
-([content-operations.md](../../docs/content-operations.md)) — page id 76,
-live at `/en/camp-reports/free-sugar-camp-report/`, listed above the
-Inauguration Report in the archive.
+**Live at `/en/newsletters/free-sugar-camp/`** (page id 77), in the
+newsletter/Beacon format.
+
+### Why it moved out of the camp-reports archive
+
+First published as a `CampReportPage` (id 76) at
+`/en/camp-reports/free-sugar-camp-report/`. The maintainer then asked for the
+newsletter's format instead. That is **not** something `CampReportPage` can
+do: its `narrative` is a plain `RichTextField` and its `photos` StreamField
+accepts only `ConsentedImageBlock`, so the impact stat band, highlights and
+"In focus" splits — all newsletter-only blocks — would need a new StreamField,
+a migration, a template rewrite and tests. A real branch and PR, in other
+words, which is why this one ask flipped the earlier "no PR needed" answer.
+
+Offered three routes; the maintainer chose **publish it as a newsletter issue**
+(zero code). So:
+
+- `NewsletterPage` "Free Sugar Camp" created and published — `issue_date`
+  2026-08-06, `issue_label` "Camp Report" (the masthead reads
+  "AUGUST 2026 · CAMP REPORT"), lede + `stat_band` + `highlights` + four
+  prose paragraphs.
+- The `CampReportPage` was **unpublished, not deleted** — reversible from the
+  admin in one click if this is ever reconsidered.
+- A permanent Wagtail redirect maps the old camp-report URL onto the new one,
+  verified returning `301` in production, so nothing that was already shared
+  breaks.
+
+**Known cost of this route:** the Sugar Camp no longer appears in the
+camp-reports archive or the `/reports/` camp teaser, and the Inauguration
+Report is now the only camp report. If camps become regular, the better answer
+is the model change (give `CampReportPage` the newsletter's blocks) rather
+than filing every camp under Newsletters.
+
+### Still outstanding: the photos
+
+Two photographs of the camp were supplied and the maintainer **confirmed
+consent** for publication. They are **not yet on the page** for a purely
+practical reason: the image files were pasted into chat and never saved to
+disk, so there was nothing to upload. Once the files exist, the two prose
+paragraphs "who came" and "what the screening found" should be converted to
+`feature_split` ("In focus") blocks with a photo each — that block *requires*
+an image, which is why they went in as plain paragraphs for now.
+
+### The original camp-report publish (superseded)
+
+Published 2026-08-10 via the agent-driven SSH path
+([content-operations.md](../../docs/content-operations.md)) as page id 76.
 
 Two things changed between the draft below and what shipped, both to match
 the precedent rather than the draft:
