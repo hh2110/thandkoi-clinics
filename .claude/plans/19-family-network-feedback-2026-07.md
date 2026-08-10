@@ -20,7 +20,7 @@ been resolved:
   ([`18-notes-privacy-remediation.md`](18-notes-privacy-remediation.md))**
   fixed the same day — merged, deployed, scrub confirmed.
 - The "Donate menu item stays highlighted" concern matches **Plan 18
-  ([`18-mobile-menu-and-dashboard-responsive.md`](18-mobile-menu-and-dashboard-responsive.md))
+  ([`18b-mobile-menu-and-dashboard-responsive.md`](18b-mobile-menu-and-dashboard-responsive.md))
   Track A** — merged.
 - Small housekeeping items (a stray `&` character, a since-redesigned
   contact-page duplicate, a "no em-dash" content-style note) were either

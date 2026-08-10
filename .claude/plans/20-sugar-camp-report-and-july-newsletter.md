@@ -317,7 +317,12 @@ data, "child" is the 0–18 approximation the daily report already uses
 **68 children (40.7%) and 99 adults (59.3%)**.
 
 "Average patients per day" needs to say *which* day it means: 6.7 per
-operating day, or 5.4 across all 31 calendar days. Pick one and label it.
+operating day, or 5.4 across all 31 calendar days. **DECIDED: use the
+calculated value.** Taken as **6.7 per clinic day**, labelled as such — an
+average over days the clinic was actually open is the meaningful one, and the
+5.4 calendar-day figure would quietly count 6 closed days as zero-patient
+days. If the intent was the calendar-day figure instead, it is 5.4 and only
+the label changes.
 
 Related: the **"Patient trend — July 2026"** line chart draws an unbroken
 line across 1–30 July, but the clinic operated on 25 of the month's days. An
@@ -325,67 +330,96 @@ unbroken line silently interpolates across the 6 closed days and reads as
 "quiet day" rather than "closed" — the exact defect PR #124 fixed on the
 site's own footfall chart. Reuse that treatment, or mark the closed days.
 
-### Brand and identity problems
+### Corrected figures — the spec for the redrawn graphic
 
-1. **The staff portraits and the building/consultation photos appear to be
-   AI-generated.** brand-guidelines.md §5 asks for "real clinic, camp, and
-   community photography" and says to use the logo's family illustration
-   "rather than generic stock". Synthetic portraits are worse than stock
-   here: they attach invented faces to three real, named members of staff.
-   Replace with real photographs, or drop the portraits and keep the names,
-   roles and qualifications.
+Everything below is recomputed from `pipeline_dailyaggregate` for
+2026-07-01 → 2026-07-31 (25 operating days). **Numbers in bold are the ones
+that change from the current design.**
+
+| Panel | Correct value |
+|---|---|
+| Total patients served | 167 |
+| Women | 91 (54.5%) |
+| Men | 76 (45.5%) |
+| Children treated | **68 (40.7%)** — was 69 |
+| Adults treated | **99 (59.3%)** — was 98 |
+| Zakat beneficiaries | 138 (82.6%) |
+| Regular patients | 29 (17.4%) |
+| Average patients per clinic day | **6.7** — was "5–6", and relabelled "per clinic day" |
+
+**The age panel, replacing the five-bucket donut entirely** — these are the
+only age groupings the clinic's data supports:
+
+| Age band | Patients | Share |
+|---|---|---|
+| 0–5 | 28 | 16.8% |
+| 6–18 | 40 | 24.0% |
+| 19–55 | **73** | 43.7% |
+| 56+ | 26 | 15.6% |
+
+Largest group is **19–55 with 73 patients** — not "18–35 with 45", which does
+not exist in the data. "Children" above is 0–5 plus 6–18.
+
+Two further notes for whoever redraws it:
+
+- **The trend chart** should mark the 6 days the clinic was closed rather than
+  drawing an unbroken line across them (see below).
+- **Every figure here is a July total**, and July contains no camp. Consistent
+  with Track C's decision, camps are never folded into these numbers.
+
+### Brand and identity problems — all resolved 2026-08-10
+
+1. ~~**The staff portraits and the building/consultation photos appear to be
+   AI-generated.**~~ **WITHDRAWN — this was wrong.** The maintainer confirmed
+   the portraits are **real photographs of real staff**. No brand-guidelines §5
+   issue; nothing to change. Recorded here rather than deleted because the
+   claim was written into this plan and committed, and a false statement about
+   named colleagues should be corrected in the same place it was made.
 2. **The masthead tagline is not the canonical Pashto line.** The design
    reads `هر چا ل پاره د امید او شفا چراغ`. The canonical line — in
    `templates/partials/footer.html:57`, `apps/core/factories.py:53`, and
    locked by a test in `apps/core/tests.py` — is
    `هر چا لپاره د شفا او امید څراغ`. Three differences: `لپاره` is split as
    `ل پاره`, the pairing is reversed (`امید او شفا` for `شفا او امید`), and
-   `چراغ` is used for `څراغ`. Use the canonical string.
-3. **The Beacon's series identity is the Urdu lockup `چراغِ شفا`**, a fixed
-   template string in `apps/core/templates/core/newsletter_page.html`
-   (Plan 11 D14 — deliberately *kept* for the newsletter when D4 retired it
-   from the home page). The design replaces it with the Pashto tagline, so
-   the printed issue and the web issue would carry different identities.
-   Decide which is the Beacon's masthead and make both agree.
-4. **"Telemedicine services — Now Live!"** — there is no telemedicine
-   surface anywhere in this repo or on the live site. Confirm the service is
-   genuinely running before announcing it in a newsletter.
-5. **Staff titles differ from the seeded team list.** Design: "Dr. Ammar
-   Ahmad — Medical Officer" and "Umar Jan — Accounts & Logistics Officer".
-   Repo (`seed_core_content`): "Dr Ammar Fayyaz — In-charge Medical Officer"
-   and "Umar Jan — Logistics & Accounts Assistant". Confirm which is current
-   and fix the other.
-6. The design prints the full bank account number and IBAN. Presumably
-   deliberate for fundraising — just confirm it's meant to be public.
+   `چراغ` is used for `څراغ`. **DECIDED: use the canonical string**
+   `هر چا لپاره د شفا او امید څراغ`.
+3. ~~**The Beacon's series identity is the Urdu lockup `چراغِ شفا`**~~ —
+   **moot.** The July issue is a **graphic only**, not a web page (decision 7
+   below), so there is no web/print pair that could disagree. The `چراغِ شفا`
+   lockup remains the series identity of newsletter *pages*
+   (`newsletter_page.html`, Plan 11 D14) and is untouched.
+4. **"Telemedicine services — Now Live!"** — **confirmed genuine.** The
+   maintainer confirmed the service runs in **manual mode** (coordinated by
+   hand, not an automated platform), which is why no telemedicine surface
+   exists in the repo. The claim can stand; wording should not imply a
+   self-service platform readers can log into.
+5. **Staff titles differ from the seeded team list.** **DECIDED: the design's
+   are current** — "Dr. Ammar Ahmad — Medical Officer (MBBS)", "Tanveer Ahmad
+   — Pharmacist (Pharm-D)", "Umar Jan — Accounts & Logistics Officer (BS
+   Economics)". **Follow-up: the site is therefore out of date.**
+   `seed_core_content` (and the live Team page built from it) still say "Dr
+   Ammar Fayyaz — In-charge Medical Officer" and "Umar Jan — Logistics &
+   Accounts Assistant". Correcting the live Team page is a content op;
+   correcting the seed is a small code change for fresh installs.
+6. The design prints the full bank account number and IBAN. **Confirmed
+   intentionally public.**
 
-### If the July issue also goes on the site
+### 7. The July issue is a graphic only
 
-The Beacon page type already carries everything this design needs, so this is
-content, not code. `NewsletterPage` fields:
+**DECIDED:** the July newsletter ships as a **graphic**, not a
+`NewsletterPage`. So no page is created, block limits (3 stats / 6 highlights)
+don't constrain it, and the corrected figures below are a spec for whoever
+redraws the artwork — not content to enter anywhere.
 
-- `issue_date` `2026-07-01`; `issue_label` e.g. `July 2026`
-- `summary` — the teaser used in the archive, masthead lede and home page
-- `body`, from the existing blocks:
-  - **Impact stat band** (max 1, exactly 3 stats) — the natural three are
-    `167 patients served` · `138 Zakat-supported (82.6%)` · `25 clinic days`
-  - **Highlights** (max 6) — the design's seven "July highlights" trimmed to
-    six, minus any that don't survive the checks above (telemedicine)
-  - **In-focus split** ×1–2, each with up to 2 pull stats — needs a real
-    photo with `consent_confirmed`
-  - **Paragraph** blocks for prose
-
-Note the block limits (3 stats, 6 highlights, 2 pull stats) are enforced by
-the model — the design's 5-stat and 7-highlight rows won't fit as-is.
+This also means invariant #4's human-review requirement is satisfied the
+ordinary way: a person makes and approves the graphic before it is posted.
 
 ### Track B acceptance
 
-- Every number in the issue traces to `pipeline_dailyaggregate`, computed in
-  Python — invariant #3. The age breakdown uses the four real bands.
-- No AI-generated image of a real person ships.
-- Masthead identity and tagline agree with the site.
-- The issue is a **draft** until the maintainer approves it (invariant #4 —
-  Plan 09's newsletter narrative is explicitly outside the auto-publish
-  exception).
+- Every number on the graphic traces to `pipeline_dailyaggregate`, computed
+  in Python — invariant #3. The age breakdown uses the four real bands.
+- The masthead carries the canonical Pashto tagline.
+- Nothing claims a service the clinic doesn't run.
 
 ---
 
@@ -425,13 +459,16 @@ This is the finding with the longest tail, and it is code, not content.
    the camp was free throughout. The correction has already been applied to
    the published camp report.
 
-   The consequence is bigger than this one page: **[Plan 16](16-clinic-dashboard.md)
-   Phase 2 (revenue) is parked waiting on exactly these fee columns, and the
-   first sample of non-zero data in them turned out to be spurious.** Phase 2
-   cannot treat a non-zero fee column as ground truth without first
-   establishing, with the clinic team, which fee columns the software
-   populates reliably and which it fabricates. Building a revenue surface on
-   this column as it stands would publish invented income figures.
+   **Being fixed at source (maintainer, 2026-08-10)** — the clinic-software
+   side of this is in hand, so no action is needed here and no question needs
+   putting to the clinic team.
+
+   One thing worth carrying into **[Plan 16](16-clinic-dashboard.md) Phase 2**
+   (revenue) anyway: the first sample of non-zero data these columns ever
+   produced was wrong. That is an argument for Phase 2 validating the fee
+   columns against a known-good day before it publishes any income figure,
+   rather than trusting the column because it is populated — not a reason to
+   keep the work blocked.
 
 5. **No clinical data was captured at the camp.** All seven free-text
    columns are empty for all 93 attendees, so the camp contributes nothing to
