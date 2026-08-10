@@ -30,7 +30,7 @@ from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
 from wagtail.models import Page
 
-from apps.core.models import CampReportIndexPage, paginate_archive
+from apps.core.models import paginate_archive
 from apps.pipeline.ai_pricing import compute_cost_usd
 from apps.pipeline.footfall_chart import build_footfall_chart
 
@@ -359,36 +359,28 @@ class DailyAggregate(models.Model):
 class ReportIndexPage(Page):
     """Archive of daily report pages — mirrors Plan 06's index/child pattern.
 
-    Same shape as ``NewsletterIndexPage``/``CampReportIndexPage`` (index +
-    child ``Page`` per item), reused rather than reinvented (Stage 7:
-    precedent over invention).
+    Same shape as ``NewsletterIndexPage`` (index + child ``Page`` per item),
+    reused rather than reinvented (Stage 7: precedent over invention).
 
-    Nav-merge decision (2026-07-22): the primary nav now carries a single
-    "Reports" entry pointing here rather than separate "Reports"/"Camp
-    Reports" links. This page's template therefore renders two sections —
-    daily reports (this index's own archive) and a camp-reports teaser
-    (sourced from ``core.CampReportIndexPage``, which keeps its own URL and
-    archive; only the nav *entry* is merged, not the content type) — rather
-    than a dropdown submenu. (Plan 11 D8 later did add a "More" dropdown
-    elsewhere in the nav, 2026-07-23's single-row header redesign — but this
-    Reports/Camp-Reports merge predates it and was never revisited to use
-    it, since the two-section page here already resolved the nav-crowding
-    problem on its own.)
+    Nav-merge history (2026-07-22, unwound 2026-08-10): the primary nav used
+    to carry separate "Reports"/"Camp Reports" links, merged into the single
+    "Reports" entry pointing here, with this page's template rendering a
+    camp-reports teaser below its own archive. Plan 21 retired
+    ``CampReportPage`` entirely — camps are newsletter issues now — so the
+    teaser and its ``camp_reports_intro`` field are gone and this page is
+    back to one section. The nav keeps its single "Reports" entry; nothing
+    to un-merge, since the other half of the merge no longer exists.
     """
 
     intro = RichTextField(blank=True, help_text="Optional intro copy for the archive.")
     daily_reports_intro = RichTextField(
         blank=True, help_text="Optional intro copy for the 'Daily reports' section."
     )
-    camp_reports_intro = RichTextField(
-        blank=True, help_text="Optional intro copy for the 'Camp reports' section."
-    )
 
     content_panels = [
         *Page.content_panels,
         FieldPanel("intro"),
         FieldPanel("daily_reports_intro"),
-        FieldPanel("camp_reports_intro"),
     ]
 
     max_count = 1
@@ -435,14 +427,6 @@ class ReportIndexPage(Page):
         context = super().get_context(request, *args, **kwargs)
         context["reports"] = paginate_archive(request, self.get_reports())
         context["funding_mix"] = self.get_funding_mix()
-        # The merged-nav "Camp reports" teaser section (see this class's
-        # docstring) — a handful of the latest camp reports plus a link to
-        # their own archive, not a second paginated list on this page.
-        camp_index = CampReportIndexPage.objects.first()
-        context["camp_reports_index"] = camp_index
-        context["camp_reports_preview"] = (
-            camp_index.get_camp_reports()[:3] if camp_index is not None else []
-        )
         # Entry point 1a (Plan 16.4): the "Open the dashboard →" link in the
         # footfall card's head. ``None`` drops the link entirely — see
         # ``ClinicDashboardPage.entry_point_url``.
@@ -555,8 +539,9 @@ class DailyReportPage(Page):
     def headline_stats(self) -> list[dict[str, str]]:
         """Inline stat pairs for the Home teaser (``feature_split.html``'s ``stats``).
 
-        Mirrors ``CampReportPage.get_context``'s ``patient_stats`` shape
-        (Plan 06) — read live from ``aggregate``, never copied onto this page.
+        Shape originally mirrored from ``CampReportPage.get_context``'s
+        ``patient_stats`` (Plan 06; that page type was retired in Plan 21) —
+        read live from ``aggregate``, never copied onto this page.
 
         Redesigned 2026-07-23 (Plan 11 Track B12, maintainer decision): drops
         "New patients" (``aggregate.new_patients`` stays on the model — just
@@ -684,8 +669,8 @@ class ClinicDashboardPage(Page):
         that has never run the D1 data migration, and a maintainer who has
         **unpublished** the page — which is exactly this plan's rollback
         lever ("unlink the entry points (a content edit, no deploy)"), so
-        the filter is ``.live()`` rather than the bare ``.first()``
-        ``ReportIndexPage.get_context`` uses for the camp-reports teaser.
+        the filter is ``.live()`` rather than a bare ``.first()``: an
+        unpublished dashboard must not be linked, only skipped.
         """
         page = cls.objects.live().first()
         return page.url if page is not None else None

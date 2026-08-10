@@ -31,7 +31,6 @@ from wagtail.models import Page, Site
 
 from apps.core.models import (
     AboutPage,
-    CampReportIndexPage,
     ContactPage,
     DonatePage,
     DonorsPartnersPage,
@@ -44,17 +43,17 @@ from apps.core.models import (
 
 # (model, title, slug) for the core children, in nav order. Slugs MUST match
 # templates/partials/nav.html (/about/, /team/, /our-work/, /donors-partners/,
-# /camp-reports/, /newsletters/, /gallery/, /contact/, /donate/). The
-# Newsletter/Camp Report archives, the Gallery (Plan 06), and Donors &
-# Partners (Plan 11) are seeded empty — each shows its own "coming soon" state
-# until content is entered — so their nav links resolve immediately after
-# deploy rather than 404ing until the first admin visit.
+# /newsletters/, /gallery/, /contact/, /donate/). The Newsletter archive, the
+# Gallery (Plan 06), and Donors & Partners (Plan 11) are seeded empty — each
+# shows its own "coming soon" state until content is entered — so their nav
+# links resolve immediately after deploy rather than 404ing until the first
+# admin visit. A Camp Reports archive was seeded here too until Plan 21
+# (2026-08-10) retired the type; camps are newsletter issues now.
 CORE_CHILDREN = [
     (AboutPage, "About", "about"),
     (TeamPage, "Our Team", "team"),
     (OurWorkPage, "Our Work", "our-work"),
     (DonorsPartnersPage, "Donors & Partners", "donors-partners"),
-    (CampReportIndexPage, "Camp Reports", "camp-reports"),
     (NewsletterIndexPage, "Newsletters", "newsletters"),
     (GalleryPage, "Gallery", "gallery"),
     (ContactPage, "Contact", "contact"),
