@@ -455,9 +455,28 @@ routine OPD visits at all? Both answers are defensible —
   handle a third bucket. That is a proper plan-and-PR piece of work, not a
   quick fix.
 
-My recommendation is **keep them separate for now** and revisit if camps
-become monthly — but this is a call about what the clinic's published numbers
-*mean*, so it is the maintainer's, not mine.
+**RESOLVED 2026-08-10 — keep them separate.** The maintainer's decision: the
+camp's 93 attendees do **not** go into the daily report or the pipeline.
+
+What follows from that:
+
+- **Do not upload `Camp Attendance Report.xls`** through the admin. Findings 2
+  and 3 above (the wholesale-supersede trap, the `Status = "Camp"` mapping, a
+  third funding bucket) are all moot unless this is revisited — no code needed.
+- **6 Aug 2026 correctly reads 16 visits** on the daily report. The pipeline's
+  figures now mean "routine clinic activity", and camps are told as narrative
+  content instead.
+- **The site's headline totals deliberately exclude camps.** A legitimate
+  definition, but now one worth being able to state: a reader comparing "93
+  people at the camp" in the newsletter against the reports page's daily
+  figures gets no hint the two count different things. Worth a line of copy on
+  `/reports/` if camps recur.
+- **Revisit only if camps become regular.** One camp a quarter doesn't justify
+  the pipeline work; a monthly camp probably does.
+
+Finding 5 (no clinical data captured at the camp) survives this decision
+independently — it's about what the clinic records at the point of care, not
+what the pipeline ingests, and is still worth raising before the next camp.
 
 ---
 
