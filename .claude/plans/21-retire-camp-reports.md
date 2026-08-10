@@ -2,6 +2,8 @@
 
 **Status:** 📝 Drafted · **Date:** 2026-08-10
 
+**Kickoff prompt:** [21-retire-camp-reports-prompt.md](21-retire-camp-reports-prompt.md)
+
 One-line summary: remove `CampReportPage` / `CampReportIndexPage` and every
 surface that feeds them, after converting the one remaining camp report into a
 newsletter issue — camps become newsletter issues, full stop.
