@@ -1416,6 +1416,46 @@ def test_newsletter_masthead_and_structured_blocks_render(client, home_page):
     assert "69%" in content and 'alt="Inauguration photo"' in content
 
 
+def test_newsletter_highlight_item_is_a_single_flex_child(client, home_page):
+    """A highlight's rich text renders inside one wrapper, whatever its markup.
+
+    `.nl-highlights__item` is a flex row (cross + text), so every top-level
+    node in the stored rich text becomes its own flex column. The Free Sugar
+    Camp issue was stored as `<b>lead</b> rest of sentence` with no `<p>`
+    wrapper — Wagtail passes that through verbatim — which split each bullet
+    into two ragged columns on the live page (observed 2026-08-10).
+
+    The assertion is structural, not textual: the pre-fix template put the
+    bold tag and the trailing text node in as siblings of the `<svg>`, so a
+    test that only checked both strings were present passed throughout.
+    """
+    index = NewsletterIndexPageFactory(parent=home_page, slug="newsletters")
+    NewsletterPageFactory(
+        parent=index,
+        slug="sugar-camp",
+        title="Free Sugar Camp",
+        issue_date=datetime.date(2026, 8, 6),
+        body=[
+            (
+                "highlights",
+                {
+                    "heading": "Highlights from the day",
+                    # Stored exactly as the live page had it: no <p> wrapper.
+                    "items": ["<b>Ninety-three people attended</b> a full day."],
+                },
+            ),
+        ],
+    )
+    content = client.get("/en/newsletters/sugar-camp/").content.decode()
+
+    # The lead and the remainder share one wrapper, so they flow as one
+    # sentence rather than becoming two flex columns.
+    assert (
+        '<div class="nl-highlights__body">'
+        "<b>Ninety-three people attended</b> a full day.</div>"
+    ) in content
+
+
 def test_newsletter_feature_split_renders_photo_caption(client, home_page):
     """The split's photo caption is displayed, not just stored.
 

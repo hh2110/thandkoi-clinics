@@ -6,6 +6,15 @@ motif, the only sanctioned coral use outside the masthead rule). `value.items`
 is a list of RichTextBlock values (bold-only) so an editor can bold the lead
 phrase inline rather than the block splitting "lead" and "detail" into two
 fields for no real benefit.
+
+The rich text is wrapped in `.nl-highlights__body` rather than dropped
+straight into the `<li>`. The `<li>` is a flex row (cross + text), so every
+top-level node the editor produces would otherwise become its own flex
+column: an item stored as `<b>lead</b> rest of sentence` — with no `<p>`,
+which is what the Free Sugar Camp issue contained — rendered the bold phrase
+and the remainder as two ragged columns instead of one sentence. The wrapper
+makes the whole rich text a single flex child, so the item reads correctly
+whatever markup the editor stored.
 {% endcomment %}
 <section class="section section--snug">
   <div class="wrapper">
@@ -18,7 +27,7 @@ fields for no real benefit.
               <rect x="9.5" y="3" width="5" height="18" rx="1.5" fill="var(--color-coral)" />
               <rect x="3" y="9.5" width="18" height="5" rx="1.5" fill="var(--color-coral)" />
             </svg>
-            {{ item|richtext }}
+            <div class="nl-highlights__body">{{ item|richtext }}</div>
           </li>
         {% endfor %}
       </ul>

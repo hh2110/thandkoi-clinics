@@ -157,10 +157,16 @@
   gap: var(--space-2);
 }
 
+/* Each highlight is a card carrying the same surface, border and radius as
+   the stat tiles above it, so the head of a report reads as one family. */
 .nl-highlights__item {
   display: flex;
   gap: 14px;
   align-items: flex-start;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  padding: var(--space-2);
 }
 
 .nl-highlights__cross {
@@ -168,14 +174,33 @@
   margin-block-start: 3px;
 }
 
-.nl-highlights__item p {
-  margin: 0;
+/* The single flex child holding the item's rich text — see the block
+   template for why the wrapper exists. `min-width: 0` lets long unbroken
+   strings wrap instead of forcing the card wider than its column. */
+.nl-highlights__body {
+  min-width: 0;
   color: var(--color-text-soft);
   line-height: 1.55;
 }
 
-.nl-highlights__item strong {
-  color: var(--color-text);
+.nl-highlights__body p {
+  margin: 0;
+  color: inherit;
+}
+
+.nl-highlights__body p + p {
+  margin-block-start: var(--space-1);
+}
+
+/* The lead phrase picks up the same teal as the stat figures above. Matches
+   both `b` and `strong`: Wagtail's rich text emits `<b>`, so the original
+   `strong`-only rule never once applied. `--color-stat-value` is used rather
+   than `--color-brand-deep` because the latter is #0a3e48 in *both* themes,
+   which is also the dark theme's page background — a lead phrase painted
+   with it disappears entirely in dark mode. */
+.nl-highlights__body :is(b, strong) {
+  color: var(--color-stat-value);
+  font-weight: 600;
 }
 
 /* --- "In focus" splits — 4:3 photos, unlike the sitewide 16:9 default -----
