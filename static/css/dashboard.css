@@ -398,6 +398,16 @@
   font-size: var(--font-size-xs);
   color: var(--color-text-faint);
 }
+/* Plan 22: the same faint note, but below the table rather than in the card
+   head — so it needs the padding the head supplies and the scroller does
+   not. Both footnotes are conditional (unattributed money; partial revenue
+   coverage), so this often renders nothing at all. */
+.dash__revenue-note--foot {
+  padding: var(--space-2) var(--space-3) 0;
+}
+.dash__revenue-note--foot:last-child {
+  padding-bottom: var(--space-3);
+}
 /* All the rows scroll together as one block below their `min-width`, so the
    columns stay aligned to each other instead of each row crushing its tracks
    by a different amount. Same mechanism as `.dash-chart__scroll` below; the

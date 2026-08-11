@@ -195,6 +195,143 @@
   padding: 0.2rem 0.55rem;
 }
 
+/* --- Revenue (Plan 16 work item 2, built in Plan 22 task 22.3) -------------
+   The table mirrors the dashboard's `.dash__revenue-*` rules rather than
+   inventing a second look for the same figures; what differs is this page's
+   card padding and its small uppercase section heading. Rendered only on a
+   date that has revenue — the section is omitted whole otherwise, so none of
+   this can produce an empty table. */
+.dr__revenue-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+.dr__revenue-head .dr__section-label {
+  margin-bottom: var(--space-2);
+}
+.dr__revenue-unit {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+}
+.dr__card .dr__revenue-scroll {
+  overflow-x: auto;
+  /* Cancel the card's own horizontal padding so the row separators and the
+     total row's fill reach the card edge, then give it back per row. */
+  margin: calc(var(--space-2) * -1) calc(var(--space-3) * -1) 0;
+}
+.dr__revenue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+  min-width: 520px;
+  gap: 0.75rem;
+  padding: 0.9rem var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  align-items: baseline;
+}
+.dr__revenue-row > * {
+  min-width: 0;
+  text-align: right;
+}
+.dr__revenue-row > *:first-child {
+  text-align: left;
+}
+.dr__revenue-row--head {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-faint);
+}
+.dr__revenue-service {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.dr__revenue-cell {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+.dr__revenue-cell--total {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--color-text);
+}
+.dr__revenue-qty {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  margin-left: 0.3rem;
+}
+.dr__revenue-row--total {
+  background: var(--color-border-default);
+  border-bottom: 0;
+  font-family: var(--font-heading);
+  font-weight: 800;
+}
+.dr__revenue-cell--grand {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: var(--font-size-md);
+  color: var(--color-stat-value);
+}
+
+/* Split bar. Segment colours match the dashboard's funding split exactly
+   (Zakat = brand, Regular = faint) — see Plan 22 D10 for why this inverts
+   the handoff's instruction: teal meaning "Zakat" on one page and "Regular"
+   on another would make a reader misread real money. */
+.dr__revenue-split {
+  padding-top: var(--space-2);
+}
+.dr__revenue-splitbar {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--color-border-default);
+  overflow: hidden;
+}
+.dr__revenue-seg--zakat {
+  background: var(--color-brand);
+}
+.dr__revenue-seg--regular {
+  background: var(--color-text-faint);
+}
+.dr__revenue-seg--unknown {
+  background: var(--color-text-soft);
+}
+.dr__revenue-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 0.6rem;
+}
+.dr__revenue-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-soft);
+}
+.dr__revenue-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+.dr__revenue-swatch--zakat {
+  background: var(--color-brand);
+}
+.dr__revenue-swatch--regular {
+  background: var(--color-text-faint);
+}
+.dr__revenue-swatch--unknown {
+  background: var(--color-text-soft);
+}
+
 /* --- Narrow screens -------------------------------------------------------- */
 @media (max-width: 40rem) {
   .dr__metrics { grid-template-columns: 1fr; }

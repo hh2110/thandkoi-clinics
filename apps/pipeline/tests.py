@@ -67,8 +67,11 @@ from apps.pipeline.models import (
 )
 from apps.pipeline.parser_clinic_v1 import ClinicDailyExportV1Parser
 from apps.pipeline.parser_registry import (
+    SERVICE_KEYS,
+    ParsedVisitRow,
     ParserRegistry,
     age_band_for,
+    coerce_fee,
     content_hash_for_rows,
     diagnosis_category_for,
     normalise_sex,
@@ -793,8 +796,22 @@ TKC_FREETEXT_ROWS = [
 ]
 
 
+#: Per-row fee cells for the Plan 22 fixtures, in the order the export's
+#: columns appear: Registration, Consultation, Lab, Ultrasound, Pharmacy,
+#: Total Paid. Aligned with ``_build_tkc_daily_xls``'s three data rows, whose
+#: ``Status`` values are Zakat / Regular / blank — so one row lands in each of
+#: the three payment buckets D3 defines.
+TKC_FEE_ROWS = [
+    (50, 300, 0, 0, 200, 550),  # Zakat row
+    (50, 300, 450, 0, 0, 800),  # Regular row
+    (50, 0, 0, 1200, 0, 1250),  # blank Status → the `unknown` bucket
+]
+
+
 def _build_tkc_daily_xls(
-    *, period: str = "Period: 08 Jul 2026 to 08 Jul 2026"
+    *,
+    period: str = "Period: 08 Jul 2026 to 08 Jul 2026",
+    fees: list[tuple] | None = None,
 ) -> bytes:
     """A synthetic legacy ``.xls`` mirroring the clinic system's real layout.
 
@@ -805,6 +822,12 @@ def _build_tkc_daily_xls(
 
     Extended (Plan 11 Track B8/B9, 2026-07-23) with the seven free-text
     columns via ``TKC_FREETEXT_ROWS`` above.
+
+    ``fees`` (Plan 22, 2026-08-11) appends the six fee columns the clinic
+    software added. It defaults to ``None`` — i.e. **the pre-update 27-column
+    export** — on purpose rather than always writing them: that default keeps
+    every pre-existing test exercising the old layout, which is the thing D1
+    promises still parses. Pass ``TKC_FEE_ROWS`` for the new layout.
     """
     book = xlwt.Workbook(encoding="utf-8")
     sheet = book.add_sheet("Patient Report")
@@ -829,6 +852,15 @@ def _build_tkc_daily_xls(
         "Diet & Drug Compliance",
         "Plan",
     ]
+    if fees is not None:
+        header += [
+            "Registration Fee (PKR)",
+            "Consultation Fee (PKR)",
+            "Lab Fee (PKR)",
+            "Ultrasound Fee (PKR)",
+            "Pharmacy Fee (PKR)",
+            "Total Paid (PKR)",
+        ]
     for column, name in enumerate(header):
         sheet.write(3, column, name)
     data = [
@@ -864,6 +896,9 @@ def _build_tkc_daily_xls(
         sheet.write(row, 14, dietitians_notes)
         sheet.write(row, 15, diet_compliance)
         sheet.write(row, 16, plan)
+        if fees is not None:
+            for index, value in enumerate(fees[offset]):
+                sheet.write(row, 17 + index, value)
     buffer = io.BytesIO()
     book.save(buffer)
     return buffer.getvalue()
@@ -3006,3 +3041,305 @@ def test_other_pages_are_not_noindex(client, home_page):
     """Plan 18: the directive is scoped to the daily report page — the rest of
     the site is a charity that wants to be found."""
     assert 'name="robots"' not in client.get("/en/").content.decode()
+
+
+# =============================================================================
+# Plan 22 — revenue ingest (Plan 16 Phase 2)
+#
+# The clinic software shipped the fee columns Plan 16 D13 was waiting on. The
+# tests below cover the ingest half (task 22.1): parsing the columns, storing
+# them per visit, and folding them into `DailyAggregate.service_revenue`.
+# =============================================================================
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        (None, 0),
+        ("", 0),
+        ("   ", 0),
+        (0, 0),
+        (250, 250),
+        # Excel hands numeric cells back as floats.
+        (20.0, 20),
+        (19.999, 20),
+        # Mixed formatting in an otherwise numeric column.
+        ("300", 300),
+        ("PKR 250", 250),
+        ("250/-", 250),
+        ("1,200", 1200),
+        # Junk degrades to "no fee recorded" rather than exploding — a bad
+        # cell must not be able to block a whole day's upload.
+        ("n/a", 0),
+        ("-", 0),
+        # A negative fee is not a refund this pipeline models; floor at 0.
+        (-50, 0),
+        # bool is an int subclass; a checkbox cell is not a fee.
+        (True, 0),
+        (False, 0),
+        (float("nan"), 0),
+        (float("inf"), 0),
+    ],
+)
+def test_coerce_fee_normalises_every_shape_a_cell_can_take(raw, expected):
+    assert coerce_fee(raw) == expected
+
+
+def test_parser_reads_the_fee_columns():
+    """D1: the six new headers are matched by name, like every other column."""
+    xlsx = convert_xls_to_xlsx(io.BytesIO(_build_tkc_daily_xls(fees=TKC_FEE_ROWS)))
+    rows = TkcDailyActivityV1Parser().parse(xlsx).rows
+
+    assert [r.registration_fee for r in rows] == [50, 50, 50]
+    assert [r.consultation_fee for r in rows] == [300, 300, 0]
+    assert [r.laboratory_fee for r in rows] == [0, 450, 0]
+    assert [r.ultrasound_fee for r in rows] == [0, 0, 1200]
+    assert [r.pharmacy_fee for r in rows] == [200, 0, 0]
+    # Read for the reconciliation check only, never persisted (D2/D5).
+    assert [r.total_paid for r in rows] == [550, 800, 1250]
+
+
+def test_export_predating_the_fee_columns_still_parses_with_zero_revenue():
+    """D1's compatibility promise, pinned. The 27-column July layout has no
+    fee headers at all, so `header_index` returns None for each and every fee
+    lands at 0 — the file parses exactly as it did before Plan 22."""
+    xlsx = convert_xls_to_xlsx(io.BytesIO(_build_tkc_daily_xls()))
+    rows = TkcDailyActivityV1Parser().parse(xlsx).rows
+
+    assert len(rows) == 3
+    assert all(r.service_fees == dict.fromkeys(SERVICE_KEYS, 0) for r in rows)
+    assert all(r.total_paid == 0 for r in rows)
+
+
+def test_fees_persist_onto_the_deidentified_visit(home_page):
+    """D2: the canonical row store carries the money, not just the aggregate."""
+    _ingest_tkc_daily_fixture(fees=TKC_FEE_ROWS)
+
+    visits = list(DeidentifiedVisit.objects.order_by("id"))
+    assert [v.registration_fee for v in visits] == [50, 50, 50]
+    assert [v.ultrasound_fee for v in visits] == [0, 0, 1200]
+    # `total_paid` is deliberately absent from the model (D2).
+    assert not hasattr(visits[0], "total_paid")
+
+
+def test_service_revenue_splits_across_all_three_payment_buckets(home_page):
+    """D3: Zakat / Regular / unknown, with `qty` counting non-zero fee cells.
+
+    The fixture's three rows are Zakat / Regular / blank-Status, so each
+    bucket gets exactly one row's money — including the blank one, whose
+    PKR 1,250 would silently vanish from published income if `unknown`
+    weren't first-class.
+    """
+    _ingest_tkc_daily_fixture(fees=TKC_FEE_ROWS)
+    revenue = DailyAggregate.objects.get().service_revenue
+
+    assert set(revenue) == set(SERVICE_KEYS)
+    # Registration: PKR 50 on all three rows, one per bucket.
+    assert revenue["registration"] == {
+        "regular": {"qty": 1, "amount": 50},
+        "zakat": {"qty": 1, "amount": 50},
+        "unknown": {"qty": 1, "amount": 50},
+    }
+    # Ultrasound: only the blank-Status row paid it.
+    assert revenue["ultrasound"]["unknown"] == {"qty": 1, "amount": 1200}
+    assert revenue["ultrasound"]["zakat"] == {"qty": 0, "amount": 0}
+    # qty counts rows where the fee was non-zero, not patients (D4): the
+    # consultation fee is on two of the three rows.
+    consultation = revenue["consultation"]
+    assert consultation["zakat"]["qty"] + consultation["regular"]["qty"] == 2
+    assert consultation["unknown"] == {"qty": 0, "amount": 0}
+
+
+def test_service_revenue_is_empty_not_zeroed_when_a_date_has_no_revenue(home_page):
+    """`has_revenue` tests this field's truthiness to decide whether a date
+    predates the fee columns, so a date with no revenue must store `{}` — a
+    dict of zeros would read as "revenue exists and is zero" and light up an
+    empty revenue table on every historical date."""
+    _ingest_tkc_daily_fixture()
+
+    assert DailyAggregate.objects.get().service_revenue == {}
+
+
+def test_recompute_rebuilds_revenue_instead_of_wiping_it(home_page):
+    """D2's whole reason for existing, pinned as a regression test.
+
+    `recompute_daily_aggregates` is documented as safe to re-run. If revenue
+    lived only on the aggregate, this command would recompute every
+    historical date's revenue as zero and destroy it. Because the fees sit on
+    `DeidentifiedVisit`, a recompute reproduces them byte for byte.
+    """
+    _ingest_tkc_daily_fixture(fees=TKC_FEE_ROWS)
+    before = DailyAggregate.objects.get().service_revenue
+    assert before  # guard: the test is meaningless if ingest stored nothing
+
+    call_command("recompute_daily_aggregates")
+
+    assert DailyAggregate.objects.get().service_revenue == before
+
+
+def test_total_paid_mismatch_logs_a_warning_without_blocking_the_ingest(
+    home_page, caplog
+):
+    """D5: the export disagreeing with itself is surfaced, never fatal.
+
+    Drops one row's consultation fee to 0 while leaving its `Total Paid`
+    untouched — exactly the shape of the 6 Aug camp's fabricated-fee bug.
+    """
+    drifting = [list(row) for row in TKC_FEE_ROWS]
+    drifting[0][1] = 0  # consultation fee, but Total Paid still says 550
+
+    with caplog.at_level("WARNING", logger="apps.pipeline.ingest"):
+        summary = _ingest_tkc_daily_fixture(fees=drifting)
+
+    # The upload still succeeded — the day's data is in.
+    assert summary.results[0].row_count == 3
+    assert DailyAggregate.objects.get().total_visits == 3
+
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1
+    message = warnings[0].getMessage()
+    assert "reconciliation mismatch" in message
+    assert "2026-07-08" in message
+    # No cell values or patient data in the log line — two sums and a date.
+    assert not any(identifier in message.lower() for identifier in RAW_IDENTIFIERS)
+
+
+def test_reconciliation_stays_quiet_when_the_export_agrees_with_itself(
+    home_page, caplog
+):
+    """The negative case — otherwise a check that always fires proves nothing
+    and would train the maintainer to ignore the warning."""
+    with caplog.at_level("WARNING", logger="apps.pipeline.ingest"):
+        _ingest_tkc_daily_fixture(fees=TKC_FEE_ROWS)
+
+    assert [r for r in caplog.records if r.levelname == "WARNING"] == []
+
+
+def _revenue_row(**overrides) -> ParsedVisitRow:
+    """A minimal ParsedVisitRow for the content-hash assertions below."""
+    base = {
+        "visit_date": datetime.date(2026, 8, 6),
+        "department": "",
+        "age_band": "19-55",
+        "sex": "female",
+        "location": "",
+        "diagnosis_category": "other",
+        "is_new_patient": None,
+        "is_zakat_beneficiary": True,
+    }
+    return ParsedVisitRow(**{**base, **overrides})
+
+
+def test_content_hash_changes_when_a_fee_is_corrected():
+    """D7: a re-upload correcting only a fee cell must not be mistaken for a
+    duplicate, or that date's revenue could never be fixed."""
+    original = content_hash_for_rows([_revenue_row(consultation_fee=300)])
+    corrected = content_hash_for_rows([_revenue_row(consultation_fee=350)])
+
+    assert original != corrected
+
+
+def test_content_hash_ignores_total_paid():
+    """D7's other half: `total_paid` is a reconciliation input that is never
+    persisted or published, so letting it move the hash would reclassify a
+    re-upload over a value that changes nothing downstream."""
+    assert content_hash_for_rows(
+        [_revenue_row(consultation_fee=300, total_paid=300)]
+    ) == content_hash_for_rows([_revenue_row(consultation_fee=300, total_paid=9999)])
+
+
+def _render_daily_report(client_fixture, home_page, *, service_revenue):
+    """Publish one DailyReportPage for a date and fetch it through its real URL."""
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    report_date = datetime.date(2026, 8, 6)
+    aggregate = DailyAggregateFactory(
+        clinic_date=report_date,
+        total_visits=4,
+        zakat_beneficiary_patients=3,
+        paying_patients=1,
+        service_revenue=service_revenue,
+        category_counts={"by_age_band": {"19-55": 4}},
+    )
+    DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=aggregate,
+    )
+    response = client_fixture.get(f"/en/reports/{report_date.isoformat()}/")
+    assert response.status_code == 200
+    return response.content.decode()
+
+
+def test_daily_report_omits_the_whole_revenue_section_without_data(client, home_page):
+    """The handoff is explicit: no heading, no empty table, no zero row. This
+    is the state of every date predating the clinic software's fee columns,
+    so it is the common case, not an edge case."""
+    content = _render_daily_report(client, home_page, service_revenue={})
+
+    assert 'data-role="revenue"' not in content
+    assert "All figures in PKR" not in content
+    assert "dr__revenue-row" not in content
+
+
+def test_daily_report_renders_the_revenue_section_with_data(client, home_page):
+    content = _render_daily_report(
+        client,
+        home_page,
+        service_revenue={
+            "consultation": {
+                "regular": {"qty": 1, "amount": 400},
+                "zakat": {"qty": 3, "amount": 600},
+            }
+        },
+    )
+
+    assert 'data-role="revenue"' in content
+    assert "All figures in PKR" in content
+    assert "Consultation" in content
+    assert "1,000" in content
+    # Split-bar shares are of the total, and with no unattributed money they
+    # come to 100 between them.
+    assert "Regular 40.0%" in re.sub(r"\s+", " ", content)
+    assert "Zakat 60.0%" in re.sub(r"\s+", " ", content)
+    assert "dr__revenue-seg--unknown" not in content
+
+
+def test_daily_report_split_bar_shows_unattributed_money_as_its_own_segment(
+    client, home_page
+):
+    """Plan 22 D3 on this page: the two named segments genuinely fall short of
+    the full bar rather than being normalised against each other, which would
+    imply a confident split of a total neither adds up to."""
+    content = re.sub(
+        r"\s+",
+        " ",
+        _render_daily_report(
+            client,
+            home_page,
+            service_revenue={
+                "registration": {
+                    "regular": {"qty": 1, "amount": 500},
+                    "unknown": {"qty": 1, "amount": 1500},
+                }
+            },
+        ),
+    )
+
+    assert "dr__revenue-seg--unknown" in content
+    assert "Regular 25.0%" in content
+    assert "Not recorded 75.0%" in content
+
+
+def test_qty_counts_visits_not_spreadsheet_rows(home_page):
+    """The phantom-row bug's money equivalent. A wrapped-text continuation row
+    carries one free-text cell and nothing else, and fees are deliberately
+    absent from the parser's continuation-stitching list — so no service can
+    count more deliveries than there were visits."""
+    _ingest_tkc_daily_fixture(fees=TKC_FEE_ROWS)
+    revenue = DailyAggregate.objects.get().service_revenue
+
+    assert DeidentifiedVisit.objects.count() == 3
+    for service in SERVICE_KEYS:
+        total_qty = sum(bucket["qty"] for bucket in revenue[service].values())
+        assert total_qty <= 3

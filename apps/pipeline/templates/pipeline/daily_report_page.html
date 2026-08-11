@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n humanize %}
 {% comment %}
 Plan 18: this page is deliberately kept out of search indexes and web
 archives. It is the only public template carrying the per-group free-text
@@ -108,6 +108,87 @@ static/css/daily-report.css. `dr` is the page-scoped root class.
 
       </div>
     </section>
+
+    {% comment %}
+    Revenue (Plan 16 work item 2, built in Plan 22 task 22.3). The handoff is
+    explicit that a date with no revenue omits the **whole** section — no
+    heading, no empty table, no zero row — so this is one `{% if %}` over a
+    context key that is None on every date predating the clinic software's
+    fee columns, rather than a table that renders zeros.
+
+    The table deliberately mirrors the dashboard's `.dash__revenue-*` markup
+    rather than inventing a second idiom for the same figures; only the
+    prefix differs, because the two pages' cards have different padding and
+    the daily report's section heading is the small uppercase style.
+    {% endcomment %}
+    {% if revenue %}
+      <section class="dr__revenue" data-role="revenue">
+        <div class="dr__revenue-head">
+          <h2 class="dr__section-label">{% translate "Revenue" %}</h2>
+          <p class="dr__revenue-unit">{% translate "All figures in PKR" %}</p>
+        </div>
+        <div class="dr__card">
+          {% comment %}
+          One scroller around every row so the columns stay aligned with each
+          other on a narrow screen instead of each row crushing its tracks by
+          a different amount — the same mechanism as the dashboard's table.
+          {% endcomment %}
+          <div class="dr__revenue-scroll">
+            <div class="dr__revenue-row dr__revenue-row--head">
+              <span>{% translate "Service" %}</span>
+              <span>{% translate "Regular" %}</span>
+              <span>{% translate "Zakat" %}</span>
+              <span>{% translate "Total" %}</span>
+            </div>
+            {% for row in revenue.rows %}
+              <div class="dr__revenue-row">
+                <span class="dr__revenue-service">{{ row.label }}</span>
+                <span class="dr__revenue-cell">{{ row.regular_amount|intcomma }}<span class="dr__revenue-qty">({{ row.regular_qty|intcomma }})</span></span>
+                <span class="dr__revenue-cell">{{ row.zakat_amount|intcomma }}<span class="dr__revenue-qty">({{ row.zakat_qty|intcomma }})</span></span>
+                <span class="dr__revenue-cell dr__revenue-cell--total">{{ row.total_amount|intcomma }}<span class="dr__revenue-qty">({{ row.total_qty|intcomma }})</span></span>
+              </div>
+            {% endfor %}
+            <div class="dr__revenue-row dr__revenue-row--total">
+              <span>{% translate "Total" %}</span>
+              <span class="dr__revenue-cell">{{ revenue.regular_amount|intcomma }}</span>
+              <span class="dr__revenue-cell">{{ revenue.zakat_amount|intcomma }}</span>
+              <span class="dr__revenue-cell dr__revenue-cell--grand">{{ revenue.total_amount|intcomma }}</span>
+            </div>
+          </div>
+
+          {% comment %}
+          Split bar. Segment widths are shares of *total* revenue, so when the
+          export left a row's Status blank the two named segments genuinely
+          fall short of the full bar and the remainder shows as the
+          unattributed segment — rather than normalising Regular/Zakat
+          against each other and implying a confident split of a total
+          neither adds up to (Plan 22 D3).
+          {% endcomment %}
+          <div class="dr__revenue-split">
+            <div class="dr__revenue-splitbar">
+              <span class="dr__revenue-seg dr__revenue-seg--regular" style="width: {{ revenue.regular_pct }}%;"></span>
+              <span class="dr__revenue-seg dr__revenue-seg--zakat" style="width: {{ revenue.zakat_pct }}%;"></span>
+              {% if revenue.has_unattributed %}
+                <span class="dr__revenue-seg dr__revenue-seg--unknown" style="width: {{ revenue.unknown_pct }}%;"></span>
+              {% endif %}
+            </div>
+            <div class="dr__revenue-legend">
+              <span class="dr__revenue-key">
+                <span class="dr__revenue-swatch dr__revenue-swatch--regular"></span>{% blocktranslate with pct=revenue.regular_pct %}Regular {{ pct }}%{% endblocktranslate %}
+              </span>
+              <span class="dr__revenue-key">
+                <span class="dr__revenue-swatch dr__revenue-swatch--zakat"></span>{% blocktranslate with pct=revenue.zakat_pct %}Zakat {{ pct }}%{% endblocktranslate %}
+              </span>
+              {% if revenue.has_unattributed %}
+                <span class="dr__revenue-key">
+                  <span class="dr__revenue-swatch dr__revenue-swatch--unknown"></span>{% blocktranslate with pct=revenue.unknown_pct %}Not recorded {{ pct }}%{% endblocktranslate %}
+                </span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </section>
+    {% endif %}
 
     {% if page.freetext_summary_male_adults or page.freetext_summary_female_adults or page.freetext_summary_children %}
       <section class="dr__notes" data-role="freetext-summary">

@@ -57,6 +57,86 @@ def header_index(header_row: tuple, column_name: str) -> int | None:
     return None
 
 
+# --- Service revenue vocabulary (Plan 22 D1) --------------------------------
+#
+# The five services the clinic export's fee columns carry, in the display
+# order Plan 16's design handoff fixed. Defined here rather than in the one
+# parser that reads them because three layers have to agree on the same keys:
+# the parser producing them, ``apps.pipeline.ingest`` aggregating them into
+# ``DailyAggregate.service_revenue``, and ``apps.pipeline.dashboard`` reading
+# them back out. A key that exists in only two of the three is a silently
+# dropped service.
+#
+# ``laboratory`` is deliberately not ``lab``: the export's header is "Lab Fee
+# (PKR)" but the handoff's display label is "Laboratory", and the stored key
+# follows the domain vocabulary rather than the spreadsheet's abbreviation.
+SERVICE_REGISTRATION = "registration"
+SERVICE_CONSULTATION = "consultation"
+SERVICE_PHARMACY = "pharmacy"
+SERVICE_LABORATORY = "laboratory"
+SERVICE_ULTRASOUND = "ultrasound"
+
+#: Canonical display order (Plan 16 handoff), and the only keys that may
+#: appear in ``DailyAggregate.service_revenue``.
+SERVICE_KEYS = (
+    SERVICE_REGISTRATION,
+    SERVICE_CONSULTATION,
+    SERVICE_PHARMACY,
+    SERVICE_LABORATORY,
+    SERVICE_ULTRASOUND,
+)
+
+#: ``ParsedVisitRow`` / ``DeidentifiedVisit`` field name per service key.
+SERVICE_FEE_FIELDS = {key: f"{key}_fee" for key in SERVICE_KEYS}
+
+#: The three payment buckets a service's revenue splits across (Plan 22 D3).
+#: ``unknown`` is first-class, mirroring the existing
+#: ``DailyAggregate.unknown_payment_type_patients`` — money on a row whose
+#: ``Status`` is neither "zakat" nor "regular" is recorded as unattributed
+#: rather than guessed into one of the other two or dropped.
+BUCKET_REGULAR = "regular"
+BUCKET_ZAKAT = "zakat"
+BUCKET_UNKNOWN = "unknown"
+REVENUE_BUCKETS = (BUCKET_REGULAR, BUCKET_ZAKAT, BUCKET_UNKNOWN)
+
+
+def coerce_fee(value) -> int:
+    """A fee cell as whole PKR — 0 for blank, non-numeric or negative input.
+
+    Excel hands numeric cells back as floats (``20.0``, not ``20``) and
+    occasionally as strings when the column has mixed formatting, so this
+    normalises both. Rounds rather than truncates: ``19.999`` from a
+    float-rounding artifact is 20 rupees, not 19.
+
+    Never raises. A malformed fee cell degrades to "no fee recorded" for that
+    one service on that one row, which is the same thing an export predating
+    the fee columns produces — the alternative, failing the parse, would
+    block a whole day's upload over one bad cell. Values that don't
+    reconcile are surfaced by the ingest-time ``Total Paid`` check instead
+    (Plan 22 D5), which warns without blocking.
+    """
+    if value is None:
+        return 0
+    if isinstance(value, bool):
+        # bool is an int subclass; a checkbox cell is not a fee.
+        return 0
+    if isinstance(value, (int, float)):
+        number = value
+    else:
+        text = str(value).strip().replace(",", "")
+        if not text:
+            return 0
+        # Tolerate a currency prefix/suffix typed into an otherwise numeric
+        # column ("PKR 250", "250/-").
+        match = re.search(r"-?\d+(?:\.\d+)?", text)
+        if match is None:
+            return 0
+        number = float(match.group())
+    if number != number or number in (float("inf"), float("-inf")):  # NaN/inf
+        return 0
+    return max(0, round(number))
+
+
 # --- De-identification helpers shared by every concrete parser --------------
 
 
@@ -222,6 +302,31 @@ class ParsedVisitRow:
     diet_and_drug_compliance: str = ""
     plan_notes: str = ""
 
+    # --- Plan 22: per-service fees, whole PKR (added 2026-08-11) -----------
+    #
+    # Defaulted to 0 like the free-text fields above are defaulted to "", so
+    # a parser that doesn't populate them needs no change — both
+    # ``parser_clinic_v1`` and any clinic export predating the software
+    # update that added these columns produce rows of zeros rather than
+    # failing. Unlike the free-text fields, these carry no text at all: a fee
+    # is a de-identified number, so this addition raises no new question
+    # under privacy invariant #1.
+    #
+    # ``total_paid`` is the export's own per-row total, kept **only** for the
+    # ingest-time reconciliation check (Plan 22 D5). It is never summed into
+    # a published figure — the per-service fees are the source of truth.
+    registration_fee: int = 0
+    consultation_fee: int = 0
+    pharmacy_fee: int = 0
+    laboratory_fee: int = 0
+    ultrasound_fee: int = 0
+    total_paid: int = 0
+
+    @property
+    def service_fees(self) -> dict[str, int]:
+        """``{service_key: fee}`` for the five services, in display order."""
+        return {key: getattr(self, field) for key, field in SERVICE_FEE_FIELDS.items()}
+
     def _canonical_tuple(self) -> tuple:
         # Includes the seven Plan 11 Track B8/B9 free-text fields below —
         # this went back and forth during code-review-tc, so the reasoning
@@ -266,6 +371,26 @@ class ParsedVisitRow:
             self.clinical_notes,
             self.diet_and_drug_compliance,
             self.plan_notes,
+            # Plan 22 D7 — the five fee fields join the hash, and the
+            # reasoning is exactly the B8/B9 one above, so it is followed
+            # rather than re-argued: excluding them would mean a genuine
+            # re-upload correcting only a fee cell hashes identically to the
+            # uncorrected file and is silently skipped as a duplicate, with
+            # that date's revenue never corrected. Including them means the
+            # first re-upload of an already-ingested date reclassifies
+            # STATUS_REPLACED once and backfills its revenue — correct, since
+            # before this change the file yielded no revenue to persist at
+            # all. Subsequent re-uploads hash identically again.
+            #
+            # `total_paid` is deliberately NOT here: it is a reconciliation
+            # input (D5), never persisted and never published, so letting it
+            # move the hash would reclassify a re-upload over a value that
+            # changes nothing downstream.
+            self.registration_fee,
+            self.consultation_fee,
+            self.pharmacy_fee,
+            self.laboratory_fee,
+            self.ultrasound_fee,
         )
 
 

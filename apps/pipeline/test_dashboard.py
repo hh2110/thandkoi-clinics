@@ -27,6 +27,7 @@ from apps.pipeline.dashboard import (
     FootfallBucket,
     bucket_footfall,
     compute_dashboard_stats,
+    compute_revenue,
     default_range,
     has_revenue,
     parse_range,
@@ -504,9 +505,128 @@ def test_bucketing_rejects_an_unknown_grain():
 # --- Revenue gate (Plan 16 D6) ---------------------------------------------
 
 
-def test_has_revenue_is_false_until_the_column_exists(db):
-    """Gated on data, not a flag — and there is no revenue column yet (D6/D13)."""
+def test_has_revenue_is_false_for_dates_predating_the_fee_columns(db):
+    """Gated on data, not a flag (D6).
+
+    Retitled in Plan 22: this used to read "until the column exists" and
+    assert a hardcoded ``False``. The column exists now, so the same
+    assertion means something sharper — a date ingested from an export
+    without fee columns stores ``{}`` and must still render the pre-revenue
+    layout, which is what makes shipping Plan 22 invisible on historical
+    ranges.
+    """
     rows = [DailyAggregateFactory(clinic_date=day(1), total_visits=10)]
 
+    assert all(row.service_revenue == {} for row in rows)
     assert has_revenue(rows) is False
     assert has_revenue([]) is False
+
+
+def test_has_revenue_is_true_as_soon_as_one_date_carries_revenue(db):
+    """One revenue day in a range of blank ones is enough to show the table —
+    the alternative would hide real income behind the range picker."""
+    rows = [
+        DailyAggregateFactory(clinic_date=day(1), total_visits=10),
+        DailyAggregateFactory(
+            clinic_date=day(2),
+            total_visits=10,
+            service_revenue={"consultation": {"regular": {"qty": 1, "amount": 300}}},
+        ),
+    ]
+
+    assert has_revenue(rows) is True
+
+
+def _revenue_day(clinic_date, **services):
+    """A DailyAggregate whose service_revenue is spelled out per service."""
+    return DailyAggregateFactory(
+        clinic_date=clinic_date, total_visits=10, service_revenue=services
+    )
+
+
+def test_compute_revenue_sums_every_bucket_across_the_range(db):
+    rows = [
+        _revenue_day(
+            day(1),
+            consultation={
+                "regular": {"qty": 2, "amount": 600},
+                "zakat": {"qty": 1, "amount": 300},
+            },
+        ),
+        _revenue_day(
+            day(2),
+            consultation={"regular": {"qty": 1, "amount": 300}},
+            laboratory={"unknown": {"qty": 4, "amount": 1000}},
+        ),
+    ]
+
+    summary = compute_revenue(rows)
+    by_label = {row.label: row for row in summary.rows}
+
+    consultation = by_label["Consultation"]
+    assert (consultation.regular_amount, consultation.regular_qty) == (900, 3)
+    assert (consultation.zakat_amount, consultation.zakat_qty) == (300, 1)
+    assert consultation.total_amount == 1200
+
+    # Unattributed money is carried into the total, not dropped (D3).
+    laboratory = by_label["Laboratory"]
+    assert laboratory.unknown_amount == 1000
+    assert laboratory.total_amount == 1000
+    assert laboratory.regular_amount + laboratory.zakat_amount == 0
+
+    assert summary.total_amount == 2200
+    assert summary.has_unattributed is True
+
+
+def test_compute_revenue_keeps_a_row_per_service_even_when_it_earned_nothing(db):
+    """The table's shape stays stable as the reader changes the range, rather
+    than gaining and losing lines."""
+    summary = compute_revenue(
+        [_revenue_day(day(1), consultation={"regular": {"qty": 1, "amount": 300}})]
+    )
+
+    assert [row.label for row in summary.rows] == [
+        "Registration",
+        "Consultation",
+        "Pharmacy",
+        "Laboratory",
+        "Ultrasound",
+    ]
+    assert summary.has_unattributed is False
+
+
+def test_compute_revenue_reports_partial_coverage(db):
+    """The "Revenue recorded for N of M reporting days." line, and its
+    negative case — a range where every reporting day has revenue says
+    nothing rather than stating the obvious."""
+    partial = compute_revenue(
+        [
+            DailyAggregateFactory(clinic_date=day(1), total_visits=10),
+            _revenue_day(day(2), consultation={"regular": {"qty": 1, "amount": 300}}),
+        ]
+    )
+    assert (partial.revenue_days, partial.reporting_days) == (1, 2)
+    assert partial.is_partial is True
+
+    complete = compute_revenue(
+        [_revenue_day(day(3), consultation={"regular": {"qty": 1, "amount": 300}})]
+    )
+    assert complete.is_partial is False
+
+
+def test_compute_revenue_ignores_a_service_key_it_does_not_know(db):
+    """Corrupt or hand-edited JSON must not invent a table row. The only
+    writer is `ingest._service_revenue`; anything else is bad data."""
+    summary = compute_revenue(
+        [
+            _revenue_day(
+                day(1),
+                dentistry={"regular": {"qty": 9, "amount": 9999}},
+                consultation={"regular": {"qty": 1, "amount": 300}},
+            )
+        ]
+    )
+
+    assert len(summary.rows) == 5
+    assert "Dentistry" not in {row.label for row in summary.rows}
+    assert summary.total_amount == 300

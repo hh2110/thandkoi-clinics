@@ -175,6 +175,92 @@ def test_revenue_branches_light_up_when_has_revenue_turns_true(
     assert "dash__split--no-revenue" not in content
 
 
+# --- Revenue with real data (Plan 22, task 22.2) ---------------------------
+#
+# The test above rehearses the branch with `has_revenue` monkeypatched. These
+# drive it from stored `service_revenue` instead, so the context keys the
+# template reads are exercised rather than assumed.
+
+
+def revenue_aggregate(clinic_date, **services):
+    row = aggregate(clinic_date)
+    row.service_revenue = services
+    row.save()
+    return row
+
+
+def test_revenue_table_renders_real_stored_figures(client, dashboard):
+    """Plan 16 D6's promise, collected: stored revenue alone lights up the
+    fourth KPI card and the table, with no flag and no template change."""
+    revenue_aggregate(
+        timezone.localdate(),
+        consultation={
+            "regular": {"qty": 2, "amount": 600},
+            "zakat": {"qty": 1, "amount": 300},
+        },
+    )
+
+    content = render(client, dashboard)
+
+    assert content.count('class="dash__kpi"') == 4
+    assert 'data-role="revenue"' in content
+    # The figures themselves, not just the markup.
+    assert "900" in content
+    assert "Consultation" in content
+    # 900 across 6 patients — the KPI card's per-patient line.
+    assert "150 per patient" in squash(content)
+
+
+def test_unattributed_revenue_is_disclosed_rather_than_hidden(client, dashboard):
+    """Plan 22 D3. Regular + Zakat come to less than Total here, so the
+    footnote must say why — otherwise the table reads as an arithmetic bug.
+    This is the exact shape of the real 6 Aug export, where every row's
+    `Status` was blank."""
+    revenue_aggregate(
+        timezone.localdate(),
+        registration={"unknown": {"qty": 93, "amount": 1860}},
+    )
+
+    content = squash(render(client, dashboard))
+
+    assert "did not record as Zakat or Regular" in content
+    assert "1,860" in content
+
+
+def test_no_unattributed_footnote_on_an_ordinary_day(client, dashboard):
+    """The negative case — a note that always renders teaches the reader to
+    stop reading it."""
+    revenue_aggregate(
+        timezone.localdate(),
+        consultation={"regular": {"qty": 2, "amount": 600}},
+    )
+
+    content = squash(render(client, dashboard))
+
+    assert "did not record as Zakat or Regular" not in content
+
+
+def test_partial_revenue_coverage_is_stated(client, dashboard):
+    """One of two reporting days carries revenue, so the reader is told —
+    otherwise a half-covered range reads as a full one."""
+    today = timezone.localdate()
+    aggregate(today - datetime.timedelta(days=1))
+    revenue_aggregate(today, consultation={"regular": {"qty": 2, "amount": 600}})
+
+    content = squash(render(client, dashboard))
+
+    assert "Revenue recorded for 1 of 2 reporting days." in content
+    # ...and the "of N" matches the reporting-day count in the page header.
+    # The two are derived separately (`compute_dashboard_stats` for the
+    # header, `len(rows)` inside `compute_revenue` for the footnote), so
+    # without this they could silently drift into stating two different
+    # totals for the same phrase on one screen.
+    assert "2 reporting days" in content
+    assert "1 reporting day" not in content.replace(
+        "Revenue recorded for 1 of 2 reporting days.", ""
+    )
+
+
 # --- The header line -------------------------------------------------------
 
 

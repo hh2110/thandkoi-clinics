@@ -14,6 +14,7 @@ date's rows and aggregate atomically. Detected via ``IngestRun.content_hash``
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
@@ -23,11 +24,18 @@ from django.db import transaction
 
 from apps.pipeline.models import DailyAggregate, DeidentifiedVisit, IngestRun
 from apps.pipeline.parser_registry import (
+    BUCKET_REGULAR,
+    BUCKET_UNKNOWN,
+    BUCKET_ZAKAT,
+    REVENUE_BUCKETS,
+    SERVICE_FEE_FIELDS,
     ParsedExport,
     ParsedVisitRow,
     ParserRegistry,
     content_hash_for_rows,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _counter(values) -> dict[str, int]:
@@ -36,6 +44,97 @@ def _counter(values) -> dict[str, int]:
     for value in values:
         counts[value] = counts.get(value, 0) + 1
     return dict(sorted(counts.items()))
+
+
+def _payment_bucket(is_zakat_beneficiary: bool | None) -> str:
+    """Which revenue bucket a visit's money belongs in (Plan 22 D3).
+
+    Three buckets, not two. ``None`` — a ``Status`` cell that is neither
+    "zakat" nor "regular" — gets its own ``unknown`` bucket rather than being
+    folded into Regular (an invention) or dropped (which would make published
+    income silently understate what the clinic took). This mirrors the
+    existing ``DailyAggregate.unknown_payment_type_patients``, which already
+    treats that third case as first-class.
+    """
+    if is_zakat_beneficiary is True:
+        return BUCKET_ZAKAT
+    if is_zakat_beneficiary is False:
+        return BUCKET_REGULAR
+    return BUCKET_UNKNOWN
+
+
+def _service_revenue(visits) -> dict:
+    """Per-service, per-bucket ``{"qty", "amount"}`` for one clinic-date.
+
+    ``amount`` sums that service's fee column; ``qty`` counts the rows where
+    it was non-zero — services delivered, not patients (Plan 16 D14: a
+    service is the line, not the item, so one lab line covering N tests is
+    one lab service).
+
+    Returns ``{}`` — not a dict of zeros — when the date has no revenue at
+    all, because ``apps.pipeline.dashboard.has_revenue`` tests the field's
+    truthiness to decide whether the date predates the clinic software's fee
+    columns. A dict of zeros would read as "revenue exists and is zero" and
+    light up an empty revenue table on every historical date.
+    """
+    revenue = {
+        service: {bucket: {"qty": 0, "amount": 0} for bucket in REVENUE_BUCKETS}
+        for service in SERVICE_FEE_FIELDS
+    }
+    any_revenue = False
+    for visit in visits:
+        bucket = _payment_bucket(visit.is_zakat_beneficiary)
+        for service, field_name in SERVICE_FEE_FIELDS.items():
+            fee = getattr(visit, field_name, 0) or 0
+            if fee <= 0:
+                continue
+            any_revenue = True
+            cell = revenue[service][bucket]
+            cell["qty"] += 1
+            cell["amount"] += fee
+    return revenue if any_revenue else {}
+
+
+def _warn_on_total_paid_drift(clinic_date: date, rows: list[ParsedVisitRow]) -> None:
+    """Reconcile the five fee columns against the export's own ``Total Paid``.
+
+    Plan 22 D5. The per-service columns are the source of truth; this only
+    checks that the export agrees with itself. It **warns and never raises**
+    — the Plan 17 observability setup forwards ``WARNING`` and above to
+    Sentry, so drift is visible without a malformed column being able to
+    block a whole day's upload.
+
+    This lives in the ingest path rather than in ``recompute_daily_aggregate``
+    because ``total_paid`` is deliberately not persisted (Plan 22 D2): it is
+    only available while the parsed rows are still in hand.
+
+    Why this check exists at all: these columns have already emitted
+    fabricated values once — the 6 Aug 2026 camp export carried a flat
+    ``Registration Fee (PKR)`` of 20 across all 93 attendees of an
+    advertised-free camp, confirmed by the maintainer as a clinic-software
+    report bug.
+    """
+    service_total = sum(
+        getattr(row, field_name, 0) or 0
+        for row in rows
+        for field_name in SERVICE_FEE_FIELDS.values()
+    )
+    reported_total = sum(row.total_paid or 0 for row in rows)
+    if service_total == reported_total:
+        return
+    # No cell values, no patient data — a date and two sums over an already
+    # de-identified set of rows.
+    logger.warning(
+        "Revenue reconciliation mismatch for %s: per-service fees sum to "
+        "PKR %s but the export's own 'Total Paid (PKR)' column sums to "
+        "PKR %s (difference PKR %s across %s rows). The per-service figures "
+        "are what the site publishes; check the clinic software's report.",
+        clinic_date.isoformat(),
+        service_total,
+        reported_total,
+        service_total - reported_total,
+        len(rows),
+    )
 
 
 def recompute_daily_aggregate(
@@ -85,6 +184,11 @@ def recompute_daily_aggregate(
             "by_diagnosis_category": _counter(v.diagnosis_category for v in visits),
             "by_age_band": _counter(v.age_band for v in visits),
         },
+        # Plan 22: recomputed from the canonical per-visit fees like every
+        # other figure here, so this stays deterministic and byte-for-byte
+        # reproducible (invariant #3) and the command below can rebuild a
+        # historical date's revenue rather than zeroing it.
+        "service_revenue": _service_revenue(visits),
     }
     if latest_ingest_run is not None:
         defaults["latest_ingest_run"] = latest_ingest_run
@@ -188,11 +292,22 @@ def _ingest_one_date(
                     clinical_notes=row.clinical_notes,
                     diet_and_drug_compliance=row.diet_and_drug_compliance,
                     plan_notes=row.plan_notes,
+                    # Plan 22 D2 — persisted per visit so the aggregate stays
+                    # recomputable from this table alone.
+                    registration_fee=row.registration_fee,
+                    consultation_fee=row.consultation_fee,
+                    pharmacy_fee=row.pharmacy_fee,
+                    laboratory_fee=row.laboratory_fee,
+                    ultrasound_fee=row.ultrasound_fee,
                 )
                 for row in rows
             ]
         )
         recompute_daily_aggregate(clinic_date, latest_ingest_run=run)
+
+    # After the transaction commits, and never inside it: this is a
+    # diagnostic, so it must not be able to affect the write it reports on.
+    _warn_on_total_paid_drift(clinic_date, rows)
 
     return DateIngestResult(clinic_date=clinic_date, status=status, row_count=len(rows))
 

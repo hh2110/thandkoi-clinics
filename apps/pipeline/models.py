@@ -271,6 +271,32 @@ class DeidentifiedVisit(models.Model):
     diet_and_drug_compliance = models.TextField(blank=True, default="")
     plan_notes = models.TextField(blank=True, default="")
 
+    # --- Plan 22 D2: per-service fees in whole PKR (added 2026-08-11) ------
+    #
+    # Stored per visit, not only on ``DailyAggregate``, and that is
+    # load-bearing rather than a convenience. ``DailyAggregate`` is a derived
+    # cache whose docstring promises it is "always recomputable from
+    # ``DeidentifiedVisit`` (the canonical store)", and
+    # ``recompute_daily_aggregates`` is documented as safe to re-run. If
+    # revenue lived only on the aggregate, that command would recompute every
+    # historical date's revenue as zero and wipe it — turning a
+    # documented-safe maintenance command into a destructive one.
+    #
+    # Privacy: a fee is a de-identified number. Invariant #1 explicitly
+    # permits "a de-identified row table with direct identifiers stripped",
+    # and no identifier is introduced here — unlike the free-text fields
+    # above, these needed no new grounding decision.
+    #
+    # The export's own ``Total Paid (PKR)`` is deliberately **not** stored:
+    # it is a reconciliation input consumed during ingest (Plan 22 D5), and
+    # persisting a second, redundant total invites a future reader to publish
+    # it as if it were a source of truth.
+    registration_fee = models.PositiveIntegerField(default=0)
+    consultation_fee = models.PositiveIntegerField(default=0)
+    pharmacy_fee = models.PositiveIntegerField(default=0)
+    laboratory_fee = models.PositiveIntegerField(default=0)
+    ultrasound_fee = models.PositiveIntegerField(default=0)
+
     class Meta:
         indexes = [models.Index(fields=["visit_date"])]
 
@@ -310,6 +336,23 @@ class DailyAggregate(models.Model):
         blank=True,
         help_text="Flexible category breakdowns: by_department, "
         "by_diagnosis_category, by_age_band.",
+    )
+
+    # Plan 22: one JSON column rather than 15 integer columns, so a service
+    # the clinic adds later needs no migration — the shape Plan 16's design
+    # handoff recommended. Empty dict for every clinic-date predating the
+    # software update that added the fee columns, which is exactly what
+    # `apps.pipeline.dashboard.has_revenue` tests for.
+    service_revenue = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Per-service revenue for this clinic-date, in whole PKR: "
+        '{"consultation": {"regular": {"qty": 3, "amount": 750}, '
+        '"zakat": {"qty": 4, "amount": 1000}, '
+        '"unknown": {"qty": 0, "amount": 0}}, ...}. `qty` is the number of '
+        "rows where that fee was non-zero (services delivered, not patients "
+        "— Plan 16 D14). The `unknown` bucket holds money from rows whose "
+        "Status is neither Zakat nor Regular (Plan 22 D3).",
     )
 
     latest_ingest_run = models.ForeignKey(
@@ -567,9 +610,24 @@ class DailyReportPage(Page):
         decision). Both remain computed at the model layer
         (`category_counts`) — this page just stops rendering them.
         """
+        # Imported here, not at module scope: `apps.pipeline.dashboard`
+        # imports this module's models, so a top-level import is circular
+        # (same reason `ClinicDashboardPage.get_context` imports it locally).
+        from apps.pipeline import dashboard
+
         context = super().get_context(request, *args, **kwargs)
         agg = self.aggregate
         context["aggregate"] = agg
+
+        # Plan 22 task 22.3 — the same aggregation the dashboard uses, scoped
+        # to this one clinic-date. The handoff is explicit that a date with no
+        # `service_revenue` omits the whole section rather than rendering an
+        # empty table or a zero row, so this stays None on every date
+        # predating the clinic software's fee columns and the template's
+        # single `{% if revenue %}` does the rest.
+        context["revenue"] = (
+            dashboard.compute_revenue([agg]) if agg.service_revenue else None
+        )
 
         # Gender bars — percentage is presentation only; counts stay
         # authoritative (rendered alongside every bar).
@@ -720,6 +778,26 @@ class ClinicDashboardPage(Page):
         context["today"] = today
         context["has_reporting_days"] = stats.reporting_days > 0
         context["has_revenue"] = dashboard.has_revenue(rows)
+        # Plan 22 task 22.2. Computed only when there is revenue to show —
+        # the template's `{% if has_revenue %}` branches never read these
+        # otherwise, and folding an all-zero table over a range of
+        # pre-fee-column dates would be pure waste.
+        if context["has_revenue"]:
+            revenue = dashboard.compute_revenue(rows)
+            context["revenue"] = revenue
+            context["revenue_rows"] = revenue.rows
+            context["revenue_totals"] = revenue
+            context["revenue_total_amount"] = revenue.total_amount
+            # Per *patient*, not per reporting day — the KPI card sits beside
+            # "Patients seen" and reads as an average ticket size. Guarded
+            # because a range can have revenue on a date whose visit count is
+            # zero only if the data is inconsistent, but dividing by zero
+            # should still not 500 the page.
+            context["revenue_per_patient"] = (
+                round(revenue.total_amount / stats.total_visits)
+                if stats.total_visits
+                else 0
+            )
 
         base_url = self.get_url(request)
         context["presets"] = [
