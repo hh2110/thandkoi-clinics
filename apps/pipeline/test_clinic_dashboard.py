@@ -250,6 +250,15 @@ def test_partial_revenue_coverage_is_stated(client, dashboard):
     content = squash(render(client, dashboard))
 
     assert "Revenue recorded for 1 of 2 reporting days." in content
+    # ...and the "of N" matches the reporting-day count in the page header.
+    # The two are derived separately (`compute_dashboard_stats` for the
+    # header, `len(rows)` inside `compute_revenue` for the footnote), so
+    # without this they could silently drift into stating two different
+    # totals for the same phrase on one screen.
+    assert "2 reporting days" in content
+    assert "1 reporting day" not in content.replace(
+        "Revenue recorded for 1 of 2 reporting days.", ""
+    )
 
 
 # --- The header line -------------------------------------------------------

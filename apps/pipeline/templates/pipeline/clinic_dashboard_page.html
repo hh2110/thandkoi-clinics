@@ -33,9 +33,12 @@ under 100 when a range holds unknown-payment visits; that shortfall is left
 implicit and the counts beside every bar stay authoritative (D5).
 
 Revenue surfaces (the 4th KPI card and the "Revenue by service" table) are
-written against `has_revenue` and are inert today — `dashboard.has_revenue`
-returns False until the clinic software ships fee columns (D6/D13), so
-Phase 2 lights them up with no template work. As of the 2026-07-25 handoff
+written against `has_revenue`, which is a **data** check, never a feature
+flag (D6): `dashboard.has_revenue` is true for a range holding any date
+whose `service_revenue` is non-empty. Plan 22 ingested the clinic
+software's fee columns and these lit up with no change to the markup
+below, as D6 promised — dates predating that software update store `{}`
+and still render the three-card layout. As of the 2026-07-25 handoff
 revision (Plan 18) that is the whole of the gate: the split section's
 layout no longer changes with it, because the table now sits full width
 above the two side cards rather than beside them.
@@ -254,9 +257,10 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
     revenue exists, so that modifier is gone rather than left as a no-op
     (Plan 18 D6).
 
-    `revenue_rows`/`revenue_totals` are still Phase 2's context keys — unset
-    today, so this whole branch stays unreachable and no empty table is
-    rendered (Plan 16 D6/D13).
+    `revenue_rows`/`revenue_totals` are supplied by `ClinicDashboardPage.
+    get_context` (Plan 22), and only when `has_revenue` is true — so on a
+    range with no revenue this branch stays unreachable and no empty table
+    is rendered, exactly as before Plan 22 (Plan 16 D6/D13).
     {% endcomment %}
     <section class="dash__split" data-role="split">
 

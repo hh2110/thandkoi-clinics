@@ -483,9 +483,9 @@ def has_revenue(rows) -> bool:
     return any(row.service_revenue for row in rows)
 
 
-#: Display labels per service key, in ``SERVICE_KEYS`` order. Lives here
-#: rather than beside the keys in ``parser_registry`` because the parser has
-#: no business knowing what a reader sees, and these need translating.
+# Display label per service key. Lives here rather than beside the keys in
+# ``parser_registry`` because the parser has no business knowing what a
+# reader sees, and these need translating at render time.
 def _service_label(key: str) -> str:
     return {
         SERVICE_REGISTRATION: _("Registration"),
