@@ -763,6 +763,26 @@ class ClinicDashboardPage(Page):
         context["today"] = today
         context["has_reporting_days"] = stats.reporting_days > 0
         context["has_revenue"] = dashboard.has_revenue(rows)
+        # Plan 22 task 22.2. Computed only when there is revenue to show —
+        # the template's `{% if has_revenue %}` branches never read these
+        # otherwise, and folding an all-zero table over a range of
+        # pre-fee-column dates would be pure waste.
+        if context["has_revenue"]:
+            revenue = dashboard.compute_revenue(rows)
+            context["revenue"] = revenue
+            context["revenue_rows"] = revenue.rows
+            context["revenue_totals"] = revenue
+            context["revenue_total_amount"] = revenue.total_amount
+            # Per *patient*, not per reporting day — the KPI card sits beside
+            # "Patients seen" and reads as an average ticket size. Guarded
+            # because a range can have revenue on a date whose visit count is
+            # zero only if the data is inconsistent, but dividing by zero
+            # should still not 500 the page.
+            context["revenue_per_patient"] = (
+                round(revenue.total_amount / stats.total_visits)
+                if stats.total_visits
+                else 0
+            )
 
         base_url = self.get_url(request)
         context["presets"] = [

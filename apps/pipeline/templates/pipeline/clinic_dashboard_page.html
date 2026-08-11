@@ -296,6 +296,24 @@ static/css/dashboard.css. `dash` is the page-scoped root class.
               <span class="dash__revenue-cell dash__revenue-cell--grand">{{ revenue_totals.total_amount|intcomma }}</span>
             </div>
           </div>
+          {% comment %}
+          Plan 22 D3. Regular + Zakat can come to less than Total, because
+          money from rows whose `Status` the export left blank is real income
+          that belongs in the total but cannot honestly be attributed to
+          either column. Said out loud only when there is some — on a normal
+          day this renders nothing — so the gap reads as a recorded fact
+          rather than an arithmetic bug in the table above.
+          {% endcomment %}
+          {% if revenue.has_unattributed %}
+            <p class="dash__revenue-note dash__revenue-note--foot">
+              {% blocktranslate with amount=revenue.unknown_amount|intcomma %}Includes PKR {{ amount }} the export did not record as Zakat or Regular, counted in the total only.{% endblocktranslate %}
+            </p>
+          {% endif %}
+          {% if revenue.is_partial %}
+            <p class="dash__revenue-note dash__revenue-note--foot">
+              {% blocktranslate with days=revenue.revenue_days total=revenue.reporting_days %}Revenue recorded for {{ days }} of {{ total }} reporting days.{% endblocktranslate %}
+            </p>
+          {% endif %}
         </div>
       {% endif %}
 

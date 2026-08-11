@@ -46,6 +46,18 @@ from django.utils.translation import gettext as _
 
 from apps.pipeline.footfall_chart import SUNDAY_WEEKDAY, slot_dates
 from apps.pipeline.models import DailyAggregate, DeidentifiedVisit
+from apps.pipeline.parser_registry import (
+    BUCKET_REGULAR,
+    BUCKET_UNKNOWN,
+    BUCKET_ZAKAT,
+    REVENUE_BUCKETS,
+    SERVICE_CONSULTATION,
+    SERVICE_KEYS,
+    SERVICE_LABORATORY,
+    SERVICE_PHARMACY,
+    SERVICE_REGISTRATION,
+    SERVICE_ULTRASOUND,
+)
 
 #: Default window when the reader supplies no usable range: the last 30 days
 #: **ending today**, inclusive — so 25 Jul 2026 defaults to 26 Jun – 25 Jul.
@@ -451,22 +463,145 @@ def _month_starts(date_range: DateRange) -> list[datetime.date]:
     return months
 
 
-# --- Revenue gate (Plan 16 D6) ---------------------------------------------
+# --- Revenue (Plan 16 D6 gate, Plan 22 data) --------------------------------
 
 
 def has_revenue(rows) -> bool:
-    """Whether the range has per-service revenue to show. Always ``False`` today.
+    """Whether the range has per-service revenue to show.
 
     Plan 16 D6: revenue is gated on **data**, not on a runtime feature flag,
     so every revenue surface — the fourth KPI card, the "Revenue by service"
-    table, the side-column layout switch — branches on this from day one and
-    Phase 2 needs no template work.
+    table, the side-column layout switch — branches on this, and Plan 22
+    needed no template work to light them up.
 
-    ``DailyAggregate`` has no revenue column yet. D13 records why: the clinic
-    software is being updated to add fee columns to the daily patient export,
-    and until that release ships there is genuinely nothing to sum. When the
-    ``service_revenue`` column lands (see the plan file's Phase 2 checklist)
-    this becomes ``any(row.service_revenue for row in rows)`` and nothing
-    else in the codebase has to change.
+    A date predating the clinic software's fee columns stores ``{}`` in
+    ``service_revenue`` (see ``apps.pipeline.ingest._service_revenue``, which
+    returns an empty dict rather than a dict of zeros for exactly this
+    reason), so a range covering only such dates reads ``False`` here and
+    renders precisely as it did before Plan 22.
     """
-    return False
+    return any(row.service_revenue for row in rows)
+
+
+#: Display labels per service key, in ``SERVICE_KEYS`` order. Lives here
+#: rather than beside the keys in ``parser_registry`` because the parser has
+#: no business knowing what a reader sees, and these need translating.
+def _service_label(key: str) -> str:
+    return {
+        SERVICE_REGISTRATION: _("Registration"),
+        SERVICE_CONSULTATION: _("Consultation"),
+        SERVICE_PHARMACY: _("Pharmacy"),
+        SERVICE_LABORATORY: _("Laboratory"),
+        SERVICE_ULTRASOUND: _("Ultrasound"),
+    }[key]
+
+
+@dataclass(frozen=True)
+class RevenueRow:
+    """One service's line in the "Revenue by service" table.
+
+    ``total_*`` includes the ``unknown`` bucket (Plan 22 D3), so Regular +
+    Zakat can legitimately come to **less** than Total — money from rows whose
+    ``Status`` the export left blank is real income that belongs in the total,
+    and folding it into Regular would be an invention. The template renders a
+    footnote whenever that gap is non-zero so it reads as a recorded fact
+    rather than an arithmetic error.
+    """
+
+    label: str
+    regular_amount: int
+    regular_qty: int
+    zakat_amount: int
+    zakat_qty: int
+    unknown_amount: int
+    unknown_qty: int
+
+    @property
+    def total_amount(self) -> int:
+        return self.regular_amount + self.zakat_amount + self.unknown_amount
+
+    @property
+    def total_qty(self) -> int:
+        return self.regular_qty + self.zakat_qty + self.unknown_qty
+
+
+@dataclass(frozen=True)
+class RevenueSummary:
+    """Everything the dashboard's revenue surfaces read, for one range."""
+
+    rows: list[RevenueRow]
+    regular_amount: int
+    zakat_amount: int
+    unknown_amount: int
+    #: Reporting days in the range that actually carry revenue, and the total
+    #: that carry any data at all — the "Revenue recorded for 12 of 22
+    #: reporting days." line. Equal values mean every reporting day has
+    #: revenue, and the template says nothing.
+    revenue_days: int
+    reporting_days: int
+
+    @property
+    def total_amount(self) -> int:
+        return self.regular_amount + self.zakat_amount + self.unknown_amount
+
+    @property
+    def has_unattributed(self) -> bool:
+        """Whether any money sits outside Regular/Zakat (drives the footnote)."""
+        return self.unknown_amount > 0
+
+    @property
+    def is_partial(self) -> bool:
+        return self.revenue_days < self.reporting_days
+
+
+def compute_revenue(rows) -> RevenueSummary:
+    """Fold a range's ``DailyAggregate.service_revenue`` into display rows.
+
+    Pure summation over already-stored JSON — no query of its own, since the
+    caller already has the rows in hand for the chart. Every service in
+    ``SERVICE_KEYS`` gets a row even when it earned nothing in this range, so
+    the table's shape is stable as the reader changes the date range rather
+    than gaining and losing lines.
+
+    Unknown keys in stored JSON are ignored rather than rendered: the only
+    writer is ``ingest._service_revenue``, and a key it never writes is
+    corrupt data, not a service to invent a label for.
+    """
+    totals = {
+        key: {bucket: {"qty": 0, "amount": 0} for bucket in REVENUE_BUCKETS}
+        for key in SERVICE_KEYS
+    }
+    revenue_days = 0
+    for row in rows:
+        revenue = row.service_revenue or {}
+        if revenue:
+            revenue_days += 1
+        for key, buckets in revenue.items():
+            if key not in totals:
+                continue
+            for bucket, cell in (buckets or {}).items():
+                if bucket not in totals[key]:
+                    continue
+                totals[key][bucket]["qty"] += (cell or {}).get("qty", 0) or 0
+                totals[key][bucket]["amount"] += (cell or {}).get("amount", 0) or 0
+
+    revenue_rows = [
+        RevenueRow(
+            label=_service_label(key),
+            regular_amount=totals[key][BUCKET_REGULAR]["amount"],
+            regular_qty=totals[key][BUCKET_REGULAR]["qty"],
+            zakat_amount=totals[key][BUCKET_ZAKAT]["amount"],
+            zakat_qty=totals[key][BUCKET_ZAKAT]["qty"],
+            unknown_amount=totals[key][BUCKET_UNKNOWN]["amount"],
+            unknown_qty=totals[key][BUCKET_UNKNOWN]["qty"],
+        )
+        for key in SERVICE_KEYS
+    ]
+    return RevenueSummary(
+        rows=revenue_rows,
+        regular_amount=sum(r.regular_amount for r in revenue_rows),
+        zakat_amount=sum(r.zakat_amount for r in revenue_rows),
+        unknown_amount=sum(r.unknown_amount for r in revenue_rows),
+        revenue_days=revenue_days,
+        reporting_days=len(rows),
+    )
