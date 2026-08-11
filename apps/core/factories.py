@@ -16,8 +16,6 @@ from wagtail.models import Page
 
 from apps.core.models import (
     AboutPage,
-    CampReportIndexPage,
-    CampReportPage,
     ContactPage,
     DonatePage,
     Donor,
@@ -213,24 +211,6 @@ class NewsletterPageFactory(_TreePageFactory):
     slug = factory.Sequence(lambda n: f"issue-{n}")
     issue_date = factory.LazyFunction(datetime.date.today)
     summary = "A short teaser blurb."
-
-
-class CampReportIndexPageFactory(_TreePageFactory):
-    class Meta:
-        model = CampReportIndexPage
-
-    title = "Camp Reports"
-    slug = "camp-reports"
-
-
-class CampReportPageFactory(_TreePageFactory):
-    class Meta:
-        model = CampReportPage
-
-    title = factory.Sequence(lambda n: f"Camp report {n}")
-    slug = factory.Sequence(lambda n: f"camp-{n}")
-    camp_date = factory.LazyFunction(datetime.date.today)
-    location = "Thandkoi, Swabi"
 
 
 class GalleryPageFactory(_TreePageFactory):

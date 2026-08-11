@@ -157,11 +157,12 @@ class ConsentedImageBlock(blocks.StructBlock):
     consent): an image cannot be saved unless the admin ticks
     ``consent_confirmed``.
 
-    Plan 06 is this block's first real user (Newsletter body photos, Camp
-    Report photos), so it's also where the block first gets a render
-    template — ``blocks/consented_image_block.html`` — shared by every
-    StreamField that reuses this block, rather than each caller inventing its
-    own markup for the same photo+caption shape.
+    Plan 06 is this block's first real user (Newsletter body photos, and
+    Camp Report photos until Plan 21 retired that type), so it's also where
+    the block first gets a render template —
+    ``blocks/consented_image_block.html`` — shared by every StreamField that
+    reuses this block, rather than each caller inventing its own markup for
+    the same photo+caption shape.
     """
 
     image = ImageChooserBlock()

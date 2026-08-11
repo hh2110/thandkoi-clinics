@@ -2,6 +2,18 @@
 
 _Status: Drafted · Depends on: 01 Project foundation, 03 Design system & base templates, 04 Core content pages · Next: 07 Accounts & roles_
 
+> **2026-08-10 — the Camp Report half of this plan was retired.**
+> [Plan 21](21-retire-camp-reports.md) deleted `CampReportIndexPage`,
+> `CampReportPage`, their templates, factories and seeding, and the
+> `/reports/` camp teaser. Camps are published as `NewsletterPage` issues
+> now, with `issue_label = "Camp Report"` keeping the framing in the
+> masthead; both retired URLs 301 to their newsletter replacements. The
+> Newsletter archive and the Gallery, and everything this plan says about
+> the consent gate, are unaffected — `ConsentedImageBlock` is still
+> load-bearing, just on newsletter and gallery photos rather than camp ones.
+> The rest of this file is left as written: it is the record of what was
+> built in July 2026, not a description of the code today.
+
 ## Goal
 
 Three more content types, human-authored for now: a Newsletter archive, a

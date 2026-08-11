@@ -109,7 +109,7 @@ Clinic software ──export──▶ daily .xls/.xlsx
 - **Home** — mission, impact numbers, latest report/newsletter, donate CTA
 - **About** — vision, mission, objectives, quality-of-care model, partners
 - **Team / Management** — founders, officers, committees
-- **Our Work** — services, infrastructure, camp reports
+- **Our Work** — services, infrastructure
 - **Reports** — auto-generated daily (high-level) and monthly report pages
 - **Newsletters** — archive
 - **Gallery** — photos
@@ -176,6 +176,9 @@ by construction.
 
 1. **Website (first):** informational pages, team, services, camp reports,
    newsletter archive, gallery, donate placeholder, contact/bank details.
+   (The separate camp-report archive shipped in Plan 06 and was **retired in
+   Plan 21**, 2026-08-10 — a camp is published as a newsletter issue now,
+   labelled "Camp Report" in the masthead.)
 2. **Pipeline core:** authenticated upload, parser registry, aggregate-and-discard,
    daily report page.
 3. **AI generation:** monthly newsletter with tooling + human review; bilingual

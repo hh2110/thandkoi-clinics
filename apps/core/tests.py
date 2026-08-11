@@ -19,8 +19,6 @@ from wagtail.models import Page, Site
 
 from apps.core.factories import (
     AboutPageFactory,
-    CampReportIndexPageFactory,
-    CampReportPageFactory,
     ContactPageFactory,
     DonatePageFactory,
     DonorFactory,
@@ -38,7 +36,6 @@ from apps.core.factories import (
     UpcomingEventFactory,
 )
 from apps.core.models import (
-    CampReportPage,
     ContactBankSettings,
     Donor,
     HomePage,
@@ -795,11 +792,6 @@ def test_hero_cta_target_guard_and_donate_only_amber(home_page):
             NewsletterIndexPageFactory,
             "newsletters",
             "core/newsletter_index_page.html",
-        ),
-        (
-            CampReportIndexPageFactory,
-            "camp-reports",
-            "core/camp_report_index_page.html",
         ),
         (GalleryPageFactory, "gallery", "core/gallery_page.html"),
         (
@@ -1664,76 +1656,6 @@ def test_about_page_never_renders_an_unconsented_photo(client, home_page):
     assert "Unconsented photo" not in content
 
 
-def test_camp_report_page_renders_under_its_index(client, home_page):
-    """A camp report is independently linkable."""
-    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
-    CampReportPageFactory(
-        parent=index,
-        slug="inauguration-camp",
-        title="Inauguration Camp",
-        camp_date=datetime.date(2026, 5, 16),
-        location="Thandkoi, Swabi",
-    )
-    response = client.get("/en/camp-reports/inauguration-camp/")
-    assert response.status_code == 200
-    assert "core/camp_report_page.html" in [t.name for t in response.templates]
-    content = response.content.decode()
-    assert "Inauguration Camp" in content
-    assert "Thandkoi, Swabi" in content
-    # No report_document set — no download link renders.
-    assert "Download the full report" not in content
-
-
-def test_camp_report_page_renders_report_document_link_when_set(client, home_page):
-    """A camp report with a ``report_document`` renders a download link to it."""
-    from django.core.files.base import ContentFile
-    from wagtail.documents.models import Document
-
-    document = Document.objects.create(
-        title="Inauguration report",
-        file=ContentFile(b"%PDF-1.4 fake pdf content", name="report.pdf"),
-    )
-    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
-    CampReportPageFactory(
-        parent=index,
-        slug="camp-with-report",
-        title="Camp With Report",
-        camp_date=datetime.date(2026, 5, 16),
-        report_document=document,
-    )
-    content = client.get("/en/camp-reports/camp-with-report/").content.decode()
-    assert "Download the full report" in content
-    assert document.url in content
-
-
-def test_camp_report_photos_render_through_the_media_grid(client, home_page):
-    """A consent-confirmed camp photo renders via the media grid."""
-    from wagtail.images.tests.utils import Image, get_test_image_file
-
-    image = Image.objects.create(title="Camp crowd", file=get_test_image_file())
-    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
-    CampReportPageFactory(
-        parent=index,
-        slug="verify-camp",
-        photos=[
-            (
-                "photo",
-                {
-                    "image": image,
-                    "alt_text": "",
-                    "caption": "Crowd at the camp",
-                    "consent_confirmed": True,
-                },
-            )
-        ],
-    )
-    content = client.get("/en/camp-reports/verify-camp/").content.decode()
-    assert "Crowd at the camp" in content
-    assert 'alt="Camp crowd"' in content
-    assert "data-lightbox-trigger" in content
-    assert "max-1200x1200" in content  # the modal's larger, uncropped rendition
-
-
 def test_newsletter_archive_lists_only_published_newest_first(client, home_page):
     """Drafts stay invisible in the archive; published issues sort newest first.
 
@@ -1766,35 +1688,6 @@ def test_newsletter_archive_lists_only_published_newest_first(client, home_page)
     assert "Issue Two" in content
     assert "Draft Issue" not in content
     assert content.index("Issue Two") < content.index("Issue One")
-
-
-def test_camp_report_archive_lists_only_published_newest_first(client, home_page):
-    """Same draft-invisibility and newest-first guarantee for Camp Reports."""
-    index = CampReportIndexPageFactory(parent=home_page, slug="camp-reports")
-    CampReportPageFactory(
-        parent=index,
-        slug="camp-1",
-        title="Camp One",
-        camp_date=datetime.date(2026, 1, 1),
-    )
-    CampReportPageFactory(
-        parent=index,
-        slug="camp-2",
-        title="Camp Two",
-        camp_date=datetime.date(2026, 6, 1),
-    )
-    CampReportPageFactory(
-        parent=index,
-        slug="camp-3",
-        title="Draft Camp",
-        camp_date=datetime.date(2026, 7, 1),
-        live=False,
-    )
-    content = client.get("/en/camp-reports/").content.decode()
-    assert "Camp One" in content
-    assert "Camp Two" in content
-    assert "Draft Camp" not in content
-    assert content.index("Camp Two") < content.index("Camp One")
 
 
 def test_home_teaser_shows_latest_published_newsletter_only(client, home_page):
@@ -1920,25 +1813,17 @@ def test_gallery_image_without_an_image_does_not_require_consent(home_page):
     empty.full_clean()
 
 
-def test_camp_report_photo_block_requires_consent(db):
-    """CampReportPage.photos' "photo" block type is ConsentedImageBlock.
-
-    Proves the model wiring, not just the block class in isolation — a camp
-    photo cannot be saved without ticked consent (brand-guidelines.md §5).
-    """
-    from wagtail.blocks import StructBlockValidationError
-    from wagtail.images.tests.utils import Image, get_test_image_file
-
-    image = Image.objects.create(title="A person", file=get_test_image_file())
-    photo_block = CampReportPage().photos.stream_block.child_blocks["photo"]
-    with pytest.raises(StructBlockValidationError):
-        photo_block.clean(
-            photo_block.to_python({"image": image.pk, "consent_confirmed": False})
-        )
-
-
 def test_newsletter_body_photo_block_requires_consent(db):
-    """NewsletterPage.body's "photo" block type is likewise consent-gated."""
+    """NewsletterPage.body's "photo" block type is consent-gated.
+
+    Proves the model wiring, not just the block class in isolation (that is
+    ``test_consent_block_requires_confirmation``'s job) — a photo cannot be
+    saved onto a real page's StreamField without ticked consent
+    (brand-guidelines.md §5). This test carried that burden jointly with
+    ``CampReportPage.photos``' equivalent until Plan 21 retired that type;
+    it is now the only model-wiring case for a StreamField photo, so don't
+    delete it without replacing the coverage.
+    """
     from wagtail.blocks import StructBlockValidationError
     from wagtail.images.tests.utils import Image, get_test_image_file
 

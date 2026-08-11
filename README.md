@@ -6,9 +6,10 @@ Zakat / Sadaqa model.
 
 The project has two parts:
 
-1. **Public website** — about the charity, management structure, services, camp
-   reports, newsletters, a photo gallery, daily/monthly impact reports, and a
-   donate (Zakat/Sadaqa) placeholder with contact and bank details.
+1. **Public website** — about the charity, management structure, services,
+   newsletters (including medical camps, published as issues), a photo
+   gallery, daily/monthly impact reports, and a donate (Zakat/Sadaqa)
+   placeholder with contact and bank details.
 2. **AI-native data pipeline** — clinic staff upload a daily Excel export from
    the clinic software; the pipeline aggregates it (discarding raw patient data),
    publishes a daily report page, and generates a monthly newsletter on demand.

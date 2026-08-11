@@ -12,7 +12,9 @@ started, per this project's Stage 3 grounding discipline.
 
 A family stakeholder asked for a way to announce an upcoming event on the
 home page (first case: the free medical camp on **6 August 2026**) — today,
-camps only appear *after the fact*, as data-driven daily/camp reports. This
+camps only appear *after the fact*, as data-driven daily reports and a camp
+report (the latter is a newsletter issue since Plan 21, 2026-08-10; at the
+time of this handoff it was its own `CampReportPage` type). This
 adds a small, teaser-style **"Upcoming events"** element to the home page,
 following the same shape as the site's other home-page teasers (latest daily
 report, latest newsletter): render only when there is something to show,

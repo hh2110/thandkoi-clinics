@@ -4,8 +4,10 @@ Core content models (Plan 04, extended by Plan 05, Plan 06).
 The site's core pages — Home, About, Team, Our Work, Contact, Donate — plus the
 site-wide Contact & Bank Details setting, modelled as editable Wagtail content a
 non-technical admin can maintain in ``/admin/`` without touching code. Plan 06
-adds the Newsletter and Camp Report archives (index + child *page* pattern) and
-the Gallery (orderable child *images*, not pages).
+adds the Newsletter archive (index + child *page* pattern) and the Gallery
+(orderable child *images*, not pages). Plan 06 also added a parallel Camp
+Report archive, **retired in Plan 21 (2026-08-10)** — camps are published as
+newsletter issues now, so there is one archive pattern here, not two.
 
 Three Wagtail idioms carry the design here:
 
@@ -15,11 +17,11 @@ Three Wagtail idioms carry the design here:
 * **StreamField** on ``HomePage`` — a flexible body whose block templates each
   ``{% include %}`` a Plan 03.5 section partial, so pages *compose* the merged
   layout kit rather than authoring new section markup or CSS.
-* **Index + child-page archives** (``NewsletterIndexPage``/``NewsletterPage``,
-  ``CampReportIndexPage``/``CampReportPage``) — new to this repo in Plan 06;
-  unlike the orderable children above, each issue/camp needs its own URL and
-  SEO metadata, so it's a real ``Page``, grounded against Wagtail's own
-  index/child archive idiom (no in-repo precedent existed before this plan).
+* **Index + child-page archive** (``NewsletterIndexPage``/``NewsletterPage``)
+  — new to this repo in Plan 06; unlike the orderable children above, each
+  issue needs its own URL and SEO metadata, so it's a real ``Page``, grounded
+  against Wagtail's own index/child archive idiom (no in-repo precedent
+  existed before this plan).
 
 Content (the real vision statement, team roster, service list, bank details)
 lives in PostgreSQL, entered through the admin — never committed to this repo
@@ -133,7 +135,6 @@ class HomePage(Page):
         "core.ContactPage",
         "core.DonatePage",
         "core.NewsletterIndexPage",
-        "core.CampReportIndexPage",
         "core.GalleryPage",
         "core.DonorsPartnersPage",
         "pipeline.ReportIndexPage",
@@ -304,10 +305,13 @@ class HomePage(Page):
 class UpcomingEvent(models.Model):
     """A forward-looking event announcement (Plan 19) — a Wagtail snippet.
 
-    Distinct from ``CampReportPage``/the data pipeline: those describe a camp
-    *after* it happened, from real attendance data. This is a hand-entered,
-    pre-event announcement with no attendance figures at all — the two are
-    deliberately not conflated (design handoff decision). A snippet, not a
+    Distinct from a camp's ``NewsletterPage`` issue/the data pipeline: those
+    describe a camp *after* it happened, from real attendance data. This is a
+    hand-entered, pre-event announcement with no attendance figures at all —
+    the two are deliberately not conflated (design handoff decision). The
+    "after" side used to be ``CampReportPage``, retired in Plan 21
+    (2026-08-10); the distinction this docstring draws is unchanged, only the
+    page type on the other side of it. A snippet, not a
     StreamField block on ``HomePage``, because ``HomePage.get_upcoming_event``
     needs to filter/order live (date >= today, ascending) rather than reflect
     whatever order an editor hand-arranged.
@@ -752,8 +756,8 @@ class SocialLink(Orderable):
 def paginate_archive(request, queryset, per_page=12):
     """Paginate an archive queryset for an index page's ``get_context``.
 
-    Shared by ``NewsletterIndexPage``/``CampReportIndexPage``/``GalleryPage``
-    (and Plan 08's ``ReportIndexPage``) so the page size and query-param name
+    Shared by ``NewsletterIndexPage``/``GalleryPage`` (and Plan 08's
+    ``ReportIndexPage``) so the page size and query-param name
     live in one place, not copy-pasted per archive. Public (not ``_``-prefixed)
     so other apps' index pages can reuse it rather than reinventing it.
     """
@@ -764,10 +768,11 @@ def paginate_archive(request, queryset, per_page=12):
 def _photo_item(image, alt_text, caption):
     """Build the ``{image, alt, caption, full}`` dict ``media_grid.html`` expects.
 
-    Shared by ``CampReportPage.get_context`` (StreamField photo blocks) and
-    ``GalleryPage.get_context`` (``GalleryImage`` children) — both reduce to
-    the same image + alt-fallback + caption shape once resolved to a concrete
-    ``Image`` instance.
+    ``GalleryPage.get_context`` (``GalleryImage`` children) is its only
+    caller since Plan 21 (2026-08-10) retired ``CampReportPage``, whose
+    StreamField photo blocks were the other one — kept a module-level
+    function rather than folded into ``GalleryPage`` because the shape it
+    builds is ``media_grid.html``'s contract, not the gallery's.
 
     ``full`` is a second rendition alongside the cropped grid thumbnail:
     ``max-1200x1200`` fits the image within a 1200px box *without* cropping
@@ -943,101 +948,6 @@ class NewsletterPage(Page):
         verbose_name = "Newsletter"
 
 
-# --- Plan 06: Camp Report archive -------------------------------------------
-
-
-class CampReportIndexPage(Page):
-    """Archive of medical camp reports, newest first.
-
-    Same index + child-page pattern as the Newsletter archive above — see
-    ``NewsletterIndexPage`` for why this needed a real archive rather than
-    Plan 04's orderable-child pattern.
-    """
-
-    intro = RichTextField(blank=True, help_text="Optional intro copy for the archive.")
-
-    content_panels = [
-        *Page.content_panels,
-        FieldPanel("intro"),
-    ]
-
-    max_count = 1
-    parent_page_types = ["core.HomePage"]
-    subpage_types = ["core.CampReportPage"]
-
-    def get_camp_reports(self):
-        """Published camp reports under this index, newest first."""
-        return list(
-            CampReportPage.objects.live().child_of(self).order_by("-camp_date", "-pk")
-        )
-
-    def get_context(self, request, *args, **kwargs):
-        context = super().get_context(request, *args, **kwargs)
-        context["camp_reports"] = paginate_archive(request, self.get_camp_reports())
-        return context
-
-    class Meta:
-        verbose_name = "Camp report index page"
-
-
-class CampReportPage(Page):
-    """One medical camp's report — date, location, narrative, photos.
-
-    Simplified 2026-07-23 (maintainer decision, branch
-    `chore/remove-camp-upload-feature`): dropped the structured
-    patients-served-by-category split (children/general/Welfare-free-service)
-    along with ``services_offered`` and ``partner_credits`` in favour of an
-    optional attached report document — the maintainer moved away from
-    wanting a generic/structured-stats breakdown here. Photos reuse
-    ``ConsentedImageBlock`` (Plan 04) and remain this plan's other real
-    load-bearing use of the consent gate alongside the Gallery — camp
-    photography is exactly the case it was built for.
-    """
-
-    camp_date = models.DateField(help_text="The date of the camp.")
-    location = models.CharField(max_length=180, blank=True)
-    narrative = RichTextField(blank=True, help_text="The camp's story.")
-    photos = StreamField(
-        [("photo", core_blocks.ConsentedImageBlock())],
-        blank=True,
-        help_text="Camp photos — consent required before publish.",
-    )
-    report_document = models.ForeignKey(
-        "wagtaildocs.Document",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        help_text="Optional source report PDF to offer as a download.",
-    )
-
-    content_panels = [
-        *Page.content_panels,
-        FieldPanel("camp_date"),
-        FieldPanel("location"),
-        FieldPanel("narrative"),
-        FieldPanel("photos"),
-        FieldPanel("report_document"),
-    ]
-
-    parent_page_types = ["core.CampReportIndexPage"]
-    subpage_types: list[str] = []
-
-    def get_context(self, request, *args, **kwargs):
-        context = super().get_context(request, *args, **kwargs)
-        context["camp_photos"] = [
-            _photo_item(
-                block.value["image"], block.value["alt_text"], block.value["caption"]
-            )
-            for block in self.photos
-            if block.value.get("image") and block.value.get("consent_confirmed")
-        ]
-        return context
-
-    class Meta:
-        verbose_name = "Camp report"
-
-
 # --- Plan 06: Gallery --------------------------------------------------------
 
 
@@ -1045,9 +955,9 @@ class GalleryPage(Page):
     """A single photo gallery.
 
     Images are orderable child *objects*, not child pages — mirroring Plan
-    04's Team/Service pattern rather than the Newsletter/Camp Report archive
-    pattern above, since a gallery photo needs no URL or SEO metadata of its
-    own (Plan 06 decision, "Gallery structure").
+    04's Team/Service pattern rather than the Newsletter archive pattern
+    above, since a gallery photo needs no URL or SEO metadata of its own
+    (Plan 06 decision, "Gallery structure").
     """
 
     intro = RichTextField(blank=True, help_text="Optional intro copy above the grid.")
@@ -1065,7 +975,7 @@ class GalleryPage(Page):
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         # select_related("image") avoids one extra query per photo to resolve
-        # its image FK; paginated (like the Newsletter/Camp Report archives)
+        # its image FK; paginated (like the Newsletter archive)
         # so a growing gallery doesn't generate every rendition on every view.
         images = self.images.select_related("image").filter(
             image__isnull=False, consent_confirmed=True

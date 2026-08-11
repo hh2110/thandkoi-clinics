@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% load wagtailcore_tags i18n %}
 {% comment %}
-Reports archive — Plan 08, extended 2026-07-22 for the nav merge (see
-apps.pipeline.models.ReportIndexPage's docstring). Two sections: daily
-reports (this index's own paginated archive, same as before) and a camp
-reports teaser (a handful of the latest, linking out to the Camp Report
-archive's own page/URL rather than a second paginated list here).
+Reports archive — Plan 08. One section: daily reports, this index's own
+paginated archive. A second "Camp reports" teaser section lived below it
+from 2026-07-22 (the nav merge) until Plan 21 (2026-08-10) retired the
+CampReportPage type — camps are newsletter issues now, so the teaser and
+its camp_reports_intro field went with it. See
+apps.pipeline.models.ReportIndexPage's docstring.
 {% endcomment %}
 
 {% block social_image_tags %}
@@ -125,28 +126,6 @@ archive's own page/URL rather than a second paginated list here).
         {% endfor %}
       </div>
       {% include "partials/pagination.html" with page_obj=reports %}
-    </div>
-  </section>
-
-  <section class="section section--tinted">
-    <div class="wrapper prose">
-      <h2>{% translate "Camp reports" %}</h2>
-      {% if page.camp_reports_intro %}<div class="intro">{{ page.camp_reports_intro|richtext }}</div>{% endif %}
-    </div>
-    <div class="wrapper">
-      <div class="card-grid card-grid--3">
-        {% for camp_report in camp_reports_preview %}
-          <article class="card card--interactive">
-            <p class="eyebrow">{{ camp_report.camp_date }}</p>
-            <h3 class="card__title"><a href="{{ camp_report.url }}">{{ camp_report.title }}</a></h3>
-          </article>
-        {% empty %}
-          <p class="card-grid__empty text-faint">{% translate "Camp reports coming soon." %}</p>
-        {% endfor %}
-      </div>
-      {% if camp_reports_index %}
-        <p><a href="{{ camp_reports_index.url }}">{% translate "View all camp reports" %} →</a></p>
-      {% endif %}
     </div>
   </section>
 {% endblock %}

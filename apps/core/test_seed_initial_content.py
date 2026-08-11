@@ -12,7 +12,6 @@ from wagtail.models import Page, Site
 
 from apps.core.models import (
     AboutPage,
-    CampReportIndexPage,
     ContactPage,
     DonatePage,
     DonorsPartnersPage,
@@ -28,7 +27,6 @@ CORE_CHILD_MODELS = (
     TeamPage,
     OurWorkPage,
     DonorsPartnersPage,
-    CampReportIndexPage,
     NewsletterIndexPage,
     GalleryPage,
     ContactPage,
@@ -64,7 +62,6 @@ def test_seed_uses_nav_slugs():
         TeamPage: "team",
         OurWorkPage: "our-work",
         DonorsPartnersPage: "donors-partners",
-        CampReportIndexPage: "camp-reports",
         NewsletterIndexPage: "newsletters",
         GalleryPage: "gallery",
         ContactPage: "contact",
@@ -123,7 +120,6 @@ def test_seeded_pages_resolve_over_http(client):
         "/en/team/",
         "/en/our-work/",
         "/en/donors-partners/",
-        "/en/camp-reports/",
         "/en/newsletters/",
         "/en/gallery/",
         "/en/contact/",

@@ -11,8 +11,9 @@ Context:
   items      — a list of {image, alt, caption, full} dicts. Any item without
                `image` renders the placeholder (caption shown inside it); an
                item *with* an image shows its caption underneath (Plan 06 —
-               the Gallery and Camp Report photo captions this grid first
-               serves for real) and is click-to-expand: it opens the full-
+               the Gallery photo captions this grid first serves for real,
+               alongside Camp Report's until Plan 21 retired that type) and
+               is click-to-expand: it opens the full-
                size `full` rendition (falls back to `image` if `full` is
                absent) in the page-level lightbox `<dialog>` from
                templates/base.html, wired by static/js/lightbox.js.

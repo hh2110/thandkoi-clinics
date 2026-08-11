@@ -1,9 +1,10 @@
 {% load wagtailimages_tags i18n %}
 {% comment %}
 Render for ``ConsentedImageBlock`` (apps/core/blocks.py) — a simple photo +
-caption. Shared by every StreamField that reuses the block (Plan 06's
-Newsletter body and Camp Report photos), so the same markup and consent
-handling serve both rather than each caller inventing its own.
+caption. Shared by every StreamField that reuses the block — Plan 06's Newsletter
+body photos today, and its Camp Report photos until Plan 21 retired that
+type — so the same markup and consent handling serve every caller rather
+than each inventing its own.
 
 ``clean()``'s block-level validation only runs through Wagtail's admin-form
 StreamField widget — Django's ``Model.full_clean()``/``.save()`` never call
@@ -18,7 +19,7 @@ fixed-aspect, `overflow: hidden` image box (static/css/layout.css) — a
 caption placed *inside* it would be clipped, so the caption sits outside as
 a sibling within the outer `.media-grid__cell`, matching the grid's own
 figure/figcaption arrangement. Also mirrors media_grid.html's click-to-expand
-trigger (static/js/lightbox.js) so a Newsletter/Camp Report body photo,
+trigger (static/js/lightbox.js) so a Newsletter body photo,
 rendered with the identical `.media-grid__item` classes, behaves the same
 way when clicked instead of looking clickable and silently doing nothing.
 

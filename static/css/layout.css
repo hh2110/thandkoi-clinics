@@ -821,8 +821,9 @@ button.events-teaser__card:hover {
 }
 
 /* --- Pagination -------------------------------------------------------------
-   Minimal prev/next pager for the Newsletter and Camp Report archives
-   (Plan 06) — plain links and a page-count label, no JS. */
+   Minimal prev/next pager for the Newsletter archive (Plan 06; it also
+   served the Camp Report archive until Plan 21 retired that type) — plain
+   links and a page-count label, no JS. */
 .pagination {
   display: flex;
   align-items: center;
