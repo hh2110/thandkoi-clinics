@@ -1,6 +1,11 @@
 # Plan 22 — Revenue ingest (Plan 16 Phase 2)
 
-**Status:** 🚧 In progress · **Date:** 2026-08-11
+**Status:** ✅ Done · **Date:** 2026-08-11
+
+Tasks 22.1–22.3 shipped in PR #162. 22.4 is **parked by decision, not
+unfinished** — D6 (the per-row `Date` column) and D8 (a live home-band
+`zakat_avg_spend`) each carry their own unpark condition below, the same way
+Plan 16 was marked Done with its Phase 2 parked.
 
 One-line summary: the clinic software's fee columns have shipped, so ingest
 them and light up the revenue surfaces Plan 16 Phase 1 already built and
