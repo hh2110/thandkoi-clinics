@@ -3248,6 +3248,89 @@ def test_content_hash_ignores_total_paid():
     ) == content_hash_for_rows([_revenue_row(consultation_fee=300, total_paid=9999)])
 
 
+def _render_daily_report(client_fixture, home_page, *, service_revenue):
+    """Publish one DailyReportPage for a date and fetch it through its real URL."""
+    index = ReportIndexPageFactory(parent=home_page, slug="reports")
+    report_date = datetime.date(2026, 8, 6)
+    aggregate = DailyAggregateFactory(
+        clinic_date=report_date,
+        total_visits=4,
+        zakat_beneficiary_patients=3,
+        paying_patients=1,
+        service_revenue=service_revenue,
+        category_counts={"by_age_band": {"19-55": 4}},
+    )
+    DailyReportPageFactory(
+        parent=index,
+        slug=report_date.isoformat(),
+        report_date=report_date,
+        aggregate=aggregate,
+    )
+    response = client_fixture.get(f"/en/reports/{report_date.isoformat()}/")
+    assert response.status_code == 200
+    return response.content.decode()
+
+
+def test_daily_report_omits_the_whole_revenue_section_without_data(client, home_page):
+    """The handoff is explicit: no heading, no empty table, no zero row. This
+    is the state of every date predating the clinic software's fee columns,
+    so it is the common case, not an edge case."""
+    content = _render_daily_report(client, home_page, service_revenue={})
+
+    assert 'data-role="revenue"' not in content
+    assert "All figures in PKR" not in content
+    assert "dr__revenue-row" not in content
+
+
+def test_daily_report_renders_the_revenue_section_with_data(client, home_page):
+    content = _render_daily_report(
+        client,
+        home_page,
+        service_revenue={
+            "consultation": {
+                "regular": {"qty": 1, "amount": 400},
+                "zakat": {"qty": 3, "amount": 600},
+            }
+        },
+    )
+
+    assert 'data-role="revenue"' in content
+    assert "All figures in PKR" in content
+    assert "Consultation" in content
+    assert "1,000" in content
+    # Split-bar shares are of the total, and with no unattributed money they
+    # come to 100 between them.
+    assert "Regular 40.0%" in re.sub(r"\s+", " ", content)
+    assert "Zakat 60.0%" in re.sub(r"\s+", " ", content)
+    assert "dr__revenue-seg--unknown" not in content
+
+
+def test_daily_report_split_bar_shows_unattributed_money_as_its_own_segment(
+    client, home_page
+):
+    """Plan 22 D3 on this page: the two named segments genuinely fall short of
+    the full bar rather than being normalised against each other, which would
+    imply a confident split of a total neither adds up to."""
+    content = re.sub(
+        r"\s+",
+        " ",
+        _render_daily_report(
+            client,
+            home_page,
+            service_revenue={
+                "registration": {
+                    "regular": {"qty": 1, "amount": 500},
+                    "unknown": {"qty": 1, "amount": 1500},
+                }
+            },
+        ),
+    )
+
+    assert "dr__revenue-seg--unknown" in content
+    assert "Regular 25.0%" in content
+    assert "Not recorded 75.0%" in content
+
+
 def test_qty_counts_visits_not_spreadsheet_rows(home_page):
     """The phantom-row bug's money equivalent. A wrapped-text continuation row
     carries one free-text cell and nothing else, and fees are deliberately

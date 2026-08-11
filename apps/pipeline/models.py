@@ -610,9 +610,24 @@ class DailyReportPage(Page):
         decision). Both remain computed at the model layer
         (`category_counts`) — this page just stops rendering them.
         """
+        # Imported here, not at module scope: `apps.pipeline.dashboard`
+        # imports this module's models, so a top-level import is circular
+        # (same reason `ClinicDashboardPage.get_context` imports it locally).
+        from apps.pipeline import dashboard
+
         context = super().get_context(request, *args, **kwargs)
         agg = self.aggregate
         context["aggregate"] = agg
+
+        # Plan 22 task 22.3 — the same aggregation the dashboard uses, scoped
+        # to this one clinic-date. The handoff is explicit that a date with no
+        # `service_revenue` omits the whole section rather than rendering an
+        # empty table or a zero row, so this stays None on every date
+        # predating the clinic software's fee columns and the template's
+        # single `{% if revenue %}` does the rest.
+        context["revenue"] = (
+            dashboard.compute_revenue([agg]) if agg.service_revenue else None
+        )
 
         # Gender bars — percentage is presentation only; counts stay
         # authoritative (rendered alongside every bar).

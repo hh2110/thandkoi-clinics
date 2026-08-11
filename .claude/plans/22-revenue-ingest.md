@@ -172,6 +172,24 @@ keep rendering the three-card layout with no revenue table. This is why the
 plan needs no rollout toggle: an export without fee columns is
 indistinguishable from today.
 
+**D10 — The daily report's split bar inverts the handoff's colours, on
+purpose (2026-08-11, task 22.3).** The handoff specifies "Regular in
+`--color-stat-value`, Zakat in `--color-text-faint`". `--color-stat-value`
+resolves to `--color-brand`, so that puts **teal on Regular**. But the clinic
+dashboard's funding split — already shipped, on the sibling page a reader
+reaches from here — does the exact opposite: `--color-brand` for Zakat,
+`--color-text-faint` for Regular.
+
+Following the handoff literally would mean teal meaning "Zakat" on one page
+and "Regular" on the next, which is a way to make someone misread real money.
+Precedent over the handoff line here, and recorded rather than silently
+diverged: **Zakat = `--color-brand`, Regular = `--color-text-faint`**,
+matching `.dash__stack-seg--*`. A third `unknown` segment
+(`--color-text-soft`) renders only when D3's unattributed money exists.
+
+Worth a maintainer glance, since it is a deliberate departure from an
+approved design file rather than a gap in it.
+
 ## Tasks
 
 One task = one PR, each reviewed clean before the PR opens.
@@ -207,11 +225,19 @@ changes and the PR can merge on its own.
       promise Plan 16 D6 made. Any template edit needed here beyond the two
       new lines above is a Phase 1 miss worth recording.
 
-### 22.3 — Daily report page Revenue section
+### 22.3 — Daily report page Revenue section ✅
 
 Plan 16's work item 2, deferred out of Phase 1. Per-service Regular / Zakat /
 Total with amount and quantity, a totals row and the split bar, mirroring the
 dashboard table's markup and CSS rather than inventing a second idiom.
+
+- [x] Section rendered between "Breakdown" and "Today's notes, summarised",
+      omitted **whole** on a date with no revenue (the handoff's explicit
+      rule: no heading, no empty table, no zero row).
+- [x] Split bar with a third `unknown` segment when D3's unattributed money
+      exists, and colours matching the dashboard's funding split rather than
+      the handoff's inverted pair — see **D10**.
+- [x] Verified on the real 6 Aug page in both themes.
 
 ### 22.4 — Parked
 

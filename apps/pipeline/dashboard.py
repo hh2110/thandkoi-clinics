@@ -553,6 +553,38 @@ class RevenueSummary:
     def is_partial(self) -> bool:
         return self.revenue_days < self.reporting_days
 
+    # --- Split-bar shares (the daily report's Revenue section, task 22.3) --
+    #
+    # Shares of *total* revenue, so Regular% + Zakat% falls short of 100
+    # exactly when unattributed money exists (D3) rather than the two being
+    # normalised against each other — the bar would otherwise show a
+    # confident 40/60 split of a total that neither figure adds up to. The
+    # remainder is the unknown segment, and the same footnote that explains
+    # the table's Total column explains the gap here.
+
+    @property
+    def regular_pct(self) -> float:
+        return self._share(self.regular_amount)
+
+    @property
+    def zakat_pct(self) -> float:
+        return self._share(self.zakat_amount)
+
+    @property
+    def unknown_pct(self) -> float:
+        return self._share(self.unknown_amount)
+
+    def _share(self, amount: int) -> float:
+        """``amount`` as a percentage of total revenue, 1 dp, 0 when empty.
+
+        One decimal place rather than a rounded integer because these are
+        CSS widths on a single bar: three integers rounded independently can
+        sum to 101 and push the last segment onto a second line.
+        """
+        if not self.total_amount:
+            return 0.0
+        return round(amount / self.total_amount * 100, 1)
+
 
 def compute_revenue(rows) -> RevenueSummary:
     """Fold a range's ``DailyAggregate.service_revenue`` into display rows.
