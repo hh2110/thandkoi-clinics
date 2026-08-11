@@ -230,6 +230,38 @@ truth — it exercises the path, and D5's warning should fire on it if the
 Nothing in this plan is published to the live site as a figure until D8's
 unpark condition is separately met.
 
+### Result of the 22.1 run (2026-08-11)
+
+The 6 Aug export went through the real upload view over a real logged-in
+HTTP session against a running server. 93 rows ingested, and the aggregate
+came back:
+
+```
+registration → unknown: {"qty": 93, "amount": 1860}
+```
+
+Two things this proved, one of them uncomfortable.
+
+**D3 is not a hypothetical.** Every row in that export has a blank `Status`,
+so all 93 patients — and all PKR 1,860 — landed in the `unknown` bucket. Under
+a two-bucket Regular/Zakat design the entire day's revenue would have silently
+vanished from the published figures with nothing indicating a loss.
+
+**D5's check cannot catch a consistently fabricated value, and it didn't.**
+The per-service columns sum to 1,860 and `Total Paid (PKR)` also sums to
+1,860, so the reconciliation correctly stayed quiet: the export agrees with
+itself. It is *internally consistent and externally wrong* — those PKR 20
+registration fees are the fabricated ones the maintainer confirmed on
+2026-08-10 for an advertised-free camp.
+
+So D5 detects the export disagreeing with itself, not the export disagreeing
+with reality. Nothing here weakens the check — a same-day cross-check is
+worth having — but it does mean the dashboard will publish PKR 1,860 for
+6 Aug once 22.2 lands, and no automated guard in this plan will object. That
+is a **content** question for the maintainer (is the clinic-software fix
+deployed, and should 6 Aug be re-uploaded once it is?), not a code defect,
+and it is exactly why D8 keeps the home page's figure hand-typed.
+
 ## Release
 
 No feature flag (D9), no migration ordering hazard (both migrations are

@@ -52,6 +52,22 @@ break parsing):
   text ever drifts.
 * No department / location / new-vs-follow-up signal exists in this format;
   those fields stay empty/unknown rather than being inferred.
+* **The fee columns are now read** (Plan 22, 2026-08-11). The clinic software
+  shipped the update Plan 16 D13 was waiting on: the export grew from 27 to
+  **34** columns, adding ``Registration Fee (PKR)``, ``Consultation Fee
+  (PKR)``, ``Lab Fee (PKR)``, ``Ultrasound Fee (PKR)``, ``Pharmacy Fee
+  (PKR)``, ``Total Paid (PKR)`` and a per-row ``Date``. Header text confirmed
+  header-row-only against the real 6 Aug 2026 export, the same way the Plan 11
+  B8/B9 names were confirmed. The five service fees flow through to
+  ``DailyAggregate.service_revenue``; ``Total Paid`` is read only for the
+  ingest-time reconciliation warning (Plan 22 D5) and never published.
+  ``header_index`` degrades to ``None`` on an export predating the update, so
+  those files still parse with every fee at 0.
+* **``Date`` is deliberately not read** (Plan 22 D6). The visit date still
+  comes from the ``Period:`` banner and a multi-day range is still refused.
+  Adopting the per-row date would unlock multi-day exports, but the
+  one-file-one-day property is assumed downstream (report publishing, the
+  per-date content hash, ``_ingest_one_date``), so it is its own change.
 
 **Phantom continuation rows (bug found 2026-07-22, real 7-patient sample
 published as 17).** The clinic system's ``.xls`` writer spills a free-text
@@ -91,6 +107,7 @@ from apps.pipeline.parser_registry import (
     ParsedVisitRow,
     ParserRegistry,
     age_band_for,
+    coerce_fee,
     diagnosis_category_for,
     header_index,
     normalise_sex,
@@ -219,6 +236,21 @@ class TkcDailyActivityV1Parser(BaseExportParser):
                 "dietitian's notes",
                 "diet & drug compliance",
                 "plan",
+                # Plan 22 D1: the fee columns the clinic software added
+                # (confirmed header-row-only against the 6 Aug 2026 export,
+                # which carries 34 columns to July's 27). `header_index`
+                # returns None for a file that predates that update, and
+                # `cell()` below already degrades to None on a missing
+                # column, so `coerce_fee` sees None and yields 0 — an old
+                # export parses exactly as it always did, with no revenue.
+                # Note "Lab Fee (PKR)" — the export abbreviates where the
+                # stored key spells `laboratory` out.
+                "registration fee (pkr)",
+                "consultation fee (pkr)",
+                "pharmacy fee (pkr)",
+                "lab fee (pkr)",
+                "ultrasound fee (pkr)",
+                "total paid (pkr)",
             )
         }
 
@@ -296,6 +328,18 @@ class TkcDailyActivityV1Parser(BaseExportParser):
                         row, "diet & drug compliance"
                     ),
                     "plan_notes": text_cell(row, "plan"),
+                    # Plan 22 — read on the visit row only. Fees are
+                    # deliberately absent from _CONTINUATION_FIELDS above: a
+                    # wrapped-text continuation row carries a value in one
+                    # free-text column and nothing else, so there is no fee
+                    # there to stitch, and treating one as an addition would
+                    # let a stray cell double-count a service.
+                    "registration_fee": coerce_fee(cell(row, "registration fee (pkr)")),
+                    "consultation_fee": coerce_fee(cell(row, "consultation fee (pkr)")),
+                    "pharmacy_fee": coerce_fee(cell(row, "pharmacy fee (pkr)")),
+                    "laboratory_fee": coerce_fee(cell(row, "lab fee (pkr)")),
+                    "ultrasound_fee": coerce_fee(cell(row, "ultrasound fee (pkr)")),
+                    "total_paid": coerce_fee(cell(row, "total paid (pkr)")),
                 }
             )
 
@@ -329,6 +373,12 @@ class TkcDailyActivityV1Parser(BaseExportParser):
                     clinical_notes=clinical_notes,
                     diet_and_drug_compliance=data["diet_and_drug_compliance"],
                     plan_notes=data["plan_notes"],
+                    registration_fee=data["registration_fee"],
+                    consultation_fee=data["consultation_fee"],
+                    pharmacy_fee=data["pharmacy_fee"],
+                    laboratory_fee=data["laboratory_fee"],
+                    ultrasound_fee=data["ultrasound_fee"],
+                    total_paid=data["total_paid"],
                 )
             )
         return ParsedExport(rows=parsed_rows)

@@ -271,6 +271,32 @@ class DeidentifiedVisit(models.Model):
     diet_and_drug_compliance = models.TextField(blank=True, default="")
     plan_notes = models.TextField(blank=True, default="")
 
+    # --- Plan 22 D2: per-service fees in whole PKR (added 2026-08-11) ------
+    #
+    # Stored per visit, not only on ``DailyAggregate``, and that is
+    # load-bearing rather than a convenience. ``DailyAggregate`` is a derived
+    # cache whose docstring promises it is "always recomputable from
+    # ``DeidentifiedVisit`` (the canonical store)", and
+    # ``recompute_daily_aggregates`` is documented as safe to re-run. If
+    # revenue lived only on the aggregate, that command would recompute every
+    # historical date's revenue as zero and wipe it — turning a
+    # documented-safe maintenance command into a destructive one.
+    #
+    # Privacy: a fee is a de-identified number. Invariant #1 explicitly
+    # permits "a de-identified row table with direct identifiers stripped",
+    # and no identifier is introduced here — unlike the free-text fields
+    # above, these needed no new grounding decision.
+    #
+    # The export's own ``Total Paid (PKR)`` is deliberately **not** stored:
+    # it is a reconciliation input consumed during ingest (Plan 22 D5), and
+    # persisting a second, redundant total invites a future reader to publish
+    # it as if it were a source of truth.
+    registration_fee = models.PositiveIntegerField(default=0)
+    consultation_fee = models.PositiveIntegerField(default=0)
+    pharmacy_fee = models.PositiveIntegerField(default=0)
+    laboratory_fee = models.PositiveIntegerField(default=0)
+    ultrasound_fee = models.PositiveIntegerField(default=0)
+
     class Meta:
         indexes = [models.Index(fields=["visit_date"])]
 
@@ -310,6 +336,23 @@ class DailyAggregate(models.Model):
         blank=True,
         help_text="Flexible category breakdowns: by_department, "
         "by_diagnosis_category, by_age_band.",
+    )
+
+    # Plan 22: one JSON column rather than 15 integer columns, so a service
+    # the clinic adds later needs no migration — the shape Plan 16's design
+    # handoff recommended. Empty dict for every clinic-date predating the
+    # software update that added the fee columns, which is exactly what
+    # `apps.pipeline.dashboard.has_revenue` tests for.
+    service_revenue = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Per-service revenue for this clinic-date, in whole PKR: "
+        '{"consultation": {"regular": {"qty": 3, "amount": 750}, '
+        '"zakat": {"qty": 4, "amount": 1000}, '
+        '"unknown": {"qty": 0, "amount": 0}}, ...}. `qty` is the number of '
+        "rows where that fee was non-zero (services delivered, not patients "
+        "— Plan 16 D14). The `unknown` bucket holds money from rows whose "
+        "Status is neither Zakat nor Regular (Plan 22 D3).",
     )
 
     latest_ingest_run = models.ForeignKey(
