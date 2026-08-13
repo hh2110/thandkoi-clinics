@@ -191,6 +191,19 @@ guaranteed to pay the cold-connect cost. Keeping it sampled is how D5's
 paid-plan feature; on the free plan the 5-minute default is what we get. Noted
 so nobody goes looking for the knob.
 
+**D9 — the deploy gate falls back to `/healthz` on a 404 (added in review).**
+Moving `HEALTH_URL` to `/readyz` silently broke the documented rollback path:
+every tag cut before this plan serves 404 there, so
+`scripts/release.sh --ref v2026.07.19` would swap Render to the old build
+successfully and *then* fail its own health check, telling the operator the
+rollback may not be healthy. That is the worst possible time for a false
+alarm. The loop now treats "404 from `/readyz`" as "this build predates Plan
+23", falls back to `/healthz`, and says out loud that the check just weakened
+to liveness-only. Verified both ways against mock builds (see Verification):
+the fallback rescues a rollback, and a build where *nothing* returns 200 still
+fails the gate. The fallback is marked for deletion once no rollback target
+predates Plan 23.
+
 ---
 
 ## Parked, deliberately
@@ -239,6 +252,23 @@ is the entire plan in two numbers.
 ```
 --- /healthz ---   HTTP/1.1 200 OK   {"status": "ok"}
 --- /readyz  ---   HTTP/1.1 200 OK   {"status": "ok"}
+```
+
+**The rollback fallback (D9), both directions.** The health-check loop was
+extracted from `scripts/release.sh` *by line range* — so the thing under test
+cannot drift from the real script — and run against two mock builds:
+
+```
+# a pre-Plan-23 build: 404 on /readyz, 200 on /healthz
+NOTE: .../readyz returned 404 — this build predates Plan 23's readiness probe.
+      Falling back to .../healthz, which only confirms the process is serving.
+OK — .../healthz returned 200
+--- loop exit status: 0 ---            # rollback correctly reported healthy
+
+# a genuinely broken build: nothing returns 200
+Attempt 2..6: .../healthz returned 404 — retrying in 15s
+ERROR: ... did not return 200 after several retries.
+--- loop exit status: 1 ---            # gate is not a rubber stamp
 ```
 
 **Suite and lint:** 502 passed; `ruff check` clean; `ruff format --check` clean;

@@ -134,7 +134,10 @@ the health check "more useful" by having it verify a dependency, that is this
 bug. `apps/core/tests.py` guards it with `assertNumQueries(0)` over the whole
 request, since middleware could reintroduce a query without the view changing.
 Corollary: the compute now genuinely sleeps, so **Neon cold resumes are real**
-— `DB_CONNECT_TIMEOUT` is 15 in production for that reason, not 5.
+— production therefore needs `DB_CONNECT_TIMEOUT=15` rather than the code
+default of 5. That is a Render dashboard action (Plan 23 release Phase 0), not
+a deploy; if you're unsure whether it was ever done, read the live service
+rather than assuming, and don't trust `render.yaml`.
 
 A **Sentry MCP server** is registered on the maintainer's machine for this
 project (`claude mcp add --transport http sentry https://mcp.sentry.dev/mcp`,

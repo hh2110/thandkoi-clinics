@@ -67,8 +67,10 @@ import logging
 #: into a 503.
 #:
 #: This is why the constant is overridable: ``DB_CONNECT_TIMEOUT`` is dialable
-#: from the Render dashboard with no deploy, and Plan 23's release sets it to
-#: **15** before the compute is first allowed to sleep. Measure a real cold
+#: from the Render dashboard with no deploy, and Plan 23's release **requires**
+#: setting it to **15** before the compute is first allowed to sleep (release
+#: Phase 0 — a dashboard action, so confirm it against the live service rather
+#: than assuming it happened). Measure a real cold
 #: resume (``/readyz`` is deliberately left traced in Sentry for this — Plan 23
 #: Decision 7) before lowering it back or changing this constant.
 DEFAULT_CONNECT_TIMEOUT_SECONDS = 5

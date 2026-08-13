@@ -241,7 +241,7 @@ may spend opening a Postgres connection:
 | Value | Effect |
 |---|---|
 | unset / blank | code default, `5` seconds |
-| **`15`** | **the value set in production** since Plan 23 — headroom for a Neon cold resume |
+| **`15`** | **required in production** as of Plan 23 — headroom for a Neon cold resume |
 | `0` | **never set this** — libpq reads 0 as "wait forever" |
 
 It exists because that "wait forever" default *was* the effective setting until
@@ -250,10 +250,13 @@ blocked on a connection that could not complete — for 30 minutes, because a
 blocked connect is not an exception and so `/healthz`'s own 503 fallback could
 never fire.
 
-**Set to `15` as part of [Plan 23](../.claude/plans/23-healthz-scale-to-zero.md).**
-Until then the health-check poll kept the Neon compute permanently warm, so
-cold resumes never happened and the 5-second default was never tested against
-one. Plan 23 removed that poll's database query on purpose, so the compute now
+**Must be set to `15` as part of
+[Plan 23](../.claude/plans/23-healthz-scale-to-zero.md)'s release (Phase 0, a
+dashboard action with no deploy).** Check the live service rather than assuming
+it was done. Until Plan 23 the health-check poll kept the Neon compute
+permanently warm, so cold resumes never happened and the 5-second default was
+never tested against one. Plan 23 removed that poll's query on purpose, so the
+compute now
 sleeps and **the first request after a quiet period pays a real resume** — the
 one case where 5 seconds could be too tight, and a 503 on someone's first page
 load is how you'd find out. Measure an actual resume before lowering it back;
