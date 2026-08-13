@@ -62,6 +62,11 @@ confirm() {
 
 REF=""
 YES=0
+IS_ROLLBACK=0   # 1 only when --ref was passed. Must be captured here, at parse
+                # time, because the "cut a new tag" path assigns REF itself
+                # further down — by the health check, REF is set either way, so
+                # it cannot distinguish the two paths. The /readyz fallback
+                # keys off this: see the health check.
 REMOTE_MAIN=""  # only set on the "cut a new tag" path; kept defined (empty)
                 # here so the --ref path's later fallback echo can't trip
                 # `set -u`'s unbound-variable check
@@ -74,6 +79,7 @@ while [[ $# -gt 0 ]]; do
     --ref)
       [[ $# -ge 2 ]] || fail "--ref requires a tag argument, e.g. --ref v2026.07.20"
       REF="$2"
+      IS_ROLLBACK=1
       shift 2
       ;;
     --yes)
@@ -291,13 +297,29 @@ for i in 1 2 3 4 5 6; do
     HEALTHY=1
     break
   fi
-  # A 404 from /readyz means this build predates Plan 23 and only serves
-  # /healthz — i.e. a `--ref` rollback to an older tag. Fall back rather than
-  # reporting a failure for a rollback that in fact worked, but say plainly
-  # that the check just got weaker, because it did: /healthz proves only that
-  # the process is serving, not that it can reach Postgres.
-  if [[ "$CODE" == "404" && "$HEALTH_URL" == "$READY_URL" ]]; then
-    echo "NOTE: $READY_URL returned 404 — this build predates Plan 23's readiness probe."
+  # /readyz not existing on this build means it predates Plan 23 and only
+  # serves /healthz — i.e. a `--ref` rollback to an older tag. Fall back rather
+  # than reporting a failure for a rollback that in fact worked, but say
+  # plainly that the check just got weaker, because it did: /healthz proves
+  # only that the process is serving, not that it can reach Postgres.
+  #
+  # Match 3xx as well as 404, and measured against production rather than
+  # assumed: an unrouted path does NOT 404 on this site. `/readyz` falls
+  # through config/urls.py to the i18n_patterns catch-all and LocaleMiddleware
+  # redirects it to `/en/readyz`, so a pre-Plan-23 build answers **302**.
+  # Checked against the live pre-Plan-23 build on 2026-08-13; a 404-only
+  # condition would never have fired, and the rollback path this whole
+  # fallback exists to protect would still have been broken.
+  #
+  # Gated on IS_ROLLBACK so this only ever loosens the check where the older
+  # build legitimately has no /readyz. On a forward deploy that path MUST
+  # exist, so a missing /readyz there is a real defect and has to fail the
+  # gate — otherwise this fallback would quietly turn "the release broke the
+  # readiness probe" into a green deploy.
+  if [[ "$IS_ROLLBACK" == "1" ]] &&
+     [[ "$CODE" == "404" || "$CODE" =~ ^3[0-9][0-9]$ ]] &&
+     [[ "$HEALTH_URL" == "$READY_URL" ]]; then
+    echo "NOTE: $READY_URL returned $CODE — this build predates Plan 23's readiness probe."
     echo "      Falling back to $LIVE_URL, which only confirms the process is serving."
     echo "      It does NOT confirm the database is reachable — check that separately."
     HEALTH_URL="$LIVE_URL"
