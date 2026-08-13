@@ -67,7 +67,10 @@ inspectable script over an agent-driven one) does the whole runbook:
    second release the same day).
 5. Triggers the Deploy workflow for that tag and watches it to completion.
 6. Health-checks production (`/readyz` — the probe that proves the new build
-   can reach Postgres) with a few retries.
+   can reach Postgres), polling for up to 10 minutes. That window is sized to
+   outlast Render's build + migrate + swap: unlike the old `/healthz` probe,
+   `/readyz` is only served by the new build, so this step genuinely waits for
+   the deploy to be live rather than passing against the build being replaced.
 7. Once the health check passes, publishes a [GitHub Release](https://github.com/hh2110/thandkoi-clinics/releases)
    for the tag with auto-generated notes (added 2026-07-24) — skipped if a
    Release for that tag already exists (the `--ref` rollback/redeploy path

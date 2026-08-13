@@ -284,13 +284,30 @@ gh run watch "$RUN_ID" --repo "$REPO" --exit-status
 
 log "Deploy workflow finished — Render is now building/swapping"
 echo "Track build/migrate progress in the Render dashboard."
-echo "This script only confirms the trigger fired; it does not wait for Render's build."
 
 # --- Health check --------------------------------------------------------------
 
-log "Health-checking production (a few retries — Render's swap isn't instant)"
+# How long to keep polling before calling the deploy unhealthy.
+#
+# This used to be 6 attempts (~75s), which was only ever enough because the
+# probe was /healthz — a path the *old* build also answers 200. So the check
+# could and did pass against the build being replaced, meaning it never really
+# confirmed the new one was live. Plan 23 pointed the gate at /readyz, which a
+# pre-Plan-23 build does not serve, and the very first release on it
+# (v2026.08.13) exhausted all six attempts while Render was still building,
+# reporting a failure for a deploy that was in fact fine and skipping the
+# GitHub Release step as a result.
+#
+# So the check is now genuinely waiting on Render's build + migrate + swap,
+# and must be sized for it rather than for a swap that had already happened.
+# 40 x 15s = 10 minutes: comfortably beyond an observed build, and a deploy
+# still not serving after ten minutes is a real problem worth failing on.
+HEALTH_ATTEMPTS=40
+HEALTH_INTERVAL=15
+
+log "Health-checking production (up to $((HEALTH_ATTEMPTS * HEALTH_INTERVAL / 60)) min — waiting out Render's build and swap)"
 HEALTHY=0
-for i in 1 2 3 4 5 6; do
+for i in $(seq 1 "$HEALTH_ATTEMPTS"); do
   CODE=$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTH_URL" || echo "000")
   if [[ "$CODE" == "200" ]]; then
     echo "OK — $HEALTH_URL returned 200"
@@ -325,10 +342,10 @@ for i in 1 2 3 4 5 6; do
     HEALTH_URL="$LIVE_URL"
     continue
   fi
-  echo "Attempt $i: $HEALTH_URL returned $CODE — retrying in 15s"
-  sleep 15
+  echo "Attempt $i/$HEALTH_ATTEMPTS: $HEALTH_URL returned $CODE — retrying in ${HEALTH_INTERVAL}s"
+  sleep "$HEALTH_INTERVAL"
 done
-[[ "$HEALTHY" == "1" ]] || fail "$HEALTH_URL did not return 200 after several retries. Check the Render dashboard directly before assuming this deploy is healthy."
+[[ "$HEALTHY" == "1" ]] || fail "$HEALTH_URL did not return 200 after $HEALTH_ATTEMPTS attempts over $((HEALTH_ATTEMPTS * HEALTH_INTERVAL / 60)) minutes. Check the Render dashboard directly before assuming this deploy is healthy. Note the tag is already pushed and the deploy already triggered, so this is 'the new build never came up', not 'nothing happened' — and the GitHub Release step below was skipped, so publish it by hand once you have confirmed the deploy is good."
 
 # --- GitHub Release ------------------------------------------------------------
 

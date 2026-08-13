@@ -227,6 +227,35 @@ predates Plan 23.
 > readiness probe" into a passing deploy. On a forward deploy `/readyz` must
 > exist, so its absence there now fails the gate as it should.
 
+**D10 — the deploy gate's retry window had to grow from ~75s to 10 minutes
+(found by the release itself).**
+Moving the gate to `/readyz` silently changed what it *measures*, and the
+window was never resized to match. `/healthz` is answered 200 by the **old**
+build too, so the old six-attempt (~75s) check could pass before Render had
+finished swapping — it confirmed "something is serving", not "the new build is
+live". `/readyz` exists only on the new build, so the check now genuinely waits
+out build + migrate + swap.
+
+The first release on it, `v2026.08.13`, exhausted all six attempts against a
+still-building deploy and failed:
+
+```
+Attempt 1..6: https://thandkoiclinics.com/readyz returned 302 — retrying in 15s
+ERROR: ... did not return 200 after several retries.
+```
+
+Production was fine — an independent poll showed `/readyz` returning 200 a
+little later — but two real consequences followed: the operator is told a good
+deploy may be unhealthy, and the script exits **before its GitHub Release
+step**, so the tag ships with no Release (it had to be published by hand for
+`v2026.08.13`). The window is now 40 × 15s = 10 minutes, and the failure
+message now says both that the tag and deploy already went out, and that the
+Release needs publishing by hand.
+
+Worth stating plainly, because it cuts against the change: this gate is
+**stricter** than the one it replaced, not merely slower. The old one could
+pass without the new build ever being live.
+
 ---
 
 ## Parked, deliberately
@@ -327,7 +356,7 @@ Ships behind no flag (D6), as a normal tagged release via `scripts/release.sh`.
 | Phase | Action | Gate | Rollback trigger |
 |---|---|---|---|
 | 0 | ✅ **Done 2026-08-13.** Set `DB_CONNECT_TIMEOUT=15` on `srv-d9ej48n41pts73f1i3p0` (merge-semantics update, so no other env var was touched). Render auto-triggered a redeploy of the then-current commit `4ad045e` — harmless, and the reason this was sequenced *before* the merge rather than after | Value set; redeploy of the pre-merge commit completed | — (env-only, revert by clearing) |
-| 1 | Deploy the tag | `scripts/release.sh`'s `/readyz` check passes | Health check fails → redeploy previous tag |
+| 1 | ✅ **Done 2026-08-13**, tag `v2026.08.13` at `c3bf401`. Deploy succeeded and production is healthy (`/healthz` 200, `/readyz` 200 `{"status": "ok"}`, homepage 200) — but `scripts/release.sh` **reported failure**: see D10 | Verified by hand after the script aborted; GitHub Release published manually | Health check fails *and* the site is genuinely down → redeploy previous tag |
 | 2 | Confirm scale-to-zero within ~10 min of quiet | Neon shows compute `idle`, `started_at` stops being 18 days old | Compute still never idle → something else polls; re-open the investigation before assuming this plan failed |
 | 3 | Watch cold-resume latency for a week | `/readyz` (and ordinary page) traces in Sentry show resume cost; CU-hours trend flat | First-page-load 503s after a quiet period → raise `DB_CONNECT_TIMEOUT` further (no deploy) |
 
