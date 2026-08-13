@@ -21,6 +21,13 @@ logger = logging.getLogger(__name__)
 #: ``/healthz`` is registered without a trailing slash in ``config/urls.py``;
 #: both spellings are listed so an ``APPEND_SLASH`` redirect can't sneak the
 #: probe back into the sample.
+#:
+#: ``/readyz`` is deliberately **absent** (Plan 23 Decision 7), inverting the
+#: reasoning below for it. That path is hit once per deploy rather than twelve
+#: times a minute, and now that the compute is allowed to scale to zero its
+#: latency is the most informative number on the site: it is the one request
+#: guaranteed to pay Neon's cold-connect cost, which no one has ever measured
+#: (see ``config/database.py``). Sampling it is how that gets measured.
 UNSAMPLED_PATHS = frozenset({"/healthz", "/healthz/"})
 
 

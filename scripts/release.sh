@@ -34,7 +34,13 @@
 set -euo pipefail
 
 REPO="hh2110/thandkoi-clinics"
-HEALTH_URL="https://thandkoiclinics.com/healthz"
+# /readyz, not /healthz (Plan 23). /healthz is now a liveness probe that does
+# no database work, because Render polls it every few seconds and that query
+# was what stopped Neon's compute ever scaling to zero. The deploy gate wants
+# the stronger claim — "this build came up able to reach Postgres" — which is
+# what /readyz still answers. Once per release is exactly the right cadence
+# for it; do not point anything faster at that path.
+HEALTH_URL="https://thandkoiclinics.com/readyz"
 
 log()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 fail() { printf '\n\033[1;31mERROR:\033[0m %s\n' "$1" >&2; exit 1; }

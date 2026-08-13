@@ -24,8 +24,13 @@ from wagtail.documents import urls as wagtaildocs_urls
 from apps.core import views as core_views
 
 urlpatterns = [
-    # Liveness/readiness probe for the host and for CI smoke tests.
+    # Liveness probe for the host and for CI smoke tests. Deliberately does no
+    # database work — Render polls it every few seconds, and a query here is
+    # what kept Neon's compute from ever scaling to zero (Plan 23).
     path("healthz", core_views.healthz, name="healthz"),
+    # Readiness probe: the database check that used to live on /healthz. Polled
+    # once per deploy by scripts/release.sh, not on a schedule.
+    path("readyz", core_views.readyz, name="readyz"),
     # Crawler directives (Plan 18). Unprefixed like the health check: robots.txt
     # is only ever read from the site root, so it must not sit behind
     # i18n_patterns' language prefix.
