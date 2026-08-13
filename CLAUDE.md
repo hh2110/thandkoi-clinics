@@ -119,7 +119,25 @@ future change here:
 
 Log forwarding is `WARNING` and above only (`sentry_logs_level`); `INFO` is
 deliberately not forwarded. `SENTRY_TRACES_SAMPLE_RATE` dials trace volume
-from the Render dashboard with no deploy; `/healthz` is never traced.
+from the Render dashboard with no deploy; `/healthz` is never traced, while
+`/readyz` deliberately is (Plan 23 D7).
+
+**`/healthz` must never touch the database** (Plan 23,
+[23-healthz-scale-to-zero.md](.claude/plans/23-healthz-scale-to-zero.md)).
+Render polls it roughly every five seconds, so the single `SELECT 1` it used
+to run was ~17,000 queries a day — enough that Neon's compute never got the
+five consecutive idle minutes scale-to-zero needs. It ran continuously from
+2026-07-26 to 2026-08-13 and consumed ~195 CU-hours against a 100 CU-hour
+allowance. The database check lives on **`/readyz`**, which only
+`scripts/release.sh` calls, once per release. If you are ever tempted to make
+the health check "more useful" by having it verify a dependency, that is this
+bug. `apps/core/tests.py` guards it with `assertNumQueries(0)` over the whole
+request, since middleware could reintroduce a query without the view changing.
+Corollary: the compute now genuinely sleeps, so **Neon cold resumes are real**
+— production therefore needs `DB_CONNECT_TIMEOUT=15` rather than the code
+default of 5. That is a Render dashboard action (Plan 23 release Phase 0), not
+a deploy; if you're unsure whether it was ever done, read the live service
+rather than assuming, and don't trust `render.yaml`.
 
 A **Sentry MCP server** is registered on the maintainer's machine for this
 project (`claude mcp add --transport http sentry https://mcp.sentry.dev/mcp`,

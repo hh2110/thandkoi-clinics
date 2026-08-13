@@ -52,14 +52,27 @@ import logging
 #:
 #: What is NOT known, deliberately stated rather than implied: Neon autosuspend
 #: is enabled on this project (``suspend_timeout_seconds: 0`` — the 5-minute
-#: default), and **no cold resume was ever timed**. Today the UptimeRobot
-#: ``/healthz`` poll queries the database often enough to keep the compute
-#: warm, so resumes effectively do not happen; if that monitor is ever paused,
-#: a resume slower than this bound would turn a slow first page load into a
-#: 503. That is the one scenario where this value could be wrong, and the
-#: reason it is overridable: ``DB_CONNECT_TIMEOUT`` is dialable from the Render
-#: dashboard with no deploy. Raise it there first, then measure, before
-#: changing this constant.
+#: default), and **no cold resume has ever been timed**.
+#:
+#: **Updated 2026-08-13 (Plan 23) — read this before trusting the 5.** Until
+#: now that gap didn't bite, because the health-check poll queried the database
+#: often enough that the compute never suspended and resumes effectively never
+#: happened. That was also the bug: at ~12 polls a minute the compute ran
+#: continuously for 18 days and consumed roughly twice the plan's monthly
+#: compute allowance. Plan 23 moved the database check off ``/healthz`` and
+#: onto ``/readyz``, so **the compute now genuinely sleeps and cold resumes are
+#: the normal case on the first request after a quiet period** — exactly the
+#: scenario named above as the one where this value could be wrong, no longer
+#: hypothetical. A resume slower than this bound turns that first page load
+#: into a 503.
+#:
+#: This is why the constant is overridable: ``DB_CONNECT_TIMEOUT`` is dialable
+#: from the Render dashboard with no deploy, and Plan 23's release **requires**
+#: setting it to **15** before the compute is first allowed to sleep (release
+#: Phase 0 — a dashboard action, so confirm it against the live service rather
+#: than assuming it happened). Measure a real cold
+#: resume (``/readyz`` is deliberately left traced in Sentry for this — Plan 23
+#: Decision 7) before lowering it back or changing this constant.
 DEFAULT_CONNECT_TIMEOUT_SECONDS = 5
 
 #: libpq silently clamps any positive connect_timeout below this up to it, and

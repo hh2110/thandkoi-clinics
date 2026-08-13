@@ -1,17 +1,20 @@
 """Smoke tests for the project foundation and the Plan 03 design system.
 
 These verify the app boots and its two entry points respond: the Wagtail home
-page renders, and the /healthz probe returns 200. The Plan 03 additions below
+page renders, and the /healthz and /readyz probes return 200. The Plan 03
+additions below
 cover the bilingual routing, RTL layout, brand-styled error pages, and the
 anti-FOUC/theme-toggle markup added in that plan.
 """
 
 import datetime
 import re
+from unittest import mock
 
 import pytest
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import OperationalError
 from django.template.loader import render_to_string
 from django.test import override_settings
 from django.urls import reverse
@@ -78,10 +81,60 @@ def test_home_page_renders(client, home_page):
 
 
 def test_healthz_returns_200(client, db):
-    """The health probe returns 200 with an ok status."""
+    """The liveness probe returns 200 with an ok status."""
     response = client.get(reverse("healthz"))
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_healthz_issues_no_database_queries(client, db, django_assert_num_queries):
+    """`/healthz` must cost zero database round-trips (Plan 23 D1/D2).
+
+    This is the guard the hosting bill depends on, so it asserts the property
+    that actually matters rather than the one that is easy to check. Render
+    polls `healthCheckPath` roughly every five seconds; when this probe ran a
+    `SELECT 1`, that alone was ~17,000 queries a day, Neon's compute never got
+    the five consecutive idle minutes it needs to suspend, and the project ran
+    at ~195 CU-hours against a 100 CU-hour allowance.
+
+    Deliberately written as "the whole request issues no queries", not "the
+    view does not call `cursor()`": `SessionMiddleware` and
+    `AuthenticationMiddleware` are lazy *today*, but a future middleware could
+    reintroduce a query without this file changing, silently re-arming the
+    whole problem. Verified to go red by re-adding the query to the view.
+    """
+    with django_assert_num_queries(0):
+        response = client.get(reverse("healthz"))
+
+    assert response.status_code == 200
+
+
+def test_readyz_returns_200_when_the_database_answers(client, db):
+    """The readiness probe reports ok when it can reach the database."""
+    response = client.get(reverse("readyz"))
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_readyz_returns_503_when_the_database_is_unreachable(client, db):
+    """A database that raises makes `/readyz` report unready, not 500.
+
+    This is the behaviour `scripts/release.sh` gates a deploy on, and it is
+    the half of the old `/healthz` that was worth keeping.
+
+    The patch is scoped to the request with a context manager rather than
+    `monkeypatch`, which would still be in force when the `db` fixture rolls
+    back its transaction — that teardown needs a working cursor and errors out
+    if it can't get one.
+    """
+    with mock.patch(
+        "apps.core.views.connection.cursor",
+        side_effect=OperationalError("connection refused"),
+    ):
+        response = client.get(reverse("readyz"))
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "error"}
 
 
 def test_homepage_factory_creates_page_in_tree(db):

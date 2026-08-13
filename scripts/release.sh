@@ -34,7 +34,19 @@
 set -euo pipefail
 
 REPO="hh2110/thandkoi-clinics"
-HEALTH_URL="https://thandkoiclinics.com/healthz"
+# /readyz, not /healthz (Plan 23). /healthz is now a liveness probe that does
+# no database work, because Render polls it every few seconds and that query
+# was what stopped Neon's compute ever scaling to zero. The deploy gate wants
+# the stronger claim — "this build came up able to reach Postgres" — which is
+# what /readyz still answers. Once per release is exactly the right cadence
+# for it; do not point anything faster at that path.
+READY_URL="https://thandkoiclinics.com/readyz"
+# The pre-Plan-23 probe, kept only as the fallback for `--ref` rollbacks: every
+# tag cut before Plan 23 serves 404 on /readyz, and failing a rollback that
+# actually succeeded is worst exactly when rollbacks get used. See the health
+# check below. Delete this fallback once no rollback target predates Plan 23.
+LIVE_URL="https://thandkoiclinics.com/healthz"
+HEALTH_URL="$READY_URL"
 
 log()  { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 fail() { printf '\n\033[1;31mERROR:\033[0m %s\n' "$1" >&2; exit 1; }
@@ -278,6 +290,18 @@ for i in 1 2 3 4 5 6; do
     echo "OK — $HEALTH_URL returned 200"
     HEALTHY=1
     break
+  fi
+  # A 404 from /readyz means this build predates Plan 23 and only serves
+  # /healthz — i.e. a `--ref` rollback to an older tag. Fall back rather than
+  # reporting a failure for a rollback that in fact worked, but say plainly
+  # that the check just got weaker, because it did: /healthz proves only that
+  # the process is serving, not that it can reach Postgres.
+  if [[ "$CODE" == "404" && "$HEALTH_URL" == "$READY_URL" ]]; then
+    echo "NOTE: $READY_URL returned 404 — this build predates Plan 23's readiness probe."
+    echo "      Falling back to $LIVE_URL, which only confirms the process is serving."
+    echo "      It does NOT confirm the database is reachable — check that separately."
+    HEALTH_URL="$LIVE_URL"
+    continue
   fi
   echo "Attempt $i: $HEALTH_URL returned $CODE — retrying in 15s"
   sleep 15

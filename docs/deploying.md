@@ -14,8 +14,18 @@ There are three, and only three:
 | **CI** | GitHub Actions, per PR | ephemeral Postgres service container | mocked — never real |
 | **production** | Render (Starter compute) | Neon Postgres, single database | real, from live traffic |
 
-**Production URL:** https://thandkoiclinics.com — health check at
-[`/healthz`](https://thandkoiclinics.com/healthz).
+**Production URL:** https://thandkoiclinics.com. Two probes, split in
+[Plan 23](../.claude/plans/23-healthz-scale-to-zero.md):
+
+| Path | Answers | Touches the DB? | Polled by |
+|---|---|---|---|
+| [`/healthz`](https://thandkoiclinics.com/healthz) | is the process serving? | **no — never add a query here** | Render's health check (~every 5s), UptimeRobot (60s) |
+| [`/readyz`](https://thandkoiclinics.com/readyz) | can this build reach Postgres? | yes | `scripts/release.sh`, once per release |
+
+The split exists because a `SELECT 1` on the high-frequency path kept Neon's
+compute from ever scaling to zero, at roughly twice the plan's monthly compute
+allowance. Point nothing fast at `/readyz`: each hit keeps the compute awake a
+further five minutes.
 
 There is **no staging environment** — deliberately. See the plan's
 [rationale](../.claude/plans/02-development-lifecycle.md#no-staging-environment--and-why-thats-fine):
@@ -56,7 +66,8 @@ inspectable script over an agent-driven one) does the whole runbook:
 4. Cuts and pushes a date-based tag (`vYYYY.MM.DD`, or `-2`/`-3`… for a
    second release the same day).
 5. Triggers the Deploy workflow for that tag and watches it to completion.
-6. Health-checks production (`/healthz`) with a few retries.
+6. Health-checks production (`/readyz` — the probe that proves the new build
+   can reach Postgres) with a few retries.
 7. Once the health check passes, publishes a [GitHub Release](https://github.com/hh2110/thandkoi-clinics/releases)
    for the tag with auto-generated notes (added 2026-07-24) — skipped if a
    Release for that tag already exists (the `--ref` rollback/redeploy path
@@ -72,7 +83,8 @@ inspectable script over an agent-driven one) does the whole runbook:
    being labeled by its Conventional-Commit type when it's opened (see
    CLAUDE.md's "PR flow").
 
-> **2026-07-23 observed gap:** `/healthz: 200` confirms *a* healthy instance
+> **2026-07-23 observed gap:** a passing probe (then `/healthz`, now `/readyz`
+> — the gap below is unchanged by that swap) confirms *a* healthy instance
 > is responding, not that *every* access path is already on the new build.
 > After a real release (`v2026.07.23-4`, adding `CampReportPage.report_document`
 > — a page type since retired in Plan 21, but the deploy behaviour below is
@@ -229,21 +241,31 @@ may spend opening a Postgres connection:
 | Value | Effect |
 |---|---|
 | unset / blank | code default, `5` seconds |
-| e.g. `15` | more headroom for a slow Neon resume |
+| **`15`** | **required in production** as of Plan 23 — headroom for a Neon cold resume |
 | `0` | **never set this** — libpq reads 0 as "wait forever" |
 
 It exists because that "wait forever" default *was* the effective setting until
 2026-07-26, when the Render instance lost outbound network and every worker
 blocked on a connection that could not complete — for 30 minutes, because a
 blocked connect is not an exception and so `/healthz`'s own 503 fallback could
-never fire. Raise it here if Neon cold starts ever start failing after an idle
-period (autosuspend is on at the 5-minute default; today the UptimeRobot
-`/healthz` poll keeps the compute warm, so resumes effectively don't happen).
-Measure before changing the code constant.
+never fire.
 
-`/healthz` is never traced at any setting (Plan 17 Decision 3) — a 60-second
-uptime poll is ~43k requests/month whose latency says nothing, and including it
-would drag every p50 widget toward zero. Sizing note: the free Developer plan
+**Must be set to `15` as part of
+[Plan 23](../.claude/plans/23-healthz-scale-to-zero.md)'s release (Phase 0, a
+dashboard action with no deploy).** Check the live service rather than assuming
+it was done. Until Plan 23 the health-check poll kept the Neon compute
+permanently warm, so cold resumes never happened and the 5-second default was
+never tested against one. Plan 23 removed that poll's query on purpose, so the
+compute now
+sleeps and **the first request after a quiet period pays a real resume** — the
+one case where 5 seconds could be too tight, and a 503 on someone's first page
+load is how you'd find out. Measure an actual resume before lowering it back;
+`/readyz` traces are there for exactly that (Plan 23 Decision 7).
+
+`/healthz` is never traced at any setting (Plan 17 Decision 3) — a bare 200
+polled every few seconds says nothing about latency and would drag every p50
+widget toward zero. `/readyz` *is* traced, deliberately: it runs once per
+deploy and is the one request guaranteed to pay the cold-connect cost. Sizing note: the free Developer plan
 includes **5M spans/month with no pay-as-you-go**, so over-quota spans are
 dropped and never billed; at this site's measured traffic (15 page views in the
 24h to 2026-07-25) full sampling sits orders of magnitude inside that budget.

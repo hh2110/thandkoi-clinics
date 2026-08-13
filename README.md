@@ -66,7 +66,10 @@ uv run python manage.py runserver
 
 - Site: <http://localhost:8000/>
 - Wagtail admin: <http://localhost:8000/admin/>
-- Health check: <http://localhost:8000/healthz> (returns `{"status": "ok"}`)
+- Liveness: <http://localhost:8000/healthz> (returns `{"status": "ok"}`; does
+  no database work — see [Plan 23](.claude/plans/23-healthz-scale-to-zero.md))
+- Readiness: <http://localhost:8000/readyz> (same body, but only after the
+  database answers; 503 if it can't)
 
 > On a fresh database the site root is Wagtail's default welcome page. Sign in to
 > the admin and add a **Home page** (the `HomePage` type), then set it as the

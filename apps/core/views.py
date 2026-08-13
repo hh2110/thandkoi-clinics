@@ -20,11 +20,49 @@ Disallow: /django-admin/
 
 def healthz(request):
     """
-    Liveness/readiness probe.
+    Liveness probe. Answers "is this process serving?" and nothing else.
 
-    Returns HTTP 200 with a small JSON body when the app can reach the
-    database, 503 otherwise. No authentication, no data exposure — safe for the
-    host's health checks and for CI smoke tests.
+    **This view must never touch the database** (Plan 23 D1). It used to run a
+    ``SELECT 1``, and that single query was enough to cost the project its
+    entire hosting plan: Render polls ``healthCheckPath`` roughly every five
+    seconds, so the probe alone issued ~17,000 queries a day. Neon's
+    scale-to-zero needs five consecutive idle minutes and never got them — the
+    compute ran continuously from 2026-07-26 to 2026-08-13, burning ~195
+    CU-hours a month against a 100 CU-hour allowance.
+
+    The database check now lives in :func:`readyz`, which is polled once per
+    deploy instead of twelve times a minute.
+
+    ``apps/core/tests.py`` asserts this request issues **zero** queries, rather
+    than merely asserting this function doesn't call ``cursor()`` — middleware
+    could reintroduce one without touching this file, which would silently
+    re-arm the whole problem.
+
+    No authentication, no data exposure — safe for the host's health checks and
+    for CI smoke tests.
+    """
+    return JsonResponse({"status": "ok"})
+
+
+def readyz(request):
+    """
+    Readiness probe: can this build actually reach its database?
+
+    Returns HTTP 200 with a small JSON body when the database answers, 503
+    otherwise. Split out of :func:`healthz` in Plan 23 so that the expensive
+    half of the old probe runs on a cadence someone chose deliberately.
+
+    **Do not point a high-frequency poller at this path.** Every request keeps
+    the Neon compute awake for a further five minutes; that is the cost that
+    made this split necessary. Today its only scheduled caller is
+    ``scripts/release.sh``, once per release, which is exactly when "did the
+    new build come up able to reach Postgres" can newly be false.
+
+    The ``except Exception`` below is load-bearing but was historically not
+    enough on its own: during the 2026-07-26 outage a *blocked* connect is not
+    an exception, so this handler never fired and the probe hung instead of
+    answering 503. What made this path real is the bounded ``connect_timeout``
+    in ``config/database.py`` — keep the two in mind together.
     """
     try:
         with connection.cursor() as cursor:
