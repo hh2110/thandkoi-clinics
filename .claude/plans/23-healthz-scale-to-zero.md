@@ -204,6 +204,29 @@ the fallback rescues a rollback, and a build where *nothing* returns 200 still
 fails the gate. The fallback is marked for deletion once no rollback target
 predates Plan 23.
 
+> **Corrected 2026-08-13, before the release, against live production.** D9
+> originally matched on **404** alone, reasoning that an unrouted path 404s.
+> It does not on this site. `/readyz` falls through `config/urls.py` to the
+> `i18n_patterns` catch-all and `LocaleMiddleware` redirects it to
+> `/en/readyz`, so the pre-Plan-23 build answers **302**. Measured directly:
+> `curl` against production before deploying returned `/healthz -> 200`,
+> `/readyz -> 302`. The 404-only condition would therefore never have fired,
+> and the rollback path this fallback exists to protect would still have been
+> broken — the fix would have looked correct and failed exactly when needed.
+> The condition now matches 404 **or** any 3xx. Proved both directions: the
+> merged 404-only loop fails against a 302 mock, the corrected loop falls back
+> and passes. This is why the plan's own instruction is to verify against the
+> real system rather than reason about what a framework "should" return.
+>
+> The same pass also **gated the fallback on `--ref`** (a new `IS_ROLLBACK`
+> flag captured at argument-parse time, since the new-tag path assigns `REF`
+> itself and so `REF` cannot distinguish the two by health-check time).
+> Without that gate the fallback cut both ways: a *forward* deploy that
+> accidentally broke `/readyz` would have been quietly downgraded to a
+> liveness check and reported green, turning "this release broke the
+> readiness probe" into a passing deploy. On a forward deploy `/readyz` must
+> exist, so its absence there now fails the gate as it should.
+
 ---
 
 ## Parked, deliberately
@@ -258,17 +281,33 @@ is the entire plan in two numbers.
 extracted from `scripts/release.sh` *by line range* — so the thing under test
 cannot drift from the real script — and run against two mock builds:
 
+Measured production behaviour first (before deploying), which is what caught
+the 404-vs-302 error above:
+
 ```
-# a pre-Plan-23 build: 404 on /readyz, 200 on /healthz
-NOTE: .../readyz returned 404 — this build predates Plan 23's readiness probe.
+BEFORE release:  /healthz -> 200        /readyz -> 302
+```
+
+Then the loop, against a mock reproducing exactly that:
+
+```
+# pre-Plan-23 build: 302 on /readyz, 200 on /healthz
+NOTE: .../readyz returned 302 — this build predates Plan 23's readiness probe.
       Falling back to .../healthz, which only confirms the process is serving.
 OK — .../healthz returned 200
 --- loop exit status: 0 ---            # rollback correctly reported healthy
 
+# the same 302 mock against the 404-only loop merged in PR #163
+Attempt 1..6: .../readyz returned 302 — retrying in 15s
+--- merged-main loop exit status: 1 ---   # the bug was real, now fixed
+
 # a genuinely broken build: nothing returns 200
 Attempt 2..6: .../healthz returned 404 — retrying in 15s
-ERROR: ... did not return 200 after several retries.
 --- loop exit status: 1 ---            # gate is not a rubber stamp
+
+# forward deploy (IS_ROLLBACK=0) that BROKE /readyz — must NOT fall back
+Attempt 1..6: .../readyz returned 302 — retrying in 15s
+--- loop exit status: 1 ---            # fallback can't mask a bad release
 ```
 
 **Suite and lint:** 502 passed; `ruff check` clean; `ruff format --check` clean;
@@ -287,7 +326,7 @@ Ships behind no flag (D6), as a normal tagged release via `scripts/release.sh`.
 
 | Phase | Action | Gate | Rollback trigger |
 |---|---|---|---|
-| 0 | Set `DB_CONNECT_TIMEOUT=15` in the Render dashboard | Value visible on the service; no deploy | — (env-only, revert by clearing) |
+| 0 | ✅ **Done 2026-08-13.** Set `DB_CONNECT_TIMEOUT=15` on `srv-d9ej48n41pts73f1i3p0` (merge-semantics update, so no other env var was touched). Render auto-triggered a redeploy of the then-current commit `4ad045e` — harmless, and the reason this was sequenced *before* the merge rather than after | Value set; redeploy of the pre-merge commit completed | — (env-only, revert by clearing) |
 | 1 | Deploy the tag | `scripts/release.sh`'s `/readyz` check passes | Health check fails → redeploy previous tag |
 | 2 | Confirm scale-to-zero within ~10 min of quiet | Neon shows compute `idle`, `started_at` stops being 18 days old | Compute still never idle → something else polls; re-open the investigation before assuming this plan failed |
 | 3 | Watch cold-resume latency for a week | `/readyz` (and ordinary page) traces in Sentry show resume cost; CU-hours trend flat | First-page-load 503s after a quiet period → raise `DB_CONNECT_TIMEOUT` further (no deploy) |
