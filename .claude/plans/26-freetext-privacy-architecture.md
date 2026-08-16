@@ -356,6 +356,12 @@ Sequenced, cheapest and most urgent first:
 6. Build the theme vocabulary module against `presenting_complaints`, mirroring
    `parser_registry`'s existing keyword-mapping pattern, with coverage measured
    in a test (78.3% today — the test records it and makes regressions visible).
+   **Handle negation**: a bare `\yfever\y` also matches "no fever". Measured, the
+   error is currently negligible — 0 uses of denies/afebrile/nil anywhere, and 1
+   negated mention out of 114 fever mentions across the whole corpus — but
+   clinical documentation style can change, and a negation-window check is a few
+   lines. Note the matching runs over `presenting_complaints || clinical_notes`;
+   the 78.3% figure is for `presenting_complaints` alone.
 7. Compute theme counts **per calendar month** (and/or rolling 30 days, reusing
    Plan 16's range aggregation), as counts *and* shares of visits. Apply
    `MIN_CELL = 5` suppression in Python — affordable at monthly denominators,
@@ -410,9 +416,18 @@ vocabulary is proven against real data before the data is destroyed.
 
 **Phase 2 — optional, and the one that carries transferable knowledge.**
 10. Distil a small student model on synthetic examples (D1), download the
-    weights, and run it on a Render cron job (~$1/month) to generate the prose
-    from the same counts. At that point *nothing at all* goes to any external
-    model for the daily report, and the learning is banked.
+    weights, and run it on a Render cron job (~$1/month). **D6 — its best job is
+    classification, not prose.** The instinct is to use a local model to *write*
+    the summary, but writing 90 words from a dozen integers is a task a fixed
+    template does adequately and a regex-free human does better. The job that
+    actually needs a model is the one regex does imperfectly: deciding that
+    "burning micturition", "temp 101" and a misspelling all belong to a theme —
+    i.e. lifting classification coverage above 78.3%. Run *inside* the ingest
+    request, a local classifier has exactly the same privacy properties as the
+    regex (nothing leaves, nothing is stored under D5) while removing the
+    vocabulary's main weakness. That makes Phase 2 genuinely additive rather than
+    a re-implementation of something already solved, and it is the version worth
+    building for the transferable knowledge.
 
 **D2 — HIPAA readiness, not ZDR.** The risk assessment recommended requesting
 zero data retention through Anthropic sales, and dismissed HIPAA readiness as a
