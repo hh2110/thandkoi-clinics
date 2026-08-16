@@ -140,6 +140,34 @@ def cache_key_for(request):
     return f"{CACHE_KEY_PREFIX}:{request.path}{suffix}"
 
 
+def _cache_get(key):
+    """Read from the cache, treating any failure as a miss.
+
+    The cache is an optimisation; it must never be able to take the site down.
+    ``FileBasedCache`` touches the filesystem on every read and write, so a
+    full disk, a read-only mount, or a permissions change would otherwise raise
+    on *every request* and turn a cost optimisation into a total outage.
+
+    This is the same principle ``config/database.py`` was written around after
+    the 2026-07-26 outage: a blip in a dependency should degrade the site, not
+    wedge it. Here degrading means "serve the page from the database", which is
+    exactly what happened before this middleware existed.
+    """
+    try:
+        return cache.get(key)
+    except Exception:  # noqa: BLE001 - any cache failure is just a miss
+        logger.warning("Page cache read failed; serving uncached", exc_info=True)
+        return None
+
+
+def _cache_set(key, response, timeout):
+    """Write to the cache, swallowing any failure. See :func:`_cache_get`."""
+    try:
+        cache.set(key, response, timeout)
+    except Exception:  # noqa: BLE001 - failing to cache is not a failed request
+        logger.warning("Page cache write failed; not cached", exc_info=True)
+
+
 class PageCacheMiddleware:
     """Serve cached public pages; store the ones that are safe to store.
 
@@ -169,7 +197,7 @@ class PageCacheMiddleware:
             return self.get_response(request)
 
         key = cache_key_for(request)
-        cached = cache.get(key)
+        cached = _cache_get(key)
         if cached is not None:
             return cached
 
@@ -180,9 +208,9 @@ class PageCacheMiddleware:
             # by the time middleware sees it, Django has already done so, but
             # be explicit rather than storing an unrendered object.
             if hasattr(response, "render") and callable(response.render):
-                response.add_post_render_callback(lambda r: cache.set(key, r, timeout))
+                response.add_post_render_callback(lambda r: _cache_set(key, r, timeout))
             else:
-                cache.set(key, response, timeout)
+                _cache_set(key, response, timeout)
 
         return response
 

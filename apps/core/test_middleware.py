@@ -277,3 +277,45 @@ def test_internal_log_snippets_do_not_clear_the_cache(rf, clean_cache):
     middleware(_anon(rf.get("/en/")))
 
     assert counter["calls"] == 1, "internal log snippets must not clear the cache"
+
+
+# --- A broken cache must not break the site ----------------------------------
+
+
+@override_settings(CACHE_PAGE_SECONDS="300")
+def test_a_failing_cache_read_still_serves_the_page(rf, clean_cache, monkeypatch):
+    """The cache is an optimisation and must never be able to take the site down.
+
+    FileBasedCache touches the filesystem on every read, so a full disk, a
+    read-only mount or a permissions change would otherwise raise on *every
+    request* — turning a cost optimisation into a total outage. Same principle
+    `config/database.py` was written around after the 2026-07-26 outage: a blip
+    in a dependency should degrade the site, not wedge it.
+    """
+
+    def _boom(*args, **kwargs):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr("apps.core.middleware.cache.get", _boom)
+
+    counter = {"calls": 0}
+    response = _counting_middleware(counter)(_anon(rf.get("/en/about/")))
+
+    assert response.status_code == 200
+    assert counter["calls"] == 1
+
+
+@override_settings(CACHE_PAGE_SECONDS="300")
+def test_a_failing_cache_write_still_serves_the_page(rf, clean_cache, monkeypatch):
+    """Failing to *store* a page is not a failed request either."""
+
+    def _boom(*args, **kwargs):
+        raise OSError("no space left on device")
+
+    monkeypatch.setattr("apps.core.middleware.cache.set", _boom)
+
+    counter = {"calls": 0}
+    response = _counting_middleware(counter)(_anon(rf.get("/en/about/")))
+
+    assert response.status_code == 200
+    assert counter["calls"] == 1
