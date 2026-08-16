@@ -267,15 +267,25 @@ second step if richer prose is wanted later. Do not do Option A at all.**
 Sequenced, cheapest and most urgent first:
 
 **Phase 0 — stop the bleeding (hours, no architecture change).**
-1. **Scrub the 10 live pages**, mirroring Plan 18a's
-   `scrub_subfloor_freetext_summaries`: a management command that blanks any
-   published group summary matching singular-patient phrasing, plus a re-run
-   confirming zero remaining. Affected dates are in the untracked findings doc.
-2. **Add a publish-time regex guard** in Python that blanks any summary matching
-   `one patient`, `a patient`, `two patients`, `a woman/man/child`, or a
-   pronoun. This is a control, not prompt wording, and it can be negative-tested.
-   It is worth shipping even though Phase 1 will make it largely redundant —
-   defence in depth on an auto-published surface.
+1. **Correct the 10 live pages**, in the shape of Plan 18a's
+   `scrub_subfloor_freetext_summaries` — a management command plus a re-run
+   confirming zero remaining — but **rewriting rather than blanking**. Reading
+   the full published text (not the extracts) shows the disclosure is the
+   *trailing sentence* in 10 of the 11 affected group-summaries, with the
+   aggregate prose before it sound; only one needs restructuring, because there
+   the offending clause is the opener. So the command carries a hardcoded
+   `{(date, group): new_text}` map of human-approved edits — not regenerated
+   summaries, since re-running the model over the same free text can reproduce
+   the same defect. The exact before/after for all 11 is in the untracked
+   findings doc §7, along with the two to do first.
+2. **Add a publish-time regex guard** in Python that blanks any summary
+   attributing to an individual. It must catch **`another`** as well as
+   `one patient` / `two patients` — measured across all 64 pages, `another`
+   occurs twice and both times introduces a *second* singled-out individual,
+   which a naive "one patient" guard would miss. Pronouns and "a woman/man/
+   child" score zero today but belong in the set. This is a control, not prompt
+   wording, and it can be negative-tested. Worth shipping even though Phase 1
+   makes it largely redundant — defence in depth on an auto-published surface.
 3. **Enable HIPAA readiness** in the Anthropic Console (see D2).
 4. **Fix `README.md` line 17**, which still claims on `main` that patient data is
    "never stored and never sent to any AI model". It is neither, and the repo is
