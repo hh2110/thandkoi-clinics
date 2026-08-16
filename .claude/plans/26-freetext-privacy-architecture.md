@@ -370,6 +370,44 @@ Sequenced, cheapest and most urgent first:
    there is no group to floor.
 10. The daily page keeps every deterministic number it has today.
 
+**D5 — once the daily summary retires, stop *storing* the narrative too.**
+Verified by grep: the only things that touch the seven free-text columns are
+the model definition, `parser_tkc_daily_v1`, `ingest.py`'s writer, and
+`freetext.py`'s payload builder. **No template renders them. No dashboard,
+report, newsletter or admin view reads them.** So the moment Phase 1 retires
+the free-text summary, those columns have *zero* consumers — written once at
+ingest and never read by anything, forever.
+
+The right move is therefore to **classify at ingest and discard the narrative
+in-request**: run the theme vocabulary over each row while the upload is being
+parsed, store the resulting theme flags on `DeidentifiedVisit`, and never write
+the raw text at all. Then drop the seven columns in a migration and purge what
+is already stored.
+
+This is worth doing for its own sake, because it changes the security posture
+qualitatively rather than incrementally:
+
+- **It restores CLAUDE.md invariant #1** ("never persist raw PHI"), which the
+  Plan 11 B8 decision effectively suspended for these seven columns. The
+  invariant goes back to meaning what it says.
+- **It removes the at-rest exposure entirely.** Today ~90,000 characters of raw
+  clinical narrative sit in Neon. After this, none do. There is no breach
+  surface because there is nothing to breach.
+- **It retires the load-bearing assumption.** The 2026-07-23 claim — that the
+  clinic's UI structurally cannot accept an identifier into these fields — stops
+  mattering at all. It does not matter whether a nurse *could* type a name into
+  a notes field, because the string is classified and discarded inside the
+  request that parsed it. The unverifiable assertion the risk assessment was
+  built around simply stops being part of the design.
+- **It makes the aggregation cheaper**, since themes are computed once at ingest
+  rather than re-derived on every read.
+
+The cost is that re-classifying historical visits under an improved vocabulary
+becomes impossible — the source text is gone. That is a real trade and should be
+made deliberately: extend the vocabulary while the text is still there, measure
+coverage, and only then discard. Sequencing note: **Phase 1 before D5**, so the
+vocabulary is proven against real data before the data is destroyed.
+
 **Phase 2 — optional, and the one that carries transferable knowledge.**
 10. Distil a small student model on synthetic examples (D1), download the
     weights, and run it on a Render cron job (~$1/month) to generate the prose
