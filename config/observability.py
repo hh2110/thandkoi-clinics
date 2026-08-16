@@ -48,9 +48,54 @@ def _strip_request_body(event):
     return event
 
 
+#: Sentry truncates tag values around 200 characters; do it ourselves so the
+#: value is predictable rather than silently clipped mid-token.
+_MAX_TAG_LENGTH = 200
+
+
+def _tag_user_agent(event):
+    """Promote the request's User-Agent to an indexed tag, in place.
+
+    Why (Plan 24 D7): as of 2026-08-16 roughly 740 successful page loads a day
+    — about 50x the site's measured *human* traffic — were keeping Neon's
+    compute awake, and **we could not say which crawlers they were.** Sentry
+    retains no queryable user agent for these spans and gunicorn runs without
+    ``--access-logfile``, so Render has no request logs either. Every "block
+    the bad bots" option was therefore a guess.
+
+    A tag is searchable in Sentry, so a week of this turns the next decision
+    (whether to put Cloudflare in front, and what to let through) into a
+    measurement. Chosen over enabling gunicorn access logs because it is an
+    in-repo, testable change in the module that already owns Sentry policy,
+    rather than a dashboard edit to the service's start command.
+
+    Not a privacy concern under CLAUDE.md's invariants: a User-Agent is a
+    client software string, not patient data, and carries no identifier. It is
+    read from headers, which :func:`_strip_request_body` never touched — that
+    function removes the request *body*, which is where a raw export would be.
+    """
+    request = event.get("request")
+    if not isinstance(request, dict):
+        return event
+
+    headers = request.get("headers")
+    if not isinstance(headers, dict):
+        return event
+
+    # Header capitalisation varies by integration; match case-insensitively
+    # rather than assuming the WSGI handler's spelling.
+    for name, value in headers.items():
+        if name.lower() == "user-agent" and isinstance(value, str):
+            tags = event.setdefault("tags", {})
+            tags["user_agent"] = value[:_MAX_TAG_LENGTH]
+            break
+
+    return event
+
+
 def before_send(event, hint):
     """Scrub error events. Registered as ``sentry_sdk.init(before_send=...)``."""
-    return _strip_request_body(event)
+    return _tag_user_agent(_strip_request_body(event))
 
 
 def before_send_transaction(event, hint):
@@ -61,8 +106,12 @@ def before_send_transaction(event, hint):
     carries its own ``request`` section, so enabling ``traces_sample_rate``
     without this hook would reopen the very hole Plan 15 Track A1 closed —
     through a new door, on every sampled request rather than only on errors.
+
+    This is also where the user-agent tag matters most (Plan 24 D7): the
+    crawler traffic we need to identify produces *transactions*, not errors,
+    so tagging only in :func:`before_send` would have answered nothing.
     """
-    return _strip_request_body(event)
+    return _tag_user_agent(_strip_request_body(event))
 
 
 def before_send_log(record, hint):

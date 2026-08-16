@@ -88,3 +88,26 @@ def _forbid_real_anthropic(monkeypatch):
         )
 
     monkeypatch.setattr("apps.pipeline.ai.get_anthropic_client", _fail)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_page_cache():
+    """Empty the page cache around every test (Plan 24 Track A).
+
+    The cache added in Plan 24 is a real file-backed cache shared by every
+    gunicorn worker, which is exactly what makes it useful in production and
+    exactly what breaks test isolation: without this, one test's rendered page
+    is served to the next test that requests the same URL, and eleven existing
+    template assertions failed against a previous test's HTML.
+
+    This is a test-isolation concern, not a production bug. In production a
+    publish fires ``page_published`` and clears the cache
+    (``apps.core.middleware.clear_page_cache``); a factory that writes content
+    straight to the database without publishing never fires that signal, and
+    only tests do that.
+    """
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()
