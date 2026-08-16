@@ -7,7 +7,11 @@ class CoreConfig(AppConfig):
     label = "core"
 
     def ready(self):
-        """Clear the page cache whenever an editor publishes (Plan 24 D4).
+        """Wire page-cache invalidation to every editor-visible change (Plan 24).
+
+        Two kinds: Wagtail page publishes, and saves of the snippets and
+        settings singletons that render into a page without any publish of
+        their own.
 
         Connected here rather than at module scope so it is wired exactly once,
         after the app registry is populated. Wagtail's signals are imported
@@ -41,11 +45,6 @@ class CoreConfig(AppConfig):
         # three hours of wrong account numbers on a donations page, which is
         # not a staleness cost worth paying for compute.
         #
-        # Scoped to the snippet and settings registries rather than a blanket
-        # post_save: an export upload writes hundreds of DeidentifiedVisit rows
-        # in one request, and clearing the cache once per row would be pure
-        # waste. Those rows reach the public site only via a report page, whose
-        # publish already fires page_published above.
         # Connected WITHOUT a sender, deliberately. The obvious version —
         # looping over `get_snippet_models()` here and connecting per model —
         # silently wires nothing: snippets are registered in `wagtail_hooks.py`,

@@ -95,11 +95,15 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
-    # Last on purpose (Plan 24 Track A). On a cache hit the response still
-    # unwinds through every middleware above, while everything below — notably
-    # RedirectMiddleware, which queries the database on every 404 — is skipped
-    # entirely. See apps/core/middleware.py for why a page cache is a compute
-    # measure here rather than a speed one.
+    # Last on purpose (Plan 24 Track A) = innermost, so a cache hit skips the
+    # view and the whole Wagtail page lookup, which is the database work worth
+    # avoiding. It must NOT be moved to the top: AuthenticationMiddleware has
+    # to have run first, or `request.user` isn't set and the middleware's
+    # "never serve a logged-in user from a shared cache" guard silently can't
+    # fire. RedirectMiddleware stays outer and still runs on every request,
+    # which is harmless — it only queries on a 404, and only 200s are cached.
+    # See apps/core/middleware.py for why this is a compute measure, not a
+    # speed one.
     "apps.core.middleware.PageCacheMiddleware",
 ]
 

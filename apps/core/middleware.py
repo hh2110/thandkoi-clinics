@@ -143,10 +143,19 @@ def cache_key_for(request):
 class PageCacheMiddleware:
     """Serve cached public pages; store the ones that are safe to store.
 
-    Placed **last** in ``MIDDLEWARE`` so that on a cache hit the response still
-    passes back out through every middleware above it, and so the ones below
-    it — notably Wagtail's ``RedirectMiddleware``, which queries the database
-    on every 404 — are skipped entirely on a hit.
+    Placed **last** in ``MIDDLEWARE``, i.e. innermost: a cache hit then skips
+    the view and the whole Wagtail page lookup, which is the database work
+    worth avoiding.
+
+    It must **not** be moved to the top of the list. ``AuthenticationMiddleware``
+    has to run first, or ``request.user`` is not set when
+    :func:`is_cacheable_request` looks at it, and the "never serve a logged-in
+    user from a shared cache" guard silently stops firing — the disclosure bug
+    that guard exists to prevent.
+
+    Everything listed above stays outer and still runs on a hit. That includes
+    Wagtail's ``RedirectMiddleware``, which is harmless here: it only queries
+    the database on a 404, and only 200s are ever cached.
     """
 
     def __init__(self, get_response):
