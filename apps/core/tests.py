@@ -2205,3 +2205,244 @@ def test_home_page_events_teaser_card_flyer_takes_precedence_over_link_url(
 
     assert "data-lightbox-trigger" in content
     assert 'href="https://example.org/talk"' not in content
+
+
+# --- Plan 25: the privacy notice ---------------------------------------------
+#
+# A hand-written notice drifts silently, and a privacy notice that has drifted
+# is worse than none: it is a confident, public, wrong statement. These five
+# guards exist so that drift breaks the build instead. They are adapted from
+# the sibling project's set (hh2110/ks1 PR #38); the two-way third-party guard
+# is new here, because unlike that app this one genuinely has third parties
+# wired up, so over-claiming is at least as likely as under-claiming.
+
+
+#: Every third party this repository's *code* can put in front of a visitor,
+#: keyed by a string that only exists when the thing is genuinely installed —
+#: never by a bare product name. That distinction is load-bearing: "Umami",
+#: "Sentry" and "Google Maps" all appear in comments and in the notice's own
+#: prose, several of them saying the opposite of "this is switched on", so a
+#: guard keyed on names would fire on its own documentation.
+#:
+#: The last six are deliberately NOT wired today. They are listed so that
+#: adding one fails this test rather than silently making the notice's list of
+#: third parties incomplete — which is the failure mode that actually happens,
+#: since nobody adding an analytics snippet thinks to re-read a prose page.
+PRIVACY_THIRD_PARTY_MARKERS = {
+    "cloud.umami.is": "Umami",
+    "sentry_sdk.init": "Sentry",
+    "map_embed_url": "Google Maps",
+    "storages.backends.s3.S3Storage": "Cloudflare",
+    "googletagmanager.com": "Google Tag Manager",
+    "gtag(": "Google Analytics",
+    "plausible.io": "Plausible",
+    "static.hotjar.com": "Hotjar",
+    "connect.facebook.net": "Meta Pixel",
+    "clarity.ms": "Microsoft Clarity",
+}
+
+#: The notice itself, excluded from the scan below — it names every third party
+#: by design, and scanning it would make the guard tautological.
+PRIVACY_NOTICE_TEMPLATE = (
+    settings.BASE_DIR / "apps" / "core" / "templates" / "core" / "privacy.html"
+)
+
+
+def _privacy_notice_scan_paths():
+    """Every file a third party could realistically be installed from.
+
+    Templates *and* settings modules, not just ``base.html``: an analytics
+    snippet is at least as likely to arrive as an ``{% include %}``, a page
+    template, or an SDK ``init`` in settings as it is inline in the base
+    template, and a guard watching one file would wave exactly that through.
+    """
+    return [
+        path
+        for path in [
+            *(settings.BASE_DIR / "templates").rglob("*.html"),
+            *(settings.BASE_DIR / "apps").rglob("templates/**/*.html"),
+            *(settings.BASE_DIR / "config" / "settings").glob("*.py"),
+        ]
+        if path != PRIVACY_NOTICE_TEMPLATE
+    ]
+
+
+def test_privacy_notice_is_public(client, db):
+    """``GET /en/privacy/`` -> 200 for a visitor who is signed out.
+
+    The whole point of the page is that it can be read *before* anyone decides
+    to trust this site with anything, and the analytics script has already run
+    by the time a reader gets here — so it can never sit behind a gate.
+
+    The assertion is on a phrase unique to this page, deliberately, and not on
+    the word "Privacy": Plan 25 puts that word in the footer of every page, so
+    asserting it would pass even if this URL routed somewhere else entirely.
+    """
+    response = client.get("/en/privacy/")
+
+    assert response.status_code == 200
+    assert "What we collect from you when you visit" in response.content.decode()
+
+
+def test_privacy_notice_serves_under_both_language_prefixes(client, db):
+    """It is inside ``i18n_patterns``, like every other page a person reads.
+
+    Plan 18's ``robots.txt`` sits *outside* the language prefix because it is
+    infrastructure; this is not, so it must serve at ``/ur/privacy/`` as well.
+    A route accidentally registered above ``i18n_patterns`` would 404 here
+    while ``/en/privacy/`` kept passing the test above.
+
+    Plan 25 D2: the prose is English in both places on purpose — there is no
+    translation catalogue in this repo, and an unreviewed Urdu rendering of
+    this particular document would be worse than one honest language. What is
+    locked here is reachability, not translation.
+    """
+    response = client.get("/ur/privacy/")
+
+    assert response.status_code == 200
+    assert "What we collect from you when you visit" in response.content.decode()
+
+
+def test_privacy_notice_is_linked_from_the_shared_footer_partial(client, home_page):
+    """The link lives in ``footer.html``, which is what puts it on every page.
+
+    Asserting only against a rendered page would not say that: moving the link
+    onto one template would leave such a test green while every other page on
+    the site quietly lost it. So this checks the shared partial itself first,
+    and only then confirms it really renders.
+    """
+    footer = (settings.BASE_DIR / "templates" / "partials" / "footer.html").read_text()
+    assert "{% url 'privacy' %}" in footer, (
+        "The privacy link is no longer in templates/partials/footer.html, so "
+        "it no longer reaches every page. Put it back, or this test is "
+        "measuring nothing."
+    )
+
+    content = client.get("/en/").content.decode()
+    assert 'href="/en/privacy/"' in content
+
+
+def test_privacy_notice_covers_every_deidentified_visit_field():
+    """Changing ``DeidentifiedVisit`` forces someone to re-read the notice.
+
+    This is the model the notice claims to describe in full — everything this
+    site keeps that came from a patient record. The prose is hand-written
+    rather than generated, because a page generated from a model reads like
+    nothing a person would want to read; the cost of that choice is silent
+    drift, and this is the guard against it.
+
+    Equality, not a subset, deliberately. A subset check only catches fields
+    being *added*. Removing one would pass while the notice went on describing
+    data this site no longer holds — untrue in the other direction, in a
+    document whose entire value is being true.
+
+    When this fails, the fix is to read
+    ``apps/core/templates/core/privacy.html`` and update it, and only then to
+    update this set — never the other way round.
+    """
+    from apps.pipeline.models import DeidentifiedVisit
+
+    described = {
+        # Bookkeeping, described as "one record per visit".
+        "id",
+        "ingest_run",
+        # "the date of the visit, and the department"
+        "visit_date",
+        "department",
+        # "the age band, and whether the patient was recorded as male, female,
+        # or neither/not recorded"
+        "age_band",
+        "sex",
+        # "a rough location — a village or union council"
+        "location",
+        # "a diagnosis category picked from a fixed list of ten"
+        "diagnosis_category",
+        # "whether it was a first visit or a follow-up"
+        "is_new_patient",
+        # "whether the visit was covered by Zakat or paid for"
+        "is_zakat_beneficiary",
+        # "seven columns of the clinician's own writing" — the section of the
+        # notice headed "The part that deserves plain language". An eighth
+        # arriving here needs that section rewritten, not this set extended.
+        "presenting_complaints",
+        "investigation",
+        "provisional_diagnosis_text",
+        "prescribed_medicine",
+        "clinical_notes",
+        "diet_and_drug_compliance",
+        "plan_notes",
+        # "the fees for registration, consultation, pharmacy, laboratory and
+        # ultrasound"
+        "registration_fee",
+        "consultation_fee",
+        "pharmacy_fee",
+        "laboratory_fee",
+        "ultrasound_fee",
+    }
+    actual = {
+        f.name
+        for f in DeidentifiedVisit._meta.get_fields()
+        if not f.is_relation or f.many_to_one
+    }
+
+    assert actual == described, (
+        f"DeidentifiedVisit's fields no longer match what the privacy notice "
+        f"describes. Not described: {sorted(actual - described) or 'none'}. "
+        f"Described but gone: {sorted(described - actual) or 'none'}. "
+        f"Update apps/core/templates/core/privacy.html, then update this set."
+    )
+
+
+def test_privacy_notice_names_exactly_the_third_parties_that_are_wired(client, db):
+    """The notice's list of outside services must match the code, both ways.
+
+    Under-claiming is the classic failure: someone adds a tracker and never
+    thinks about a prose page again, so the notice goes on promising a shorter
+    list than the truth.
+
+    Over-claiming is the one that is likelier *here*, and the sibling project's
+    version of this test did not guard it because that app had no third parties
+    to lose. This site has four wired up; removing one and leaving the notice
+    naming it is just as wrong, and reads as carelessness in exactly the
+    document where carelessness costs most.
+
+    Known limit, stated rather than papered over: the map's embed URL is
+    Wagtail *content* (``ContactBankSettings.map_embed_url``), not code, so
+    this test can see that a map is embedded but not who provides it. Swapping
+    Google Maps for OpenStreetMap in ``/admin/`` would make the notice's
+    "Google Maps" wrong with nothing here to catch it. That is a content
+    operation with a documentation step attached — see the plan file.
+    """
+    body = client.get("/en/privacy/").content.decode()
+
+    installed = {}
+    for path in _privacy_notice_scan_paths():
+        source = path.read_text()
+        for marker, name in PRIVACY_THIRD_PARTY_MARKERS.items():
+            if marker in source:
+                installed.setdefault(name, set()).add(
+                    str(path.relative_to(settings.BASE_DIR))
+                )
+
+    undisclosed = {
+        name: sorted(files) for name, files in installed.items() if name not in body
+    }
+    assert not undisclosed, (
+        f"These third parties are wired into the code but the privacy notice "
+        f"does not name them: {undisclosed}. Update "
+        f"apps/core/templates/core/privacy.html in the same change that added "
+        f"them — a notice with a short list is a wrong notice, not an "
+        f"incomplete one."
+    )
+
+    claimed_but_gone = sorted(
+        name
+        for name in set(PRIVACY_THIRD_PARTY_MARKERS.values())
+        if name in body and name not in installed
+    )
+    assert not claimed_but_gone, (
+        f"The privacy notice names {claimed_but_gone}, but nothing in the "
+        f"templates or settings installs them any more. Remove them from "
+        f"apps/core/templates/core/privacy.html — the notice should describe "
+        f"what this site does, not what it used to do."
+    )

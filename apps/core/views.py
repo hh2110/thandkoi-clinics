@@ -2,6 +2,9 @@
 
 from django.db import connection
 from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render
+
+from apps.core.models import ContactBankSettings, ContactPage
 
 #: Plan 18. Deliberately does NOT disallow the daily report pages, even
 #: though those are the pages we want out of search results. The two
@@ -127,3 +130,58 @@ def readyz(request):
 def robots_txt(request):
     """Serve ``/robots.txt``. See :data:`ROBOTS_TXT` for what it deliberately omits."""
     return HttpResponse(ROBOTS_TXT, content_type="text/plain")
+
+
+def privacy(request):
+    """The site's privacy notice (Plan 25).
+
+    Unauthenticated, and reachable with no prior step of any kind — a visitor
+    has to be able to read what this site does with their data, and the site's
+    analytics script has already run by the time they arrive here, so this page
+    can never be gated on anything.
+
+    **A plain view over a hardcoded template, and not a Wagtail page,
+    deliberately** (Plan 25 D3). Every other prose page on this site — About,
+    Contact, Donate — is editable content in ``/admin/``, and this one is not,
+    because its whole value is that each sentence was checked against the code
+    in this repository. As Wagtail content it would live in PostgreSQL, where
+    ``git log`` is not its history, no review would ever see a change to it,
+    and ``apps/core/tests.py``'s guards would have nothing to assert against.
+    "The notice changes in the same PR as the code it describes" is only
+    enforceable while the notice *is* code. Same reasoning, and the same
+    module, as :func:`robots_txt`.
+
+    It differs from :func:`robots_txt` in one respect: it is registered
+    **inside** ``i18n_patterns`` (``/en/privacy/``, ``/ur/privacy/``), because
+    unlike the crawler directives and the health probes this is a page a human
+    reads — which is the line ``config/urls.py``'s docstring draws.
+
+    ``contact_page_url`` mirrors ``core.models.DonatePage.get_context``: the
+    notice needs somewhere to send a reader when the Contact & Bank Details
+    setting has no email entered, and a hardcoded ``/en/contact/`` would break
+    the moment that page is renamed or the language changes. ``None`` when no
+    Contact page is published, in which case the template omits the link rather
+    than rendering a dead one — the same guard, for the same reason.
+
+    **That lookup is skipped entirely when an email is set**, which is the
+    normal state, so the fallback costs nothing on the path everyone takes.
+    ``for_request`` is what makes this free rather than a second query: it
+    caches the settings instance on the request (``wagtail.contrib.settings``),
+    and the footer's context processor then reuses that same instance while
+    rendering ``base.html``. Reading it here therefore adds no query at all,
+    and removes one. Worth the two lines in this project specifically — Plans
+    23 and 24 exist because ordinary page queries were keeping Neon's compute
+    awake, so "one more query per page, for a branch almost nobody hits" is not
+    a free choice here.
+
+    Note this view is *not* query-free the way :func:`healthz` is, and is not
+    meant to be: rendering ``base.html`` reads that same settings singleton on
+    every page of this site, footer included.
+    """
+    contact = ContactBankSettings.for_request(request)
+    contact_page = None if contact.email else ContactPage.objects.live().first()
+    return render(
+        request,
+        "core/privacy.html",
+        {"contact_page_url": contact_page.url if contact_page else None},
+    )

@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% comment %}
+The privacy notice (Plan 25 — .claude/plans/25-privacy-notice.md).
+
+HOW TO CHANGE THIS PAGE
+-----------------------
+Every factual claim below was checked against this repository's own code, not
+written from a privacy-policy template. The plan file carries the full
+claim-by-claim table of what was checked against what. If you change any of the
+following, this page changes in the SAME pull request:
+
+  * what `DeidentifiedVisit` stores            (apps/pipeline/models.py)
+  * what the parser reads or discards          (apps/pipeline/parser_tkc_daily_v1.py)
+  * what is sent to a model                    (apps/pipeline/ai.py, freetext.py)
+  * the analytics or error-tracking wiring     (templates/base.html, config/settings/prod.py)
+  * the third parties a visitor's browser talks to (base.html, contact_page.html)
+
+Two tests in apps/core/tests.py exist to make that non-optional: one fails if
+`DeidentifiedVisit`'s field list stops matching what this page describes, and
+one fails if the third parties wired into the code stop matching the ones named
+here — in BOTH directions, so over-claiming fails as loudly as under-claiming.
+
+>>> MAINTAINER DECISION STILL OPEN (Plan 25 D1) <<<
+The "Who is responsible" section below states a split: the clinic is the
+controller for clinic data and for anything sent to it directly, and North West
+Data Products Ltd is its processor for those AND a controller in its own right
+for this site's analytics and error diagnostics (it chose those tools, holds
+both accounts, and used their output for its own hosting decisions in Plans 23
+and 24). That reading is grounded in what the code shows; the legal entities,
+their registered details and the applicable jurisdiction are NOT this repo's to
+decide. Confirm before this page goes live.
+
+NOT a Wagtail page, deliberately (Plan 25 D3) — see apps.core.views.privacy for
+why a document whose value is its accuracy must live in git rather than in the
+admin.
+
+English only, deliberately (Plan 25 D2) — `locale/` holds no translation
+catalogue at all, so `{% translate %}` on this prose would mark strings nobody
+can translate, and an unreviewed Urdu rendering of this particular document
+would be worse than one honest language. The page serves at /ur/privacy/ too
+and says so in its own words below.
+{% endcomment %}
+
+{% block title %}{% translate "Privacy" %}{% endblock %}
+
+{% block content %}
+  {% with contact=settings.core.ContactBankSettings %}
+  <section class="section">
+    <div class="wrapper prose">
+      <h1>Privacy</h1>
+
+      <p class="intro">
+        This site is the public face of a clinic, so it is built to need almost
+        nothing from you. There is no account to make, no form to fill in, and
+        no cookie set on your browser. This page says exactly what does happen,
+        including the parts that are less comfortable to write down.
+      </p>
+
+      <p>
+        It is written for a person to read rather than for a lawyer, and every
+        statement on it was checked against the code that runs this site — not
+        copied from a template. Last updated 16 August 2026.
+      </p>
+
+      <p>
+        <em>
+          This notice is in English only for now. If you would like any of it
+          explained in Urdu or Pashto, please ask us using the contact details
+          at the end — we would rather explain it properly than publish a
+          translation nobody has checked.
+        </em>
+      </p>
+
+      <h2>Who is responsible</h2>
+      <p>
+        <strong>The Thandkoi Clinics</strong> — a not-for-profit, family-run
+        primary care clinic in Thandkoi, Swabi (Khyber Pakhtunkhwa, Pakistan) —
+        decides what this site is for and what it publishes, and is responsible
+        for the clinic's own patient records and for anything you send to the
+        clinic directly.
+      </p>
+      <p>
+        <strong>North West Data Products Ltd</strong> built this website and the
+        software behind it, and runs the hosting on the clinic's behalf. It is a
+        company registered in England and Wales, company number 17388764,
+        registered office Unit A, 82 James Carter Road, Mildenhall, Bury St.
+        Edmunds, IP28 7DE. For the clinic's data it acts on the clinic's
+        instructions. For two narrow things — the visitor statistics and the
+        error diagnostics described below — it decided to collect them, for its
+        own purpose of keeping the site running affordably, so it answers for
+        those itself.
+      </p>
+      <p>
+        In plain terms: questions about the clinic, its patients or its funding
+        go to the clinic; questions about the website's own analytics or error
+        reports go to
+        <a href="mailto:privacy@northwestdata.io">privacy@northwestdata.io</a>.
+        Either address will pass your question on if it arrives in the wrong
+        place.
+      </p>
+
+      <h2>What we collect from you when you visit</h2>
+      <p>
+        Nothing that you type, because there is nothing to type into. This site
+        has <strong>no contact form, no sign-up, no comments, no search box and
+        no payment page</strong>. The only form anywhere in this
+        software is the one clinic staff use to upload their daily export, and
+        that sits behind a login.
+      </p>
+      <p>
+        <strong>No cookies are set on your browser by this site.</strong> That
+        is why you have never seen a cookie banner here — there is nothing to
+        ask you about. Signed-in staff get a session cookie in the admin area;
+        an ordinary visitor gets none.
+      </p>
+      <p>
+        If you switch the site between light and dark, that choice is remembered
+        <em>inside your browser</em> and is never sent to us. It is why the
+        setting follows the device rather than you.
+      </p>
+      <p>
+        This site keeps no access log of its own: the web server runs without
+        one, so there is no file here recording which address requested which
+        page.
+      </p>
+
+      <h2>The outside services involved</h2>
+      <p>
+        Four, and no more. Three of them are ours, listed below with what each
+        one can see; the fourth is the embedded map, which is a different kind
+        of thing and is described straight after them.
+      </p>
+      <ul>
+        <li>
+          <strong>Umami Cloud</strong> counts visits. It is a deliberately
+          minimal, <strong>cookieless</strong> analytics tool: it sets nothing on
+          your browser, and nothing it reports back to us identifies a visitor.
+          What we look at is visitors, visits, page views, how long a visit
+          lasted, which pages were read and which site sent someone here. There
+          is no way for us to go from any of that to a person, and we do not try.
+        </li>
+        <li>
+          <strong>Sentry</strong> tells us when the site breaks. A report is sent
+          only when something goes wrong, and it carries the address of the page
+          and the technical detail of the fault, plus the name and version your
+          browser gives out. It is configured so that it carries
+          <strong>no IP address, no cookies, and none of the contents of any
+          form or upload</strong> — that last one matters here, because an upload
+          on this site is a file of patient records. Those reports are stored in
+          Sentry's European region.
+        </li>
+        <li>
+          <strong>Cloudflare</strong> stores and serves the photographs on this
+          site, from <code>media.thandkoiclinics.com</code>. Loading a page with
+          photos on it means your browser fetches them from there.
+        </li>
+      </ul>
+      <p>
+        The fourth is the <strong>one embedded item</strong> on the whole site:
+        the map on the Contact page, which comes from Google Maps. Unlike
+        everything above, Google can see your IP address and can set its own
+        cookies inside that map frame, under its own terms rather than ours. It
+        is the only place on this site where that happens, and it happens only
+        on the Contact page.
+      </p>
+      <p>
+        Beyond those: no advertising, no ad networks, no social-media tracking
+        pixels, no session recording, and no fonts loaded from anyone else's
+        servers — the typefaces are served from this site itself. The links to
+        our Facebook and Instagram pages are ordinary links; nothing is shared
+        with either company unless you click one.
+      </p>
+
+      <h2>Giving Zakat or Sadaqa</h2>
+      <p>
+        The Donate page is a page of information, not a checkout. It shows the
+        clinic's bank details and how to get in touch; there is no card form, no
+        payment processor and no donation button anywhere on this site. If you
+        make a transfer, that happens between you, your bank and the clinic's
+        bank — this website plays no part in it and is told nothing about it.
+      </p>
+      <p>
+        If you write or call about giving, or about giving medicine, equipment or
+        your time, your message goes to the clinic's own inbox or phone and stays
+        there. It is not stored in this website, and it is not passed to anyone
+        else.
+      </p>
+
+      <h2>Patient information, and what this site does with it</h2>
+      <p>
+        The clinic's own software holds full patient records. Once a day, staff
+        upload an export of the day's activity so the site can publish figures
+        about the clinic's work. That export contains real patient detail, so
+        this is the part of the system built most carefully — and it is worth
+        being precise about it rather than reassuring.
+      </p>
+
+      <h3>What is thrown away, and when</h3>
+      <p>
+        The uploaded file is read <strong>in memory, during the upload, and is
+        never written to disk or to the database</strong>. Nothing keeps a copy
+        of it. Of what it contains:
+      </p>
+      <ul>
+        <li>
+          <strong>Patient name, father's or husband's name, address, medical
+          record number and all vital signs are never read at all.</strong> The
+          software has no instruction anywhere to look at those columns.
+        </li>
+        <li>
+          <strong>Date of birth is read once, to work out which age band the
+          patient falls into, and then discarded.</strong> Only the band is
+          kept — 0&ndash;5, 6&ndash;18, 19&ndash;55, 56+, or "unknown" when the
+          export did not give a usable date. The date itself is never stored,
+          and no exact age is ever derived from it again.
+        </li>
+      </ul>
+
+      <h3>What is kept</h3>
+      <p>One record per visit, with no name and no way to reach a person through it:</p>
+      <ul>
+        <li>the date of the visit, and the department;</li>
+        <li>the age band, and whether the patient was recorded as male, female,
+          or neither of those / not recorded;</li>
+        <li>a rough location — a village or union council, never a street
+          address;</li>
+        <li>a diagnosis category picked from a fixed list of ten, rather than
+          what was written;</li>
+        <li>whether it was a first visit or a follow-up;</li>
+        <li>whether the visit was covered by Zakat or paid for;</li>
+        <li>the fees for registration, consultation, pharmacy, laboratory and
+          ultrasound.</li>
+      </ul>
+
+      <h3>The part that deserves plain language</h3>
+      <p>
+        Alongside those, <strong>seven columns of the clinician's own writing are
+        kept</strong>: presenting complaints, investigation, the written
+        diagnosis, prescribed medicine, the doctor's, nurse's or dietitian's
+        notes, diet and drug compliance, and the plan. That is more than the word
+        "de-identified" might suggest on its own, so here is exactly where it
+        stands.
+      </p>
+      <ul>
+        <li>
+          They are kept because the clinic's data-entry software cannot accept a
+          patient's name or identifier into those particular boxes — they contain
+          clinical description and nothing that points to a person.
+        </li>
+        <li>
+          <strong>None of them is ever shown on any public page.</strong> Not in
+          part, not in summary form, not anywhere.
+        </li>
+        <li>
+          They are used for one thing: an automatically written paragraph
+          describing the day's clinical pattern in general terms, grouped only as
+          adult men, adult women, and children.
+        </li>
+        <li>
+          That paragraph is only published for a group of <strong>at least three
+          patients</strong>. Below three it is not written and not shown, so a
+          quiet day's single patient can never become a sentence about them.
+          The threshold is enforced in code, as a hard rule, rather than by
+          instructing the model to write generally — an instruction is not a
+          control.
+        </li>
+      </ul>
+
+      <h3>Automatic writing, and what it is given</h3>
+      <p>
+        Some prose on this site is written by an AI model run by Anthropic: the
+        summary sentence on a daily report, the per-group paragraph described
+        just above, a note flagging which columns the day's export left empty,
+        and the monthly newsletter draft. Two rules govern all of it, and both
+        are enforced in code rather than by asking the model to behave:
+      </p>
+      <ul>
+        <li>
+          <strong>It is never given a patient record.</strong> It receives
+          counts, categories and the clinical text described above, grouped into
+          those three buckets. No name, no identifier, no date of birth, no exact
+          age, no location.
+        </li>
+        <li>
+          <strong>Every number you see was calculated here, not by the model.</strong>
+          The model writes sentences around figures that were already worked out;
+          it is never the source of a statistic.
+        </li>
+      </ul>
+      <p>
+        The monthly newsletter is a draft until a person reads and publishes it.
+      </p>
+
+      <h3>Where the figures appear</h3>
+      <p>
+        Daily and monthly report pages publish counts and percentages — how many
+        visits, the split by age and sex, how many were Zakat-supported. Nothing
+        on them identifies anyone. The daily pages additionally ask search
+        engines not to keep a copy, so their content does not settle permanently
+        into search results and web archives.
+      </p>
+
+      <h2>How long things are kept</h2>
+      <p>
+        The uploaded export lasts only as long as the upload itself. The
+        visit-level records above have no deletion date: they are what every
+        published figure is recalculated from, so a year of them is what makes a
+        yearly total possible. They contain no identity to delete.
+      </p>
+      <p>
+        Visitor statistics and error reports are kept for as long as Umami and
+        Sentry hold them under their own retention settings.
+      </p>
+
+      <h2>Asking us something, or asking us to stop</h2>
+      <p>
+        If you have been treated at the clinic and want to know what is held
+        about you, ask the clinic — its own records are the ones that identify
+        you, and this website does not hold them. If you want a figure corrected
+        or a page taken down, tell us and we will look at it.
+      </p>
+      <p>
+        {% if contact.email %}
+          Email <a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% if contact.phone %} or call {{ contact.phone }}{% endif %}.
+        {% elif contact_page_url %}
+          The clinic's current contact details are on the
+          <a href="{{ contact_page_url }}">Contact page</a>.
+        {% else %}
+          The clinic's current contact details are shown in the footer of every
+          page of this site.
+        {% endif %}
+        For anything about this website's own analytics or error reporting,
+        email <a href="mailto:privacy@northwestdata.io">privacy@northwestdata.io</a>.
+      </p>
+
+      <h2>When this page changes</h2>
+      <p>
+        If what this site does with information changes, this page changes in the
+        same release — not later. That is enforced by tests that fail the build
+        if the software starts collecting something this page does not describe,
+        or stops doing something it claims.
+      </p>
+    </div>
+  </section>
+  {% endwith %}
+{% endblock %}

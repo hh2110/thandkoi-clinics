@@ -51,6 +51,14 @@ if settings.DEBUG:
 # visiting "/" 404s here and LocaleMiddleware redirects to "/en/" (or the
 # visitor's detected language) — see apps/core/tests.py.
 urlpatterns += i18n_patterns(
+    # The privacy notice (Plan 25). Language-prefixed, unlike robots.txt and
+    # the health probes above: this is a page a person reads, not
+    # infrastructure, which is the line this module's docstring draws. It must
+    # stay ABOVE the Wagtail catch-all, or it is unreachable. Registering it
+    # here is also what makes the existing /privacy -> /en/privacy/ redirect
+    # (LocaleMiddleware, on an unrouted path) land on a real page rather than
+    # the 404 it hit until this plan.
+    path("privacy/", core_views.privacy, name="privacy"),
     path("", include(wagtail_urls)),
     prefix_default_language=True,
 )
