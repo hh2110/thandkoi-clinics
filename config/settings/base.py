@@ -95,6 +95,12 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "wagtail.contrib.redirects.middleware.RedirectMiddleware",
+    # Last on purpose (Plan 24 Track A). On a cache hit the response still
+    # unwinds through every middleware above, while everything below — notably
+    # RedirectMiddleware, which queries the database on every 404 — is skipped
+    # entirely. See apps/core/middleware.py for why a page cache is a compute
+    # measure here rather than a speed one.
+    "apps.core.middleware.PageCacheMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -222,6 +228,35 @@ WAGTAILDOCS_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "gif", "webp"]
 # (it ships in every page's HTML source either way), unlike SENTRY_DSN, so it
 # doesn't need Render's secret handling — a plain env var is enough.
 UMAMI_WEBSITE_ID = env("UMAMI_WEBSITE_ID", default="")
+
+# --- Page cache (Plan 24 Track A) -------------------------------------------
+# This exists to keep Neon's compute asleep, not to make pages faster: each
+# uncached request restarts Neon's five-minute idle clock, and ~740 crawler
+# page-loads a day were enough to burn the free tier's whole allowance. See
+# apps/core/middleware.py for the full reasoning.
+#
+# FileBasedCache rather than LocMemCache (D2): gunicorn runs multiple workers
+# and LocMem is per-process, so each worker would keep its own copy and the hit
+# rate — the only thing that matters here — would be divided by the worker
+# count. A file cache is shared by every worker on the instance and needs no
+# new service. Render's disk is ephemeral per deploy, which is fine: a cold
+# cache after a deploy costs one repopulation, not correctness.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": env("CACHE_DIR", default=str(BASE_DIR / ".page-cache")),
+        # Bounded so a runaway crawl over unique query strings can't fill the
+        # disk; Django culls a third of entries when the count is exceeded.
+        "OPTIONS": {"MAX_ENTRIES": 2000},
+    }
+}
+
+# Seconds to keep a cached page. Dialable from the Render dashboard with no
+# deploy, like DB_CONNECT_TIMEOUT and SENTRY_TRACES_SAMPLE_RATE. **0 turns the
+# cache off entirely** — that is this plan's rollback lever (D8). Read as a
+# string and coerced in apps.core.middleware.parse_cache_seconds so a blank or
+# mistyped value degrades to the default instead of breaking boot.
+CACHE_PAGE_SECONDS = env("CACHE_PAGE_SECONDS", default="")
 
 # --- Org contact / bank / socials ------------------------------------------
 # "Contact and bank details are configured in the running application, not

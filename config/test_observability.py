@@ -211,3 +211,76 @@ def test_bad_sample_rates_degrade_to_the_default_rather_than_raising(raw, caplog
         assert observability.parse_sample_rate(raw, default=1.0) == 1.0
 
     assert "SENTRY_TRACES_SAMPLE_RATE" in caplog.text
+
+
+# --- User-agent tagging (Plan 24 D7) -----------------------------------------
+
+
+def test_the_user_agent_becomes_a_searchable_tag():
+    """Plan 24 D7. ~740 crawler page-loads a day were keeping Neon's compute
+    awake and we could not say which crawlers they were: Sentry retains no
+    queryable user agent for these spans and gunicorn runs without
+    --access-logfile. A tag is searchable, so a week of this turns the
+    "should we put Cloudflare in front, and what do we let through?" question
+    into a measurement instead of a guess."""
+    event = {"request": {"headers": {"User-Agent": "GPTBot/1.2"}}}
+
+    tagged = observability.before_send_transaction(event, {})
+
+    assert tagged["tags"]["user_agent"] == "GPTBot/1.2"
+
+
+def test_the_user_agent_tag_is_set_on_error_events_too():
+    event = {"request": {"headers": {"User-Agent": "Googlebot/2.1"}}}
+
+    assert observability.before_send(event, {})["tags"]["user_agent"] == "Googlebot/2.1"
+
+
+def test_header_capitalisation_does_not_matter():
+    """Spelling varies by integration; don't assume the WSGI handler's."""
+    event = {"request": {"headers": {"user-agent": "CCBot/2.0"}}}
+
+    assert observability.before_send(event, {})["tags"]["user_agent"] == "CCBot/2.0"
+
+
+def test_a_long_user_agent_is_truncated():
+    """Sentry clips tag values around 200 chars; do it predictably ourselves."""
+    event = {"request": {"headers": {"User-Agent": "x" * 500}}}
+
+    assert len(observability.before_send(event, {})["tags"]["user_agent"]) == 200
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        {},
+        {"request": None},
+        {"request": {}},
+        {"request": {"headers": None}},
+        {"request": {"headers": {}}},
+    ],
+)
+def test_a_missing_user_agent_is_not_an_error(event):
+    """An event without one must pass through untouched, never raise — raising
+    inside a Sentry hook drops the event silently."""
+    result = observability.before_send(event, {})
+
+    assert result is event
+    assert "user_agent" not in result.get("tags", {})
+
+
+def test_tagging_does_not_reintroduce_the_request_body():
+    """The PHI scrub still runs first and still wins (invariant #1)."""
+    event = {
+        "request": {
+            "headers": {"User-Agent": "GPTBot/1.2"},
+            "data": "raw patient export bytes",
+            "body": "raw patient export bytes",
+        }
+    }
+
+    scrubbed = observability.before_send_transaction(event, {})
+
+    assert "data" not in scrubbed["request"]
+    assert "body" not in scrubbed["request"]
+    assert scrubbed["tags"]["user_agent"] == "GPTBot/1.2"

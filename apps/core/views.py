@@ -12,9 +12,56 @@ from django.http import HttpResponse, JsonResponse
 #: re-fetch it to learn it should go. So removal from the index is the meta
 #: tag's job (see ``pipeline/daily_report_page.html``) and this file covers
 #: only the admin surfaces, which have nothing to gain from being crawled.
-ROBOTS_TXT = """User-agent: *
+#: Agents disallowed outright (Plan 24 Track B, D6). These exist to scrape
+#: content for training corpora or resale, not to refer readers to the clinic,
+#: so there is nothing to lose by turning them away.
+#:
+#: **Googlebot and Bingbot are deliberately absent and must stay absent.** A
+#: not-for-profit clinic needs to be findable; suppressing search indexing to
+#: save compute would trade the site's purpose for its hosting bill.
+_SCRAPER_AGENTS = (
+    "GPTBot",
+    "ChatGPT-User",
+    "OAI-SearchBot",
+    "ClaudeBot",
+    "anthropic-ai",
+    "CCBot",
+    "Google-Extended",  # Gemini training corpus — NOT Googlebot's indexing
+    "PerplexityBot",
+    "Bytespider",
+    "Amazonbot",
+    "meta-externalagent",
+    "Applebot-Extended",
+    "Diffbot",
+    "omgili",
+)
+
+_SCRAPER_RULES = "\n\n".join(
+    f"User-agent: {agent}\nDisallow: /" for agent in _SCRAPER_AGENTS
+)
+
+#: Plan 18. Deliberately does NOT disallow the daily report pages, even
+#: though those are the pages we want out of search results. The two
+#: mechanisms pull in opposite directions: a crawler must be allowed to
+#: *fetch* a page before it can read the ``noindex`` meta tag telling it to
+#: drop the page. Disallowing ``/reports/`` here would strand any
+#: already-indexed URL in the index permanently, because Google would never
+#: re-fetch it to learn it should go. So removal from the index is the meta
+#: tag's job (see ``pipeline/daily_report_page.html``) and this file covers
+#: only the admin surfaces, which have nothing to gain from being crawled.
+#:
+#: Plan 24 adds the crawl budget half. ``Crawl-delay`` is honoured by Bing and
+#: Yandex and ignored by Google (which has its own rate control), and the
+#: scraper block above is honoured only by crawlers that choose to be polite.
+#: **This is advisory and is not the fix** — the crawlers costing the most
+#: compute may well be exactly the ones ignoring this file. The page cache in
+#: ``apps.core.middleware`` is what actually bounds the cost.
+ROBOTS_TXT = f"""User-agent: *
 Disallow: /admin/
 Disallow: /django-admin/
+Crawl-delay: 10
+
+{_SCRAPER_RULES}
 """
 
 

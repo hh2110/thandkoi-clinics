@@ -2034,6 +2034,37 @@ def test_robots_txt_does_not_disallow_the_report_pages(client):
     assert not any("report" in path for path in disallowed)
 
 
+def test_robots_txt_blocks_scrapers_but_never_search_engines(client):
+    """Plan 24 D6. A not-for-profit clinic needs to be findable, so saving
+    compute must never come at the cost of search indexing. Googlebot and
+    Bingbot must stay absent from the disallow list; the training-corpus and
+    resale scrapers, which refer no readers, are turned away."""
+    body = client.get("/robots.txt").content.decode()
+
+    blocked = {
+        line.split(":", 1)[1].strip().lower()
+        for line in body.splitlines()
+        if line.lower().startswith("user-agent:")
+        and line.split(":", 1)[1].strip() != "*"
+    }
+
+    assert "gptbot" in blocked
+    assert "ccbot" in blocked
+    # Google-Extended is the Gemini training corpus, NOT Googlebot's indexing.
+    assert "google-extended" in blocked
+
+    assert "googlebot" not in blocked
+    assert "bingbot" not in blocked
+
+
+def test_robots_txt_asks_for_a_crawl_delay(client):
+    """Advisory, and only honoured by some crawlers (Bing, Yandex; not Google).
+    Plan 24 is explicit that this is a cheap partial, not the fix."""
+    body = client.get("/robots.txt").content.decode()
+
+    assert "Crawl-delay:" in body
+
+
 # --- Plan 19: "Upcoming events" hero corner card -----------------------------
 
 

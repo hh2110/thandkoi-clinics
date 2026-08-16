@@ -2360,7 +2360,14 @@ def test_home_page_report_teaser_shows_photo_only_once_curated(client, home_page
     home_page.report_teaser_image = Image.objects.create(
         title="Camp photo", file=get_test_image_file()
     )
+    # Publish rather than a bare .save() (Plan 24): curating this image is an
+    # admin action that goes through Wagtail's publish flow, and publishing is
+    # what fires `page_published` and clears the page cache. A bare save() left
+    # the first response cached and this assertion reading stale HTML — a test
+    # artifact, but going through publish here also makes the test cover the
+    # real invalidation path rather than sidestepping it.
     home_page.save()
+    home_page.save_revision().publish()
 
     content = client.get("/en/").content.decode()
     assert "feature-split__image" in content
