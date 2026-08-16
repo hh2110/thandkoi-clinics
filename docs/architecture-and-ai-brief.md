@@ -115,6 +115,11 @@ Clinic software ──export──▶ daily .xls/.xlsx
 - **Gallery** — photos
 - **Donate (Zakat/Sadaqa)** — placeholder: bank details + "contact us to donate"
 - **Contact** — phone, email, socials, bank details, location
+- **Privacy** — the privacy notice (added 2026-08-16, Plan 25). Unlike every
+  other page above it is **not** Wagtail content: it is a hardcoded template
+  behind a plain view, because each of its claims is checked against this
+  repository's code and has to change in the same pull request the code does.
+  See [Plan 25](../.claude/plans/25-privacy-notice.md) D3.
 - **Admin (login only)** — upload, generate, review, download de-identified data
 
 > Contact and bank details are configured in the running application, not stored

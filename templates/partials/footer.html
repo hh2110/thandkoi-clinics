@@ -54,6 +54,19 @@ is suppressed there to avoid showing it twice in a row on one page (feedback,
   </div>
   <div class="wrapper site-footer__meta">
     <p>&copy; {% now "Y" %} {% translate "The Thandkoi Clinics" %}</p>
+    {% comment %}
+    The privacy notice (Plan 25). It lives HERE, in the shared footer partial,
+    rather than on any one page — that is what puts it on every page of the
+    site, which is the only way a notice is any use at all. apps/core/tests.py
+    asserts against this file itself, so moving the link onto a single template
+    fails the build instead of quietly stripping it from everywhere else.
+
+    No new CSS is needed: site-footer__meta is already a flex row, and
+    `.site-footer a` is already themed for both modes (see the paired-selector
+    note in components.css — a bare `.site-footer a` loses to base.css and
+    renders footer links invisible in light mode).
+    {% endcomment %}
+    <p><a href="{% url 'privacy' %}">{% translate "Privacy" %}</a></p>
     <p lang="ps" dir="rtl">هر چا لپاره د شفا او امید څراغ</p>
   </div>
 </footer>
