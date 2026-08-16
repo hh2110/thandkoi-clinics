@@ -1,9 +1,10 @@
 # Plan 26 — Free-text privacy architecture: stop sending raw clinical narrative
 
-**One line.** Replace the raw free-text payload with Python-computed theme
-counts under a per-cell suppression floor, so the seven clinical columns never
-leave our infrastructure and no summary can single out a patient — and fix the
-10 live pages that already do.
+**One line.** Give donors a better answer to "what is this clinic treating?" by
+moving it from a per-day AI summary over raw clinical narrative to
+Python-computed theme counts over a **month**, under a per-cell suppression
+floor — which is simultaneously more informative, and the only version that
+cannot single out a patient. Plus: fix the 10 live pages that already do.
 
 **Status: 📝 Drafted.** This is a plan, not an implementation. Nothing in the
 pipeline is changed by this branch.
@@ -259,6 +260,60 @@ first task below.
    not the counting. The win is that the floor is now **enforceable in Python on
    a number**, instead of requested of a model in prose.
 
+## 4a. The purpose these summaries serve — and why the *unit* is wrong
+
+**Maintainer, 2026-08-17: the summaries exist so the clinic's donors know what
+is being treated.** That is the requirement, and it reframes the design more
+usefully than anything above, because it separates the thing donors want from
+the thing that creates the risk.
+
+**The date is the identifier.** "One of four women, at this named village
+clinic, on 4 July" is identifying. "Among the 287 patients seen in June" is not.
+Nothing about a donor's question requires knowing which Tuesday — they want to
+know what this clinic treats and what their money paid for. So the
+informativeness and the risk separate cleanly along the **time axis**, not the
+content axis. Aggregating over a month is the single most effective
+de-identification move available here, and it costs the donor nothing.
+
+**Measured across the full 64-day history**, counting `(unit, theme)` cells:
+
+| Aggregation unit | Non-zero cells | Cells ≥3 | **Cells ≥5** | Largest cell |
+|---|---:|---:|---:|---:|
+| **Per day** | 333 | 58 | **8** | 8 |
+| **Per month** | 48 | 43 | **36** | **41** |
+
+At a cell floor of 5, the daily unit yields **8 publishable facts in three
+months**. The monthly unit yields **36** — roughly nine themes every month,
+every month, with cells up to 41.
+
+**This also explains §3's 58 blank-but-eligible slots.** At ~10 visits a day the
+daily page never had enough data to support a summary. The feature could only
+ever be empty or unsafe; there was no third option, and both failure modes
+duly appeared in production. The defect was never really the prompt — it was
+asking a per-day unit to carry a per-month question.
+
+**A monthly view is strictly more informative to a donor, not less.** June's
+287 visits give fever 41, body aches 31, respiratory 26, musculoskeletal 21,
+headache 15, gastrointestinal 12, ear/eye 11 — nine to twelve themes with real
+denominators, expressible as shares ("14% of June's visits were fever"). It
+also supports the thing a daily page structurally cannot: **trend**.
+Hypertension ran 4 → 19 → 7 across June/July/August, which is a real,
+donor-relevant story that no single day could ever show.
+
+**D4 — the surface, and the invariant-#4 bonus.** The natural homes already
+exist: Plan 13's rolling 30-day chart on `/reports/`, Plan 16's dashboard range
+aggregation, and Plan 09's monthly newsletter. Putting the prose in the
+**monthly newsletter** has a structural advantage worth taking: the newsletter
+is human-reviewed before publishing under CLAUDE.md invariant #4's normal rule.
+So moving it there means **the auto-publish exception for `freetext_summary`
+can simply be retired** rather than re-engineered — one fewer widened exception
+to defend, and a human reads every word before a donor does.
+
+**What the daily page keeps.** Its deterministic numbers — visit counts,
+gender/age splits, funding mix, the empty-column chips, the daily summary
+sentence over aggregates. Those are unaffected. Only the per-day free-text prose
+retires.
+
 ## 5. Recommendation
 
 **Do Option C now, as the primary control. Treat Option B as a genuine, cheap
@@ -297,16 +352,23 @@ Sequenced, cheapest and most urgent first:
    this is not a guarantee about future entries, and that the text is sent to
    Anthropic in the United States.
 
-**Phase 1 — the counts-only pipeline (days).**
+**Phase 1 — move the donor answer to a monthly unit (days).**
 6. Build the theme vocabulary module against `presenting_complaints`, mirroring
    `parser_registry`'s existing keyword-mapping pattern, with coverage measured
-   in a test.
-7. Replace `build_freetext_summary_payload` with a counts payload. Apply
-   `MIN_CELL` suppression in Python before the payload is constructed, exactly
-   as `empty_group_entries()` already substitutes sub-floor groups out.
-8. Keep the existing N=3 group floor. The two floors are complementary: one
-   gates the group, one gates the cell.
-9. Delete the free-text columns from the payload path entirely.
+   in a test (78.3% today — the test records it and makes regressions visible).
+7. Compute theme counts **per calendar month** (and/or rolling 30 days, reusing
+   Plan 16's range aggregation), as counts *and* shares of visits. Apply
+   `MIN_CELL = 5` suppression in Python — affordable at monthly denominators,
+   where 36 of 48 cells clear it.
+8. Publish it as a "What we treated" section on `/reports/` and in the monthly
+   newsletter, which is human-reviewed (D4). Any prose is drafted from the
+   suppressed counts alone — never from free text.
+9. **Retire the daily `freetext_summary` entirely**: drop the three fields from
+   the page, delete `build_freetext_summary_payload` and the free-text columns
+   from every payload path, and retire invariant #4's auto-publish exception for
+   it. `MIN_GROUP_VISITS_TO_SUMMARISE` goes with it — with no per-day summary
+   there is no group to floor.
+10. The daily page keeps every deterministic number it has today.
 
 **Phase 2 — optional, and the one that carries transferable knowledge.**
 10. Distil a small student model on synthetic examples (D1), download the
@@ -434,10 +496,16 @@ attention, not money.
   90-word generation a day it is the wrong instrument, but it is the right one
   for the distillation run itself if that is done on rented hardware rather than
   Distil Labs' free tier.
-- **Dropping the per-group prose entirely.** The risk assessment's alternative.
-  Parked because the maintainer has said the summaries are wanted and readers
-  like them, and C preserves them. Condition to revisit: C's vocabulary coverage
-  proves unworkable in practice.
+- **Dropping the per-group prose entirely** — *no longer parked; adopted, with
+  the substance relocated rather than deleted.* The risk assessment proposed
+  dropping it and the maintainer's objection was that donors want to know what
+  is being treated, which is correct and is the actual requirement (§4a). The
+  resolution is that the **daily** prose retires and the donor question is
+  answered **monthly**, where it is both safer and 4.5× richer. Nothing the
+  maintainer asked for is lost.
+- **A per-day narrative in any form.** Condition to revisit: clinic-day volume
+  rises far enough that per-day cells routinely clear a floor of 5. At ~10
+  visits/day it is nowhere close — 8 such cells existed in three months.
 - **The monthly newsletter's operator-typed notes and captions.** Out of scope
   here; needs its own decision.
 
