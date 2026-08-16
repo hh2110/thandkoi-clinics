@@ -1,10 +1,11 @@
 # Plan 26 — Free-text privacy architecture: stop sending raw clinical narrative
 
 **One line.** Give donors a better answer to "what is this clinic treating?" by
-moving it from a per-day AI summary over raw clinical narrative to
-Python-computed theme counts over a **month**, under a per-cell suppression
-floor — which is simultaneously more informative, and the only version that
-cannot single out a patient. Plus: fix the 10 live pages that already do.
+moving it from a per-day AI summary over raw clinical narrative to **monthly**
+theme counts under a per-cell suppression floor — where the themes are assigned
+by a **language model running on our own infrastructure**, so the notes are read
+intelligently but never leave, never persist, and can never be published as an
+individual. Plus: fix the 10 live pages that already do.
 
 **Status: 📝 Drafted.** This is a plan, not an implementation. Nothing in the
 pipeline is changed by this branch.
@@ -316,8 +317,20 @@ retires.
 
 ## 5. Recommendation
 
-**Do Option C now, as the primary control. Treat Option B as a genuine, cheap
-second step if richer prose is wanted later. Do not do Option A at all.**
+**Options B and C merge. Do not do Option A at all.**
+
+The final shape is **C's data architecture powered by B's model**: a
+locally-hosted language model reads the raw notes and assigns themes (B — so
+there is no keyword vocabulary to maintain, and it generalises to whatever
+clinic staff actually type), the themes are aggregated to **monthly** counts
+under a cell-suppression floor (C — so the published output can never describe
+an individual), and the narrative is discarded once classified (D5).
+
+The two options were never really rivals. B answers "how do we read the text
+without sending it away"; C answers "what unit can we safely publish". Each
+leaves the other's problem open — B alone still publishes single-patient
+sentences, C alone needs a regex someone has to curate. Together they close
+both.
 
 Sequenced, cheapest and most urgent first:
 
@@ -353,15 +366,13 @@ Sequenced, cheapest and most urgent first:
    Anthropic in the United States.
 
 **Phase 1 — move the donor answer to a monthly unit (days).**
-6. Build the theme vocabulary module against `presenting_complaints`, mirroring
-   `parser_registry`'s existing keyword-mapping pattern, with coverage measured
-   in a test (78.3% today — the test records it and makes regressions visible).
-   **Handle negation**: a bare `\yfever\y` also matches "no fever". Measured, the
-   error is currently negligible — 0 uses of denies/afebrile/nil anywhere, and 1
-   negated mention out of 114 fever mentions across the whole corpus — but
-   clinical documentation style can change, and a negation-window check is a few
-   lines. Note the matching runs over `presenting_complaints || clinical_notes`;
-   the 78.3% figure is for `presenting_complaints` alone.
+6. **A locally-hosted language model classifies each visit** against a small,
+   stable taxonomy (~15 clinical concepts plus `uncategorised`), running
+   in-process at ingest. See D7 — this replaces the regex vocabulary as the
+   primary mechanism, at the maintainer's direction (2026-08-17), and it is the
+   right call: a hand-maintained keyword list is exactly the kind of artefact
+   that rots in a one-part-time-maintainer project, and the measured 78.3%
+   coverage is the evidence for that, not against it.
 7. Compute theme counts **per calendar month** (and/or rolling 30 days, reusing
    Plan 16's range aggregation), as counts *and* shares of visits. Apply
    `MIN_CELL = 5` suppression in Python — affordable at monthly denominators,
@@ -414,20 +425,80 @@ made deliberately: extend the vocabulary while the text is still there, measure
 coverage, and only then discard. Sequencing note: **Phase 1 before D5**, so the
 vocabulary is proven against real data before the data is destroyed.
 
-**Phase 2 — optional, and the one that carries transferable knowledge.**
-10. Distil a small student model on synthetic examples (D1), download the
-    weights, and run it on a Render cron job (~$1/month). **D6 — its best job is
-    classification, not prose.** The instinct is to use a local model to *write*
-    the summary, but writing 90 words from a dozen integers is a task a fixed
-    template does adequately and a regex-free human does better. The job that
-    actually needs a model is the one regex does imperfectly: deciding that
-    "burning micturition", "temp 101" and a misspelling all belong to a theme —
-    i.e. lifting classification coverage above 78.3%. Run *inside* the ingest
-    request, a local classifier has exactly the same privacy properties as the
-    regex (nothing leaves, nothing is stored under D5) while removing the
-    vocabulary's main weakness. That makes Phase 2 genuinely additive rather than
-    a re-implementation of something already solved, and it is the version worth
-    building for the transferable knowledge.
+**D7 — a local language model does the classification, not a regex**
+(maintainer direction, 2026-08-17, and it supersedes the earlier D6 framing
+that had this as an optional Phase 2).
+
+*The objection, which is correct:* the point of using a model is that it
+generalises. It recognises "burning micturition", "temp 101", a misspelling, a
+transliterated Urdu word, and a presentation nobody anticipated — none of which
+a keyword list handles without someone forever adding strings to it. Asking a
+part-time maintainer to curate a spelling list is how the feature quietly
+degrades.
+
+*The resolution:* the model reads the raw notes, and it reads them **on our own
+infrastructure**. Nothing about the privacy architecture changes — the text is
+classified inside the request that parsed it and then discarded (D5); no free
+text ever crosses a network boundary. What changes is that the classifier is a
+model rather than a regex, so there is no vocabulary to maintain.
+
+*What you maintain instead:* a taxonomy of ~15 clinical **concepts**, not
+strings. "Is there a category for maternal health?" is a question that comes up
+once or twice a year; "did they type micturition or micturation?" is one that
+never stops. That difference is the whole argument.
+
+*What this does to invariant #3* ("numbers are deterministic — all published
+figures are computed in Python"). This is a genuine widening and must be decided
+deliberately, not assumed:
+
+- The **classification** becomes model-derived. The **counts** do not: each
+  visit's labels are stored once at ingest, and every published figure is then
+  a `count(*)` in SQL over stored flags — reproducible, auditable, and
+  recomputable without re-running any model.
+- The model never sees a number and never produces one. Invariant #3's actual
+  hazard — a model inventing or restating a statistic — is untouched.
+- **Self-hosting makes this *more* deterministic than the status quo, not
+  less.** Pinned local weights classify the same input identically for as long
+  as we keep them. The daily-summary and newsletter calls this project already
+  depends on run against a hosted model that can change underneath us with no
+  notice. This is the stronger position.
+- Store the classifier's model identifier and version alongside the flags, so a
+  future change in labelling is attributable rather than mysterious.
+
+*The regex does not disappear — it becomes the test oracle.* Keep the keyword
+vocabulary in the test suite only, asserting the model agrees on the obvious
+cases (fever, cough, back pain). That is a real CI smoke test on classifier
+quality with no production dependency, and it turns the 78.3% measurement into
+a regression baseline rather than a maintenance burden.
+
+*Operational consequence, and the one real cost.* Classification now sits on the
+ingest path, so the model must be reachable when an upload happens, and the
+Render `starter` instance (512 MB) cannot host it. Two shapes, and the choice is
+a genuine privacy/cost trade for the maintainer:
+
+| | How it works | Raw text at rest | Cost |
+|---|---|---|---|
+| **A. Classify in-request** | A small private Render service runs the model; the web app calls it during ingest, then discards the text | **Never persisted** | ~$25/mo (2 GB Standard, 1–1.7B Q4) |
+| **B. Classify nightly** | Text is stored, a cron job classifies and then purges it | Persisted **< 24 h**, never long-term | ~$1/mo (cron only) |
+
+A is the cleaner privacy story; B gets most of the benefit for a twentieth of
+the cost and still ends the indefinite retention that is the actual problem
+today. **Recommendation: B to start**, because it is reversible, cheap, and the
+sub-24-hour window is a vastly smaller exposure than the current forever; move
+to A if the clinic's data ever warrants it.
+
+*If classification fails*, the upload must fail loudly rather than silently
+storing unclassified visits — ingest is a human-triggered admin action, so a
+visible error is the correct behaviour. Under shape B, unclassified text is
+retried on the next run and only purged once classification has succeeded.
+
+**Phase 2 — the distillation itself (the transferable-knowledge piece).**
+10. Distil the classifier with Distil Labs on synthetic examples (D1), download
+    the weights (`distil slm download`), quantise, and serve with `llama.cpp`.
+    A ~1.7B Q4 student is ~1.4 GB. Start with an off-the-shelf small instruct
+    model to prove the shape end to end, then distil to shrink and sharpen it —
+    the fallback if distillation underperforms is simply the larger
+    off-the-shelf model, which keeps the privacy properties either way.
 
 **D2 — HIPAA readiness, not ZDR.** The risk assessment recommended requesting
 zero data retention through Anthropic sales, and dismissed HIPAA readiness as a
