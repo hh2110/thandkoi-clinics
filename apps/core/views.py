@@ -4,7 +4,7 @@ from django.db import connection
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 
-from apps.core.models import ContactPage
+from apps.core.models import ContactBankSettings, ContactPage
 
 #: Plan 18. Deliberately does NOT disallow the daily report pages, even
 #: though those are the pages we want out of search results. The two
@@ -159,16 +159,27 @@ def privacy(request):
     ``contact_page_url`` mirrors ``core.models.DonatePage.get_context``: the
     notice needs somewhere to send a reader when the Contact & Bank Details
     setting has no email entered, and a hardcoded ``/en/contact/`` would break
-    the moment the page is renamed or the language changes. ``None`` when no
+    the moment that page is renamed or the language changes. ``None`` when no
     Contact page is published, in which case the template omits the link rather
     than rendering a dead one — the same guard, for the same reason.
 
+    **That lookup is skipped entirely when an email is set**, which is the
+    normal state, so the fallback costs nothing on the path everyone takes.
+    ``for_request`` is what makes this free rather than a second query: it
+    caches the settings instance on the request (``wagtail.contrib.settings``),
+    and the footer's context processor then reuses that same instance while
+    rendering ``base.html``. Reading it here therefore adds no query at all,
+    and removes one. Worth the two lines in this project specifically — Plans
+    23 and 24 exist because ordinary page queries were keeping Neon's compute
+    awake, so "one more query per page, for a branch almost nobody hits" is not
+    a free choice here.
+
     Note this view is *not* query-free the way :func:`healthz` is, and is not
-    meant to be: rendering ``base.html`` reads the site-wide Contact & Bank
-    Details setting through the Wagtail settings context processor on every
-    page of this site, footer included.
+    meant to be: rendering ``base.html`` reads that same settings singleton on
+    every page of this site, footer included.
     """
-    contact_page = ContactPage.objects.live().first()
+    contact = ContactBankSettings.for_request(request)
+    contact_page = None if contact.email else ContactPage.objects.live().first()
     return render(
         request,
         "core/privacy.html",

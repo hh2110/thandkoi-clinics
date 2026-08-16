@@ -104,8 +104,8 @@ and says so in its own words below.
       <h2>What we collect from you when you visit</h2>
       <p>
         Nothing that you type, because there is nothing to type into. This site
-        has <strong>no contact form, no sign-up, no comments, no search box that
-        we record, and no payment page</strong>. The only form anywhere in this
+        has <strong>no contact form, no sign-up, no comments, no search box and
+        no payment page</strong>. The only form anywhere in this
         software is the one clinic staff use to upload their daily export, and
         that sits behind a login.
       </p>
@@ -126,16 +126,20 @@ and says so in its own words below.
         page.
       </p>
 
-      <h2>The three outside services involved</h2>
-      <p>Three, and no more. They are all listed here, including what each one can see.</p>
+      <h2>The outside services involved</h2>
+      <p>
+        Four, and no more. Three of them are ours, listed below with what each
+        one can see; the fourth is the embedded map, which is a different kind
+        of thing and is described straight after them.
+      </p>
       <ul>
         <li>
           <strong>Umami Cloud</strong> counts visits. It is a deliberately
           minimal, <strong>cookieless</strong> analytics tool: it sets nothing on
-          your browser and it never identifies anyone. What we look at is
-          visitors, visits, page views, how long a visit lasted, which pages were
-          read and which site sent someone here. There is no way for us to go
-          from any of that to a person, and we do not try.
+          your browser, and nothing it reports back to us identifies a visitor.
+          What we look at is visitors, visits, page views, how long a visit
+          lasted, which pages were read and which site sent someone here. There
+          is no way for us to go from any of that to a person, and we do not try.
         </li>
         <li>
           <strong>Sentry</strong> tells us when the site breaks. A report is sent
@@ -154,11 +158,12 @@ and says so in its own words below.
         </li>
       </ul>
       <p>
-        There is <strong>one embedded item</strong> on the whole site: the map on
-        the Contact page comes from Google Maps. Unlike everything above, Google
-        can see your address and can set its own cookies inside that map frame,
-        under its own terms rather than ours. It is the only place on this site
-        where that happens.
+        The fourth is the <strong>one embedded item</strong> on the whole site:
+        the map on the Contact page, which comes from Google Maps. Unlike
+        everything above, Google can see your IP address and can set its own
+        cookies inside that map frame, under its own terms rather than ours. It
+        is the only place on this site where that happens, and it happens only
+        on the Contact page.
       </p>
       <p>
         Beyond those: no advertising, no ad networks, no social-media tracking
@@ -207,8 +212,9 @@ and says so in its own words below.
         <li>
           <strong>Date of birth is read once, to work out which age band the
           patient falls into, and then discarded.</strong> Only the band is
-          kept — one of 0&ndash;5, 6&ndash;18, 19&ndash;55 or 56+. The date
-          itself is never stored.
+          kept — 0&ndash;5, 6&ndash;18, 19&ndash;55, 56+, or "unknown" when the
+          export did not give a usable date. The date itself is never stored,
+          and no exact age is ever derived from it again.
         </li>
       </ul>
 
@@ -217,7 +223,7 @@ and says so in its own words below.
       <ul>
         <li>the date of the visit, and the department;</li>
         <li>the age band, and whether the patient was recorded as male, female,
-          or neither/not recorded;</li>
+          or neither of those / not recorded;</li>
         <li>a rough location — a village or union council, never a street
           address;</li>
         <li>a diagnosis category picked from a fixed list of ten, rather than
@@ -255,17 +261,20 @@ and says so in its own words below.
         <li>
           That paragraph is only published for a group of <strong>at least three
           patients</strong>. Below three it is not written and not shown, so a
-          single day's single patient can never become a sentence about them.
-          This rule is enforced in code, not by asking the writing tool nicely —
-          because a previous version relied on the latter and it did not hold.
+          quiet day's single patient can never become a sentence about them.
+          The threshold is enforced in code, as a hard rule, rather than by
+          instructing the model to write generally — an instruction is not a
+          control.
         </li>
       </ul>
 
       <h3>Automatic writing, and what it is given</h3>
       <p>
-        Some prose on this site — a summary sentence on a daily report, and the
-        monthly newsletter draft — is written by an AI model run by Anthropic.
-        Two rules govern it, and both are enforced in code:
+        Some prose on this site is written by an AI model run by Anthropic: the
+        summary sentence on a daily report, the per-group paragraph described
+        just above, a note flagging which columns the day's export left empty,
+        and the monthly newsletter draft. Two rules govern all of it, and both
+        are enforced in code rather than by asking the model to behave:
       </p>
       <ul>
         <li>
