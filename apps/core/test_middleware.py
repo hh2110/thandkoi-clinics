@@ -18,6 +18,7 @@ from apps.core.middleware import (
     cache_key_for,
     clear_page_cache,
     is_cacheable_request,
+    is_scanner_path,
     parse_cache_seconds,
     should_cache_response,
 )
@@ -319,3 +320,132 @@ def test_a_failing_cache_write_still_serves_the_page(rf, clean_cache, monkeypatc
 
     assert response.status_code == 200
     assert counter["calls"] == 1
+
+
+@pytest.fixture
+def site_with_home(db):
+    """A HomePage as the default site root, so real URLs actually resolve.
+
+    Mirrors the `home_page` fixture in apps/core/tests.py; duplicated rather
+    than imported because that one is module-local.
+    """
+    from wagtail.models import Page, Site
+
+    from apps.core.factories import HomePageFactory
+
+    root = Page.get_first_root_node()
+    home = HomePageFactory(
+        parent=root, title="The Thandkoi Clinics", slug="thandkoi-home"
+    )
+    site = Site.objects.get(is_default_site=True)
+    old_root = site.root_page
+    site.root_page = home
+    site.save()
+    if old_root and old_root.pk != home.pk:
+        old_root.delete()
+    return home
+
+
+# --- Scanner short-circuit (Plan 24 Track E) ---------------------------------
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/wp-admin/install.php",
+        "/wp-login.php",
+        "/xmlrpc.php",
+        "/en/wp-admin/setup-config.php",  # language-prefixed by LocaleMiddleware
+        "//blog/wp-includes/wlwmanifest.xml",
+        "/wp-content/uploads/x.php",
+        "/wp-json/wp/v2/users",
+        "/en/wp/",
+        "/en/wordpress/",
+        "/phpmyadmin/index.php",
+        "/.env",
+        "/.git/config",
+        "/examples/x/.env",
+        "/shell.aspx",
+        "/cmd.jsp",
+    ],
+)
+def test_scanner_paths_are_recognised(path):
+    assert is_scanner_path(path) is True
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/en/",
+        "/en/about/",
+        "/en/reports/",
+        "/en/reports/2026-08-15/",
+        "/en/reports/dashboard/",
+        "/ur/about/",
+        "/healthz",
+        "/readyz",
+        "/robots.txt",
+        "/admin/",
+        "/admin/login/",
+        "/documents/1/report.pdf",
+        "/static/css/base.css",
+        # Generic English words scanners also probe. The same 2026-08-16 scan
+        # hit /news/ and /blog/, and this clinic could legitimately publish
+        # either — blocking them would break a real page the day it is added.
+        "/en/news/",
+        "/en/blog/",
+        "/en/newsletters/",
+        "/en/our-work/",
+        # A human mistyping a URL must still reach the branded 404, not the
+        # bare one meant for bots.
+        "/en/no-such-page/",
+        "/en/abuot/",
+    ],
+)
+def test_legitimate_and_mistyped_paths_are_not_short_circuited(path):
+    assert is_scanner_path(path) is False
+
+
+def test_well_known_is_deliberately_not_blocked():
+    """404ing an ACME challenge could break TLS renewal for the whole site.
+
+    Recorded as a test so nobody adds it later thinking it was an oversight.
+    """
+    assert is_scanner_path("/.well-known/acme-challenge/tokenvalue") is False
+
+
+@pytest.mark.django_db
+def test_a_scanner_probe_costs_zero_database_queries(client, django_assert_num_queries):
+    """The whole point of Track E.
+
+    Before this, one probe cost three queries — Wagtail's page lookup,
+    RedirectMiddleware's redirect lookup, and ContactBankSettings while
+    rendering 404.html's footer — and, far more expensively, restarted Neon's
+    five-minute idle clock. Asserted over the whole request rather than on the
+    middleware in isolation, because the queries came from middleware and
+    template rendering, not from any view.
+    """
+    with django_assert_num_queries(0):
+        response = client.get("/wp-admin/install.php")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_a_mistyped_url_still_renders_the_branded_404(client, site_with_home):
+    """The bare 404 is for bots only; humans keep the real page.
+
+    If this starts failing, the marker list has grown too broad.
+    """
+    response = client.get("/en/no-such-page/")
+
+    assert response.status_code == 404
+    assert b"Not Found" != response.content
+    # The branded page extends base.html, so it carries the site chrome.
+    assert b"Thandkoi" in response.content
+
+
+@pytest.mark.django_db
+def test_real_pages_still_serve(client, site_with_home):
+    assert client.get("/en/").status_code == 200

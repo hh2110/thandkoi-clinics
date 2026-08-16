@@ -178,6 +178,80 @@ deploy, which is the rollback lever a flag would otherwise provide.
 
 ---
 
+## Track E — a DB-free 404 for scanner probes (added 2026-08-16, post-release)
+
+**Tracks A–C shipped as `v2026.08.16`. Measured 3.9 hours later, they moved the
+number by only ~6%** — 29.5% awake / 1.80 CU-hr/day, against 31% / 1.92 before.
+Still ~2.1× over the 0.855 CU-hr/day the remaining budget allows, and the
+~23 August exhaustion date is unchanged.
+
+**The cache itself is not the problem — it is verified working in production.**
+With the compute `idle` (suspended 21:00:02, five minutes after last activity),
+two full page loads of `/en/` returned 200 in 0.66 s and 0.26 s while
+`last_active` stayed at 20:54:59 and `suspended_at` stayed at 21:00:02. Zero
+database contact. No cache-failure warnings in the Render logs either.
+
+What changed is **which bottleneck dominates**. Track A caches 200s only, so
+what still wakes the compute is the first request of each spread-out visit and,
+notably, **404s from vulnerability scanners**. Caught in the act: a
+`Not Found: /wp-admin/install.php` at 20:54:49 was the last request keeping the
+compute awake before it suspended.
+
+**This reverses Plan 24's own opening judgement, and that is the point.** The
+plan dismissed Plan 23's parked "DB-free 404 for scanner paths" as "nearly
+useless" because scanners were ~112 requests in three days against 2,219 page
+loads. That was correct *then*. Once the cache absorbed the 200s, the 404s were
+what remained — each costing a full five-minute wake exactly like any other
+request.
+
+Measured cost of one probe: **seven** database queries (Wagtail's page lookup,
+`RedirectMiddleware`'s redirect lookup, and the settings reads behind
+`404.html` → `base.html`'s footer and navigation), confirmed by disabling the
+short-circuit and watching the guard report "Expected to perform 0 queries but
+7 were done".
+
+**D11 — match narrowly, and never on a generic word.** `.php` (plus `.asp`,
+`.jsp`, `.cgi`) is the highest-value rule because this site serves no PHP under
+any circumstance, so one suffix covers most of the long tail with no bot list to
+maintain. The substring markers are WordPress-specific paths and dotfiles only.
+The same 2026-08-16 scan also probed `/news/` and `/blog/` — **deliberately not
+blocked**, because this clinic could legitimately publish either and a
+wrongly-blocked page is a broken site, where a missed probe costs one wake.
+
+**D12 — `/.well-known/` is deliberately never blocked**, recorded as a test so
+nobody adds it later thinking it was an oversight. Render terminates TLS at its
+edge so the app should never see an ACME challenge, but "should never" is not
+"cannot", and 404ing a certificate-renewal challenge would break HTTPS for the
+whole site — a catastrophic downside against saving at most one wake.
+
+**D13 — return a bare body, not the branded 404.** Rendering `404.html` is
+itself several of the queries being removed. A scanner gains nothing from a
+styled page; humans who mistype a URL don't match these patterns and still get
+the normal branded 404, which is asserted by its own test.
+
+**Verified through the running app** against real Postgres, counting the
+database's own transactions with a zero-request control:
+
+```
+control (0 requests)                  -> 0 app transactions
+5x scanner probes                     -> 0 app transactions
+1x human mistyped URL (branded 404)   -> 7 app transactions
+```
+
+Both halves matter: probes now cost nothing, and a human mistyping a URL still
+pays for — and receives — the full branded 404. Status codes checked in the
+same run: `/wp-admin/install.php` 404, `/en/no-such-page/` 404, `/en/` 200,
+`/healthz` 200. The zero-query guard was mutation-tested by disabling the
+short-circuit, which is how the "7 queries" figure above was measured.
+
+**Honest sizing.** In the 3.9-hour sample the scanner 404s formed roughly two of
+about six wake windows, so expect a 20–35% cut on top of the cache. That is
+worth having and it is the correct next change, but it does **not** obviously
+close a 2.1× gap. The Neon upgrade remains the backstop, and the maintainer has
+deferred that decision by 24 hours (2026-08-16) to see this measured first.
+
+---
+
 ## Parked, deliberately
 
 - **Cloudflare in front of the site (Track D).** Would let Cloudflare's own

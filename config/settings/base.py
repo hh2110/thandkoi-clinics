@@ -77,6 +77,14 @@ MIDDLEWARE = [
     # WhiteNoise serves static files in every environment; kept high in the
     # stack so it runs right after the security middleware.
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Near the top on purpose (Plan 24 Track E). Answers obvious scanner probes
+    # with a bare 404 before anything can touch the database. It MUST stay
+    # above RedirectMiddleware — that middleware acts on the 404 *response*, so
+    # short-circuiting from below it would still let it run a redirect lookup,
+    # one of the seven queries a probe was measured to cost. Above
+    # SessionMiddleware too, so a probe carrying a stale cookie can't trigger a
+    # session load.
+    "apps.core.middleware.ScannerShortCircuitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     # Must come after SessionMiddleware, before CommonMiddleware (Django
     # docs). Activates the request language from the /en/, /ur/ URL prefix
