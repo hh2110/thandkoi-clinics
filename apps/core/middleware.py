@@ -45,9 +45,121 @@ bug arrives.
 import logging
 
 from django.core.cache import cache
+from django.http import HttpResponseNotFound
 from django.utils.cache import get_max_age
 
 logger = logging.getLogger(__name__)
+
+
+# --- Scanner short-circuit (Plan 24 Track E) ---------------------------------
+#
+# Measured 2026-08-16, after Track A's cache shipped: the cache works (two page
+# loads served with the Neon compute asleep and zero database contact), but the
+# burn rate only fell ~6%, because the bottleneck moved. What now wakes the
+# compute is largely **404s from vulnerability scanners**, which Track A
+# deliberately never caches — it stores 200s only.
+#
+# Each such probe cost **seven** database queries — measured, by disabling the
+# short-circuit and watching ``test_a_scanner_probe_costs_zero_database_queries``
+# report "Expected to perform 0 queries but 7 were done" — and, far more
+# expensively, restarted Neon's five-minute idle clock. They come from three
+# places:
+#
+#   1. Wagtail's catch-all looking the path up in the page tree.
+#   2. ``RedirectMiddleware`` firing on the 404 and looking for a redirect.
+#   3. ``404.html`` extending ``base.html``, whose footer and navigation read
+#      site settings through Wagtail's settings context processor.
+#
+# A scanner gets nothing from a branded 404 page, so recognising the obviously
+# bogus paths and answering with a bare 404 — no page lookup, no redirect
+# lookup, no template — removes all three.
+#
+# Caught in the act: a ``Not Found: /wp-admin/install.php`` at 20:54:49 on
+# 2026-08-16 was the last request keeping the compute awake before it suspended.
+
+#: Suffixes that can never be legitimate here. This is the single
+#: highest-value rule: a Django/Wagtail site serves **no PHP under any
+#: circumstance**, so one check covers ``wp-login.php``, ``install.php``,
+#: ``xmlrpc.php``, ``phpmyadmin/index.php`` and most of the long tail without
+#: anyone maintaining a list of bots.
+SCANNER_SUFFIXES = (".php", ".asp", ".aspx", ".jsp", ".cgi")
+
+#: Substrings that mark a request as a scanner probe wherever they appear in
+#: the path. Substring rather than prefix matching on purpose: the same
+#: scanners hit both ``/wp-admin/…`` and ``/en/wp-admin/…`` (a bare probe gets
+#: language-prefixed by ``LocaleMiddleware`` first).
+#:
+#: **Kept deliberately narrow.** Every entry is either WordPress-specific or a
+#: dotfile that no page slug could produce. Generic English words are excluded
+#: even when scanners use them: the same scan on 2026-08-16 probed ``/news/``
+#: and ``/blog/``, and this clinic could legitimately publish either, so
+#: blocking them would break a real page the day someone adds it. A missed
+#: probe costs one wake; a wrongly-blocked page is a broken site.
+SCANNER_PATH_MARKERS = (
+    "/wp-admin",
+    "/wp-includes",
+    "/wp-content",
+    "/wp-json",
+    "/wp-login",
+    "/wp/",
+    "/wordpress/",
+    "wlwmanifest",
+    "/xmlrpc",
+    "/phpmyadmin",
+    "/.env",
+    "/.git/",
+    "/.aws",
+    "/.ssh",
+)
+
+#: Deliberately NOT blocked, recorded so nobody adds it later thinking it was
+#: an oversight: ``/.well-known/``. Render terminates TLS at its edge so the
+#: app should never see an ACME challenge — but "should never" is not "cannot",
+#: and 404ing a certificate-renewal challenge would break HTTPS for the whole
+#: site. That is a catastrophic downside against saving at most one wake.
+
+
+def is_scanner_path(path):
+    """True for paths only a vulnerability scanner would ask for.
+
+    Pure string matching — no database, no settings, nothing that could make
+    the cheap path expensive.
+    """
+    lowered = path.lower()
+    if lowered.endswith(SCANNER_SUFFIXES):
+        return True
+    return any(marker in lowered for marker in SCANNER_PATH_MARKERS)
+
+
+class ScannerShortCircuitMiddleware:
+    """Answer obvious scanner probes with a bare 404, touching no database.
+
+    Placement is load-bearing and it must stay **above**
+    ``wagtail.contrib.redirects.middleware.RedirectMiddleware`` in
+    ``MIDDLEWARE``. ``RedirectMiddleware`` acts on the 404 *response*, so a
+    short-circuit from below it would still let it run its redirect lookup —
+    one of the three queries this exists to avoid. Above it, it never sees the
+    request at all.
+
+    It is also above ``SessionMiddleware`` and ``AuthenticationMiddleware``, so
+    a probe carrying a stale cookie cannot trigger a session load either.
+
+    Returns a plain body rather than rendering ``404.html`` **on purpose**:
+    that template extends ``base.html``, whose footer reads
+    ``ContactBankSettings`` from the database. Rendering a branded 404 for a
+    bot would reintroduce the very query being removed, and a scanner gains
+    nothing from it. Humans who mistype a URL are unaffected — their paths
+    don't match these patterns, so they still get the normal branded page.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if is_scanner_path(request.path):
+            return HttpResponseNotFound(b"Not Found")
+        return self.get_response(request)
+
 
 #: Cache-key namespace. Bumping this string invalidates every cached page at
 #: once, which is the cheap escape hatch if a bad entry is ever suspected.
