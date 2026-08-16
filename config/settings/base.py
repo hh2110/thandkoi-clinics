@@ -81,8 +81,9 @@ MIDDLEWARE = [
     # with a bare 404 before anything can touch the database. It MUST stay
     # above RedirectMiddleware — that middleware acts on the 404 *response*, so
     # short-circuiting from below it would still let it run a redirect lookup,
-    # one of the three queries this removes. Above SessionMiddleware too, so a
-    # probe carrying a stale cookie can't trigger a session load.
+    # one of the seven queries a probe was measured to cost. Above
+    # SessionMiddleware too, so a probe carrying a stale cookie can't trigger a
+    # session load.
     "apps.core.middleware.ScannerShortCircuitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     # Must come after SessionMiddleware, before CommonMiddleware (Django

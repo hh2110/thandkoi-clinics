@@ -138,8 +138,8 @@ class ScannerShortCircuitMiddleware:
     ``wagtail.contrib.redirects.middleware.RedirectMiddleware`` in
     ``MIDDLEWARE``. ``RedirectMiddleware`` acts on the 404 *response*, so a
     short-circuit from below it would still let it run its redirect lookup —
-    one of the three queries this exists to avoid. Above it, it never sees the
-    request at all.
+    one of the seven queries a probe was measured to cost. Above it, it never
+    sees the request at all.
 
     It is also above ``SessionMiddleware`` and ``AuthenticationMiddleware``, so
     a probe carrying a stale cookie cannot trigger a session load either.
