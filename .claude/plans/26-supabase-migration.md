@@ -69,13 +69,22 @@ refuses to let a deadline choose that.
 
 ### Two findings that change the shape of the work
 
-**1. Neon runs Postgres 18; Supabase runs 17.** So this is a major-version
-*downgrade*, and `pg_dump`/`pg_restore` are only supported in the forward
-direction — a custom-format dump taken from an 18 server cannot be restored into
-a 17 server, and a v17 `pg_dump` refuses to talk to an 18 server at all. Every
-mechanic in D7 exists because of this sentence, and it is the one thing that
-must be proven on a throwaway target before anything touches production. It is
-not Supabase-specific: any destination that is not on 18 has the same problem.
+**1. Neon runs Postgres 18; Supabase runs 17. This is settled, not a risk to
+assess.** Neon reports `pg_version: 18` for this project (and CI already runs
+`postgres:18`). On the Supabase side, the default image for new projects moved
+**15 → 17 on 2026-06-17** and is still 17 as of August 2026; no 18 option is
+documented anywhere. So the migration is a confirmed major-version **downgrade**,
+and `pg_dump`/`pg_restore` only work in the forward direction — which takes the
+vendor's own recommended `pg_restore` path off the table entirely. That is what
+D7 is built around, and D12 explains why logical replication does not rescue it
+either. None of this is Supabase-specific: any destination not on 18 has the
+same problem.
+
+One cheap confirmation is still worth doing, because the changelog entry that
+records the 15 → 17 move is worded for the *self-hosted* image: run
+`select version()` on the real project at release Phase 1. It takes ten seconds
+and turns a documented fact into a measured one — and if it comes back **18**,
+D7 gets much simpler and the guide's Method 2 becomes available.
 
 **2. We do not currently have backups.** Neon's history retention on this
 project is **six hours**, and there is no dump anywhere else. So "Supabase free
@@ -114,9 +123,13 @@ to "pay the $6". Details in D4.
 
 ### Track C — cutover (operational, no deploy)
 
-Dry run against a throwaway target, then a short maintenance window: dump →
-restore → verify (Track D) → swap `DATABASE_URL` in the Render dashboard →
-`/readyz`. Mechanics in D7.
+Dry run against a throwaway target, then a short maintenance window: `migrate`
+to build the schema natively on 17 → truncate → load a data-only dump → verify
+(Track D) → swap `DATABASE_URL` in the Render dashboard → `/readyz`. This
+deviates from Supabase's own recommended `pg_dump`/`pg_restore` path, and D7
+says exactly why that path cannot work at 18 → 17. Truncation is not a detail:
+D11 explains why keeping Django's own seeded rows would silently re-point group
+permissions. Logical replication is rejected in D12.
 
 ### Track D — verification, before the swap and after it
 
@@ -159,27 +172,46 @@ has drifted a third time.
 **D1 — connect through the Supavisor **session-mode** pooler (port 5432), not
 the direct connection and not transaction mode.**
 
-The direct connection is not available to us at all: on new Supabase projects
-`db.<ref>.supabase.co` resolves to **IPv6 only**, the IPv4 add-on that would
-change that is **Pro-plan and above**, and **Render has no IPv6 egress** — this
-is a well-documented dead end that Render's own community threads are full of.
-So the shared pooler is the only reachable endpoint on a free project, and both
-of its modes are IPv4 on every tier. The choice is session vs transaction:
+**Two independent lines of reasoning land on the same endpoint, which is the
+strongest kind of agreement — they share no premises.**
+
+*Reachability.* The direct connection is not available to us at all: on new
+Supabase projects `db.<ref>.supabase.co` resolves to **IPv6 only**, the IPv4
+add-on that would change that is **Pro-plan and above**, and **Render has no
+IPv6 egress** — a dead end Render's own community threads are full of. So the
+shared pooler is the only reachable endpoint on a free project, and both of its
+modes are IPv4 on every tier.
+
+*The vendor's own migration guidance.* Supabase's
+[migrating-from-Postgres guide](https://supabase.com/docs/guides/platform/migrating-to-supabase/postgres)
+independently tells you to **use Supavisor session mode, port 5432, for database
+migration tasks**, and gives the connection string as:
 
 ```
-postgres://postgres.<project-ref>:<password>@aws-<n>-ap-southeast-1.pooler.supabase.com:5432/postgres
+postgres://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+```
+
+Which is to say: the endpoint we are forced onto by Render's networking is the
+same one Supabase recommends for the job. Nothing about that agreement was
+engineered; it is worth noting precisely because the two arguments could have
+disagreed.
+
+```
+postgres://postgres.<project-ref>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
                                                                                      ^^^^ session mode
 ```
 
-(Copy the exact host from the dashboard — the `aws-<n>-` prefix is
-project-specific. Transaction mode is the same host on **6543**.)
+(Copy the exact host and the `aws-<n>-` prefix from the dashboard — the guide
+writes `aws-0-` but it is project-specific. Transaction mode is the same host on
+**6543**.)
 
-Session mode, for three reasons, in ascending order of importance:
+Session over transaction, for three reasons, in ascending order of importance:
 
-1. Supabase's own guidance points persistent servers, migrations and `pg_dump`
-   at a session-level connection; transaction mode exists for serverless
-   functions that open a connection per invocation. This app is one long-lived
-   container.
+1. Supabase's guidance points persistent servers, migrations and `pg_dump` at a
+   session-level connection; transaction mode exists for serverless functions
+   that open a connection per invocation. This app is one long-lived container,
+   and the migration itself is exactly the "migration task" the guide has in
+   mind.
 2. Transaction mode would buy nothing. Plan 23's `pg_stat_activity` sampling saw
    **exactly one** application backend at a time, so with `CONN_MAX_AGE=60` this
    app holds on the order of one Postgres connection. `render.yaml` declares no
@@ -412,42 +444,113 @@ call.
 add a row to `.claude/plans/README.md`. Whichever merges second resolves a
 trivial conflict; neither should rebase the other.
 
-**D7 — cutover is a plain dump-and-restore in a short window, dry-run first,
-and the 18 → 17 downgrade is what the dry run exists to prove.**
+**D7 — Django builds the schema on the target and we copy data only. The
+vendor's own recommended path cannot work at 18 → 17, and this deviation is
+deliberate and citable.**
 
-41 MB does not justify logical replication, a dual-write period, or any other
-zero-downtime machinery. It justifies a quiet hour.
+Supabase publishes a [migrating-from-Postgres
+guide](https://supabase.com/docs/guides/platform/migrating-to-supabase/postgres),
+and the honest thing is to start from it rather than invent a procedure. It
+offers three methods: a Colab notebook (1), a manual `pg_dump`/`pg_restore` (2),
+and logical replication (3, rejected in D12). Its Method 2 is:
 
-The version gap is the whole difficulty. `pg_dump`/`pg_restore` support the
-forward direction only; a v17 `pg_dump` refuses an 18 server outright, and a
-v18 custom-format dump is not loadable by a v17 `pg_restore`. So:
+```
+pg_dump  --host … --port … --username … --dbname … --jobs <n> \
+         --format=directory --no-owner --no-privileges --no-subscriptions --verbose
+pg_restore --dbname … --jobs <n> --format=directory --no-owner --no-privileges --verbose
+```
 
-- **Primary mechanic:** dump with the **v18** client in **plain SQL**, restore
-  with `psql`. Plain SQL is text a v17 server can execute, and neither Django
-  5.2 nor Wagtail 7.4 emit PG18-only DDL — but "should work" is not "works", and
-  proving it is the dry run's entire job.
-  ```
-  pg_dump "$NEON_URL" --schema=public --no-owner --no-privileges \
-      --format=plain --file=tkc.sql
-  psql "$SUPABASE_SESSION_URL" --single-transaction \
-      --set ON_ERROR_STOP=on --file=tkc.sql
-  ```
-  `--schema=public` because a Supabase project's `postgres` database already
-  owns `auth`, `storage`, `extensions` and `realtime` schemas that are none of
-  our business. `--no-owner --no-privileges` because Supabase's `postgres` role
-  is not a superuser and cannot chown to `neondb_owner`. `--single-transaction`
-  with `ON_ERROR_STOP` so a failed restore leaves **nothing** behind rather than
-  half a schema — a half-restored database that then verifies "mostly fine" is
-  the failure worth engineering against.
-- **Documented fallback if that dump will not load:** let Django build the
-  schema on 17 (`manage.py migrate` against the empty project), then copy data
-  only. This works without `--disable-triggers` (which would need superuser)
-  because **Django creates every Postgres FK as `DEFERRABLE INITIALLY
-  DEFERRED`** — verified in `django/db/backends/postgresql/operations.py` — so a
-  single-transaction data load is insensitive to table order. It costs one extra
-  step: `migrate` writes its own rows into `django_migrations`,
-  `django_content_type` and `auth_permission`, so every table in `public` must
-  be truncated before the data load or the load hits duplicate keys.
+**That path is unavailable to us, and precisely why is worth writing down.**
+`--format=directory` can only be read back by `pg_restore`, and `pg_restore`
+cannot restore into an *older* major version. The obvious dodge — run the v17
+client so the artefact is a v17 artefact — does not exist either, because
+`pg_dump` **refuses to dump from a server newer than itself**. So at Neon 18 →
+Supabase 17 the pincer is closed: the newer client produces something the older
+server's `pg_restore` will not take, and the older client will not talk to the
+newer server at all. The guide even says downgrade migrations are "highly not
+recommended", which is fair warning rather than a prohibition. This is not a
+Supabase problem; it is the shape of `pg_dump` versioning, and it would apply to
+any 17 destination.
+
+So the primary method inverts the guide's logic: **do not carry the schema
+across at all.** Let Django generate it natively on the target, then move only
+data, which is version-agnostic `COPY` text.
+
+1. `manage.py migrate` against the empty Supabase project (dev settings,
+   `DATABASE_URL` pointed at the session pooler). **This structurally cannot hit
+   a cross-version DDL mismatch**, because the DDL is generated *by Django, on
+   17, for 17* — there is no v18 SQL text anywhere in the path. It also proves
+   the app's own migrations run clean on the target before any data exists.
+2. Dump data only from Neon with the v18 client, adopting the guide's flags
+   where they still apply:
+   ```
+   pg_dump "$NEON_URL" --data-only --schema=public \
+       --no-owner --no-privileges --no-subscriptions \
+       --format=plain --file=tkc-data.sql
+   ```
+   `--data-only --format=plain` because plain text is what a v17 server can
+   execute and what `psql` can stream; the guide's `--jobs` parallelism is
+   meaningless at 41 MB and incompatible with a single-transaction load anyway.
+   `--no-subscriptions` is the guide's, kept even though this database has none
+   — a flag that is a no-op today is free, and it stops the question being
+   re-asked. `--schema=public` because a Supabase project's `postgres` database
+   already owns `auth`, `storage`, `extensions` and `realtime` schemas that are
+   none of our business.
+3. Truncate and load in **one** transaction (D11):
+   ```
+   cat truncate-public.sql tkc-data.sql \
+     | psql "$SUPABASE_SESSION_URL" --single-transaction --set ON_ERROR_STOP=on
+   ```
+   Concatenated into a single stream on purpose, rather than two `--file`
+   arguments: `psql` takes one `-f`, and the truncate has to be inside the *same*
+   transaction as the load or it is not doing its job. `--single-transaction`
+   with `ON_ERROR_STOP` so a failed load leaves the target **empty rather than
+   half-populated** — a half-loaded database that then verifies "mostly fine" is
+   the failure worth engineering against.
+
+Two properties make step 3 safe, both verified rather than assumed:
+
+- **Table order does not matter.** Django creates every Postgres FK as
+  `DEFERRABLE INITIALLY DEFERRED` (verified in
+  `django/db/backends/postgresql/operations.py`), so inside one transaction the
+  FKs are checked at `COMMIT` and a data-only dump's arbitrary table order is
+  harmless. This is also why `--disable-triggers` — which would need superuser,
+  and Supabase's `postgres` role is not one — is not needed.
+- **Sequences come across.** A `--data-only` dump emits `setval` for every
+  sequence, so the guide's "sequences require manual synchronisation" caveat
+  belongs to its logical-replication method, not to this one. Verification 1's
+  row counts would not catch a bad sequence, so this is worth stating: the check
+  that *does* catch it is creating a page in `/admin/` after cutover
+  (Verification 4).
+
+**Fallback, if step 1 or 3 fails:** the full plain-SQL dump —
+`pg_dump --schema=public --no-owner --no-privileges --no-subscriptions
+--format=plain` restored with `psql --single-transaction` — on the reasoning that
+plain SQL is text a v17 server can *attempt*, and neither Django 5.2 nor Wagtail
+7.4 emit PG18-only DDL. It is the fallback rather than the primary precisely
+because that last clause is a belief about generated text, where the primary
+method needs no such belief.
+
+**The guide's caveats, checked against this repo rather than assumed:**
+
+- **"Extensions must be verified and installed separately."** Moot: **no
+  migration in this repo creates one.** Grepped all 45 migration files in
+  `apps/*/migrations/` — no `CreateExtension`, no `RunSQL`. And
+  `WAGTAILSEARCH_BACKENDS` is `wagtail.search.backends.database`, Wagtail's
+  built-in full-text backend, which needs no `pg_trgm` and no `unaccent`. So
+  there is no extension list to reconcile between hosts.
+- **"Users/roles are not migrated."** Moot: Django connects as one application
+  role and the app has no notion of Postgres roles. `DATABASES` sets no
+  `search_path` and there are no routers. The *application's* users live in
+  `auth_user` and are ordinary rows that come across with the data.
+- **"RLS status on tables is not migrated."** Moot: this project uses no row
+  level security — no migration enables it, and Django's ORM does not. Wagtail
+  and Django enforce authorisation in Python, not in the database.
+
+These three are recorded so a future reader does not re-litigate them; if any
+one ever stops being true, this decision needs re-reading before a second
+migration.
+
 - **Dry run target:** a second free Supabase project (the free plan allows two),
   thrown away afterwards. It costs nothing, it is the same Postgres version as
   the real target, and it lets the whole sequence including Track D verification
@@ -544,6 +647,89 @@ lever is an environment variable and a redeploy (D8), which is what a flag would
 have provided. Recorded so the choice is deliberate (lifecycle Stage 6),
 matching Plan 23 D6.
 
+**D11 — truncate every table in `public` and load production's rows wholesale.
+Do NOT keep the rows Django's own `migrate` seeded.**
+
+D7's step 1 leaves the target populated before any data arrives: `migrate` writes
+`django_migrations`, `django_content_type` and `auth_permission`, and Wagtail's
+initial migrations go further — a root page, a default `Site`, a root
+`Collection`, the Moderators/Editors groups. So a data-only load has to decide
+what happens to those rows, and the two options are not close.
+
+**Rejected: exclude those tables and let Django's rows stand.** It looks tidier
+and it is quietly corrupting, because **their primary keys are referenced by
+foreign keys in the data we are loading**:
+
+- `auth_permission.id` is referenced by `auth_group_permissions` and
+  `auth_user_user_permissions`. Production's group→permission rows name
+  production's permission IDs. A fresh `migrate` assigns its own, and this
+  project's ID space is *not* reproducible — Plan 21 deleted two page types, so
+  production's content-type and permission IDs have holes a fresh run will not
+  recreate. Loading production's mappings against Django's fresh IDs would
+  silently re-point the Editors and Moderators groups at **different
+  permissions**. A migration that quietly changes who can publish is the worst
+  possible outcome here, and nothing in Verification 1's row counts would show
+  it: the counts would match perfectly.
+- `django_content_type.id` is referenced by `wagtailcore_page.content_type_id`
+  (among others: `django_admin_log`, `taggit_taggeditem`, Wagtail's collection
+  permissions). Renumbered content types mean pages resolving to the wrong model
+  class or failing their FK outright.
+
+**Decided: truncate all of `public` inside the load transaction, then load
+everything including `django_migrations`.** Generate the statement from the
+catalogue so no table can be missed, and run it as the first statement of the
+same single transaction as the data:
+
+```sql
+-- truncate-public.sql, generated, not hand-maintained:
+SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
+FROM pg_tables WHERE schemaname = 'public';
+-- → TRUNCATE TABLE <that list> CASCADE;
+```
+
+Three notes on why this is safe rather than merely convenient. `CASCADE` is
+required because `TRUNCATE` refuses to leave a referencing table untruncated,
+and truncating *everything* means it has nothing left to cascade into.
+Non-deferrable `UNIQUE` constraints — which is all of them — are what would have
+collided under the rejected option, and truncating first removes the collision
+rather than deferring it. And `django_migrations` is loaded from production
+deliberately: the schema was built by *our* `migrate` run from the *same* code,
+so the two agree, and the next deploy's `preDeployCommand` needs production's
+rows to see nothing to apply.
+
+**D12 — logical replication: rejected, on three independent grounds.**
+
+The guide offers it (Method 3) as the minimal-downtime path, and it does cross
+major versions in the newer→older direction, so it deserves a real answer rather
+than silence.
+
+1. **It would cost the entire remaining allowance in under two days.** A
+   connected subscriber holds an active replication slot, and [Neon's own
+   docs](https://neon.com/docs/guides/logical-replication-neon) are explicit
+   that this **keeps the compute active and it will not scale to zero**. An
+   always-on 0.25 CU compute is 6.0 CU-hr/day (Plan 23's arithmetic). With
+   **11.4 CU-hr left**, replication would exhaust the allowance in **under 48
+   hours** — causing the exact outage this plan exists to prevent, while
+   migrating away from it. This alone ends the discussion.
+2. **Enabling it on Neon is irreversible.** The project currently reports
+   `enable_logical_replication: false`, and Neon states the setting **"cannot be
+   reverted once enabled"**. That is a permanent modification to the one database
+   that is also our only rollback target (D8) — a bad trade for a convenience.
+3. **It does not actually solve the version problem.** Logical replication
+   replicates rows, not DDL: the subscriber's schema must already exist, created
+   by some other means. So Method 3 *still* needs D7's step 1, and all it
+   replaces is the one-off `COPY` with a continuous stream. It buys downtime
+   reduction and nothing else.
+
+Against which: 41 MB, a site whose visitor traffic is read-only and largely
+served from Plan 24's cache, and exactly one person able to write to the
+database. The maintenance window D7 describes is minutes, at a Karachi-night
+hour, and costs nothing. Minimal downtime is a solution to a problem this site
+does not have. Also noted, since the guide raises them: its logical-replication
+method does not carry sequences or large objects and does not replicate DDL — so
+even on its own terms it would need manual reconciliation that a data-only dump
+does not.
+
 ---
 
 ## Verification — what must be true before the swap, and after it
@@ -561,8 +747,11 @@ SELECT format('SELECT %L AS t, count(*) FROM %I.%I', tablename, schemaname, tabl
 FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
 ```
 
-Run the generated `UNION ALL` on Neon and on Supabase and diff. Pass condition:
-**identical, every table, including the ones nobody thinks about** —
+Run the generated `UNION ALL` on Neon and on Supabase and diff. This is also the
+check that catches a mis-executed D11: if the truncate did not run, or if
+someone excluded a table from the load and let Django's seeded rows stand, the
+counts diverge here. Pass condition: **identical, every table, including the
+ones nobody thinks about** —
 `wagtailcore_pagerevision`, `wagtailcore_pagelogentry`,
 `wagtailredirects_redirect`, `django_content_type`, `auth_permission`,
 `django_migrations`.
@@ -630,6 +819,12 @@ is wrong and worth knowing.
   changes shape under us.
 - **Neon Launch at $19/month.** Zero-risk, zero-migration. Unpark as the
   deadline valve (Phase 0) or if this migration has to be abandoned mid-flight.
+- **Logical replication (the guide's Method 3).** Rejected outright in D12, not
+  merely deferred — it would burn the remaining CU-hours in under two days,
+  needs an irreversible change to our own rollback target, and does not solve
+  the version problem anyway. Unpark condition: none of substance. If a future
+  migration ever runs *from* a host with no compute meter, reread D12's third
+  reason before assuming replication is the easy path.
 - **The GitHub Actions variant of the backup job.** Free instead of $1, at the
   cost of pulling de-identified clinical text onto a US-region runner attached to
   a **public** repository. Unpark only if the Render cron job is unavailable, and
@@ -662,8 +857,8 @@ dashboard environment-variable swap that is not a deploy at all.
 | Phase | Action | Gate | Rollback trigger |
 |---|---|---|---|
 | 0 | **Maintainer decision (D9):** Supabase + own the backup job, or $6 Render Postgres and skip Tracks B and D6's pooler reasoning. Also decide whether the 24 Aug deadline gets the $19 Neon-Launch valve so the cutover is not done in a hurry | An answer, recorded in this file | — |
-| 1 | Create the Supabase project in **Singapore**, strong password, copy the **session-mode** URI (D1). Create the throwaway second project for the dry run (the free plan's two-project cap is exactly enough) | Both projects exist, **and the session URI connects from an SSH shell on the live Render instance** — not just from a laptop. A laptop may well have IPv6 and so cannot prove the thing D1 depends on, which is that the *instance* can reach the host. See `docs/content-operations.md` for the SSH route | — (nothing live is touched) |
-| 2 | **Dry run** the whole of D7 against the throwaway project, then Verification 1–4 against it | The 18 → 17 plain-SQL restore loads clean, counts match, `find_problems()` empty, every page in Verification 4 renders with correct figures | Dry run fails → try D7's fallback mechanic; if that fails too, **stop and take Render Postgres or Neon Launch**. This is the phase that is allowed to end the plan |
+| 1 | Create the Supabase project in **Singapore**, strong password, copy the **session-mode** URI (D1). Create the throwaway second project for the dry run (the free plan's two-project cap is exactly enough). Run `select version()` | Both projects exist, **and the session URI connects from an SSH shell on the live Render instance** — not just from a laptop. A laptop may well have IPv6 and so cannot prove the thing D1 depends on, which is that the *instance* can reach the host. See `docs/content-operations.md` for the SSH route. Record the version: **17 expected**, and 18 would simplify D7 | — (nothing live is touched) |
+| 2 | **Dry run** the whole of D7 against the throwaway project — `migrate`, then truncate-and-load (D11) — then Verification 1–4 against it | `migrate` runs clean on 17; the data-only load commits; counts match; `find_problems()` empty; every page in Verification 4 renders with correct figures; **a new page saved in `/admin/` gets a fresh ID** (the sequence check D7 calls out) | Dry run fails → try D7's full plain-SQL fallback; if that fails too, **stop and take Render Postgres or Neon Launch**. This is the phase that is allowed to end the plan |
 | 3 | Ship the docs/comment PR (Track A + E) as a normal tagged release, still pointing at Neon | `scripts/release.sh`'s `/readyz` gate; site renders | Redeploy previous tag |
 | 4 | **Cutover** (D7): quiet Karachi-night hour, no uploads or publishes, dump → restore → Verification 1–4 against the real target → swap `DATABASE_URL` in the dashboard (leave `DB_CONNECT_TIMEOUT=15`, D2) | `/readyz` 200; the auto-redeploy's `migrate --no-input` is a **no-op**; home, a daily report and the dashboard all render with the right numbers | Any check fails → put the Neon `DATABASE_URL` back and let it redeploy. **Only available while Neon has CU-hours (D8) — so do not schedule this into the 24 Aug → 1 Sep window** |
 | 5 | Ship **Track B**: the backup cron job, then the restore drill (Verification 6) | A dump lands in the private bucket; yesterday's object restores into a scratch database and passes checks 1–3 | Job broken → fix before Phase 6; the site is fine, the safety net is not |
@@ -684,11 +879,21 @@ resuming from zero any more.
 
 ## Reference material
 
-- Supabase — [connecting to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres)
+- Supabase — **[migrating from Postgres to Supabase](https://supabase.com/docs/guides/platform/migrating-to-supabase/postgres)**,
+  the guide this plan is built against and deviates from on the record (its
+  Method 2 flags, its session-pooler recommendation, and its caveats are all
+  addressed in D7; its Method 3 in D12). Also
+  [connecting to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres)
   (direct vs session vs transaction, ports, IPv6), [dedicated IPv4](https://supabase.com/docs/guides/platform/ipv4-address)
   (Pro-plan only), [backups](https://supabase.com/docs/guides/platform/backups)
   (no automated backups on Free; export your own), [going into prod](https://supabase.com/docs/guides/platform/going-into-prod)
   (the 7-day low-activity pause).
+- Supabase changelog — [self-hosted PG 15 → 17, 2026-06-17](https://supabase.com/changelog/46080-self-hosted-supabase-upgrading-from-pg-15-to-17-breaking-change)
+  (the dated record behind "Supabase is on 17"; worded for the self-hosted image,
+  hence Phase 1's ten-second `select version()`).
+- Neon — [logical replication](https://neon.com/docs/guides/logical-replication-neon)
+  (an active subscriber keeps the compute out of scale-to-zero, and the setting
+  cannot be un-enabled) — the evidence behind D12.
 - Render — [cron jobs](https://render.com/docs/cronjobs) ($1/month minimum, no
   free instance type), [Postgres backups](https://render.com/docs/postgresql-backups)
   (continuous backups and PITR on paid instances only), and the community thread
