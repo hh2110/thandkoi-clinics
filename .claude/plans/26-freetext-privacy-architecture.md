@@ -473,8 +473,12 @@ a regression baseline rather than a maintenance burden.
 
 *Operational consequence, and the one real cost.* Classification now sits on the
 ingest path, so the model must be reachable when an upload happens, and the
-Render `starter` instance (512 MB) cannot host it. Two shapes, and the choice is
-a genuine privacy/cost trade for the maintainer:
+Render `starter` instance (512 MB) cannot host a 1–1.7B generative model. Two
+shapes, and the choice is a genuine privacy/cost trade for the maintainer.
+**But test §8c first** — a fine-tuned encoder classifier is roughly an order of
+magnitude smaller than the generative SLM assumed here and may fit the existing
+instance, in which case both rows below cost nothing and neither shape is
+needed:
 
 | | How it works | Raw text at rest | Cost |
 |---|---|---|---|
@@ -582,15 +586,74 @@ and it is the direct answer to the brief's fourth requirement.
 
 ## 8. Cost and maintenance
 
-| | One-off | Monthly | Maintenance burden |
-|---|---|---|---|
-| **A — detector** | Days of integration + an evaluation we cannot source data for | $0–20 | A detector, a gazetteer, a model version, and an unquantifiable recall claim |
-| **B — self-hosted** | Days: distillation, quantisation, cron job, model in build | **~$1** (Render cron, per-second billing, $1 floor) | Model file, llama.cpp version, one more failure mode on the daily publish |
-| **C — counts only** | Days: vocabulary + payload + tests | **$0** (input tokens shrink) | One keyword vocabulary, reviewed like any other Python |
+**Read this section knowing that self-hosting is not a saving — it is a
+purchase.** The figure it is measured against is tiny.
 
-Option C is cheaper to run than today, because the payload shrinks from ~1,400
-characters of narrative to a few dozen integers. Option B's real cost is
-attention, not money.
+### 8a. What the Anthropic calls actually cost today
+
+Measured, not estimated. The corpus is 90,274 characters of free text across
+661 visits, ~1,400 characters per clinic day (see the findings doc). At ~4
+characters per token, plus the system prompt and JSON scaffolding, the daily
+free-text call is on the order of **1,000 input tokens and ≤300 output
+tokens**. Over ~23 clinic days, on `claude-haiku-4-5` at $1.00/MTok input and
+$5.00/MTok output:
+
+> **≈ $0.05 per month.** Five cents.
+
+No hosting option below beats five cents. Every number in 8b is money spent to
+buy a privacy property, and it should be argued for on that basis alone. Any
+case for self-hosting that leans on cost savings is a false one.
+
+### 8b. What hosting a model costs
+
+The decisive fact is **the workload is trivial**: ~10 visits per clinic day,
+1,847 free-text entries across three months, averaging ~49 characters each.
+That is roughly **10 inferences a day**, each a few hundred tokens in and a few
+tokens out. No GPU is required and none should be rented. What is being paid
+for is *RAM sitting available*, not compute consumed — which is why utilisation,
+not speed, drives the bill.
+
+| Shape | What it is | Monthly | Notes |
+|---|---|---|---|
+| **Always-on service** | Private Render service holding the model in memory 24/7 | ~$25 | Needs ≥2 GB for a 1.7B Q4. Serving 10 requests/day off a box that never sleeps — ~0.01% utilisation |
+| **Nightly cron** | Render cron loads model, classifies, exits | **~$1** | Per-second billing, but a $1 floor dominates: ~5 min/day of a 2 GB instance is ~$0.13 of actual compute |
+| **Own VPS** | e.g. Hetzner CAX11 (2 vCPU ARM, 4 GB) | ~€4–5 | Cheapest RAM by far, Singapore region available (matches current residency). Cost is a box to patch, secure and monitor — real burden for one part-time maintainer |
+| **In the existing web service** | Model small enough to load alongside Django | **$0** | Only viable if the model is small enough. See 8c — this is the option worth testing first |
+
+Render and Hetzner list prices are JS-rendered and could not be fetched to
+verify; confirm on the dashboards before committing. The Anthropic figures
+above are from current published pricing.
+
+### 8c. Size the model to the task, not to the fashion
+
+D7 assumed a 1–1.7B generative SLM (~1.4 GB at Q4), which is what forces the
+2 GB floor and every cost above it. But the task is **multi-label
+classification into ~15 fixed concepts** — not generation. A fine-tuned encoder
+(DistilBERT-class, int8 ONNX, on the order of tens of MB) is roughly an order
+of magnitude smaller, runs in milliseconds on CPU, and may fit inside the
+existing 512 MB `starter` instance with no new infrastructure at all.
+
+That is the difference between **$0/month and $25/month**, so it should be
+measured before anything is provisioned.
+
+*The trade, stated honestly:* a generative SLM accepts a new category as a
+prompt edit; an encoder needs retraining to add a label. Retraining is minutes
+on CPU, but it is a step, and it slightly weakens the "it picks up on things we
+require" property that motivated D7. Prove the shape with an off-the-shelf
+generative SLM first, then measure whether an encoder holds the same quality —
+the fallback in either direction preserves the privacy properties.
+
+### 8d. One-off costs
+
+| | Cost |
+|---|---|
+| Distillation | **$0** — Distil Labs free tier is 2 runs with downloadable weights (D1) |
+| GPU rental for training | **$0** — not needed; the free tier covers it, and inference is CPU-only |
+| Engineering | Days, not weeks: taxonomy, classifier integration, purge job, tests |
+
+The recurring cost that actually matters is **attention** — a model file, a
+runtime version, and one more failure mode on the ingest path — not the dollar
+figure.
 
 ## 9. Migration path, including what has already been sent
 
